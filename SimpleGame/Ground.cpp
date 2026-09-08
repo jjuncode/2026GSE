@@ -11,6 +11,7 @@ namespace
 {
 	int g_screen_width = 0;
 	int g_screen_height = 0;
+	float g_pixel_scale = 1.f;
 	bool g_ready = false;
 
 	GLuint g_program = 0;
@@ -18,6 +19,7 @@ namespace
 
 	GLint g_position_attrib = -1;
 	GLint g_screen_size = -1;
+	GLint g_pixel_scale_uniform = -1;
 	GLint g_tile_size = -1;
 	GLint g_camera_tile = -1;
 	GLint g_camera_frac = -1;
@@ -50,6 +52,7 @@ namespace
 		g_position_attrib = glGetAttribLocation(g_program, "a_Position");
 
 		g_screen_size = glGetUniformLocation(g_program, "u_ScreenSize");
+		g_pixel_scale_uniform = glGetUniformLocation(g_program, "u_PixelScale");
 		g_tile_size = glGetUniformLocation(g_program, "u_TileSize");
 		g_camera_tile = glGetUniformLocation(g_program, "u_CameraTile");
 		g_camera_frac = glGetUniformLocation(g_program, "u_CameraFrac");
@@ -116,10 +119,11 @@ namespace
 	}
 }
 
-bool InitGround(int screen_width, int screen_height)
+bool InitGround(int screen_width, int screen_height, float pixel_scale)
 {
 	g_screen_width = screen_width;
 	g_screen_height = screen_height;
+	g_pixel_scale = pixel_scale;
 
 	// 정점 셰이더는 좌표를 통과만 시키므로 후처리 것을 그대로 쓴다
 	g_program = CompileShaderProgram("./Shaders/FullScreen.vs", "./Shaders/Ground.fs");
@@ -177,6 +181,7 @@ void DrawGroundLayer(const GroundFrame& frame)
 	glUseProgram(g_program);
 
 	glUniform2f(g_screen_size, static_cast<float>(g_screen_width), static_cast<float>(g_screen_height));
+	glUniform1f(g_pixel_scale_uniform, g_pixel_scale);
 	glUniform2f(g_tile_size, TILE_PIXEL_WIDTH, TILE_PIXEL_HEIGHT);
 
 	glUniform2i(g_camera_tile, frame.m_camera_tile_x, frame.m_camera_tile_y);

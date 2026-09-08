@@ -22,7 +22,9 @@ namespace
 
 	// 왕복 횟수를 늘리면 번짐이 넓어진다. 해상도를 낮춰 잡아 한 번이 싸다
 	const int BLUR_PASS_COUNT = 3;
-	const int BLOOM_DIVISOR = 4;
+
+	// 씬 자체가 이미 절반이라 여기서 또 넷으로 나누면 번짐이 두 배로 퍼진다
+	const int BLOOM_DIVISOR = 2;
 
 	struct RenderTarget
 	{
@@ -32,14 +34,17 @@ namespace
 		int m_height = 0;
 	};
 
-	int g_screen_width = 0;
-	int g_screen_height = 0;
+	int g_render_width = 0;
+	int g_render_height = 0;
+	int g_window_width = 0;
+	int g_window_height = 0;
 	bool g_ready = false;
 
 	RenderTarget g_scene;
 	RenderTarget g_bright;
 	RenderTarget g_ping;
 	RenderTarget g_pong;
+	RenderTarget g_post;
 
 	GLuint g_fullscreen_vbo = 0;
 
@@ -66,7 +71,12 @@ namespace
 	GLint g_composite_vignette = -1;
 	GLint g_composite_position = -1;
 
-	bool CreateRenderTarget(RenderTarget* target, int width, int height)
+	GLuint g_upscale_program = 0;
+	GLint g_upscale_source = -1;
+	GLint g_upscale_size = -1;
+	GLint g_upscale_position = -1;
+
+	bool CreateRenderTarget(RenderTarget* target, int width, int height, GLint filter)
 	{
 		target->m_width = width;
 		target->m_height = height;
@@ -77,9 +87,9 @@ namespace
 		// 부동소수 포맷이라야 1 을 넘는 값이 저장된다. 8비트면 여기서 잘린다
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
 
-		// 축소본을 다시 키워 읽으므로 선형 보간이 필수다
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		// 블룸 축소본은 되키워 읽으니 선형, 도트 확대는 최근접이라야 블록이 안 뭉갠다
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
 
 		// 가장자리에서 반대편을 물어 오면 빛이 화면 끝에서 반대쪽으로 샌다
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -166,30 +176,37 @@ namespace
 	}
 }
 
-bool InitPostProcess(int screen_width, int screen_height)
+bool InitPostProcess(int render_width, int render_height, int window_width, int window_height)
 {
-	g_screen_width = screen_width;
-	g_screen_height = screen_height;
+	g_render_width = render_width;
+	g_render_height = render_height;
+	g_window_width = window_width;
+	g_window_height = window_height;
 
-	const int bloom_width = screen_width / BLOOM_DIVISOR;
-	const int bloom_height = screen_height / BLOOM_DIVISOR;
+	const int bloom_width = render_width / BLOOM_DIVISOR;
+	const int bloom_height = render_height / BLOOM_DIVISOR;
 
-	if (!CreateRenderTarget(&g_scene, screen_width, screen_height))
+	if (!CreateRenderTarget(&g_scene, render_width, render_height, GL_LINEAR))
 	{
 		return false;
 	}
 
-	if (!CreateRenderTarget(&g_bright, bloom_width, bloom_height))
+	if (!CreateRenderTarget(&g_bright, bloom_width, bloom_height, GL_LINEAR))
 	{
 		return false;
 	}
 
-	if (!CreateRenderTarget(&g_ping, bloom_width, bloom_height))
+	if (!CreateRenderTarget(&g_ping, bloom_width, bloom_height, GL_LINEAR))
 	{
 		return false;
 	}
 
-	if (!CreateRenderTarget(&g_pong, bloom_width, bloom_height))
+	if (!CreateRenderTarget(&g_pong, bloom_width, bloom_height, GL_LINEAR))
+	{
+		return false;
+	}
+
+	if (!CreateRenderTarget(&g_post, render_width, render_height, GL_NEAREST))
 	{
 		return false;
 	}
@@ -199,8 +216,9 @@ bool InitPostProcess(int screen_width, int screen_height)
 	g_bright_program = CompileShaderProgram("./Shaders/FullScreen.vs", "./Shaders/BrightPass.fs");
 	g_blur_program = CompileShaderProgram("./Shaders/FullScreen.vs", "./Shaders/Blur.fs");
 	g_composite_program = CompileShaderProgram("./Shaders/FullScreen.vs", "./Shaders/Composite.fs");
+	g_upscale_program = CompileShaderProgram("./Shaders/FullScreen.vs", "./Shaders/Upscale.fs");
 
-	if (g_bright_program == 0 || g_blur_program == 0 || g_composite_program == 0)
+	if (g_bright_program == 0 || g_blur_program == 0 || g_composite_program == 0 || g_upscale_program == 0)
 	{
 		return false;
 	}
@@ -225,6 +243,10 @@ bool InitPostProcess(int screen_width, int screen_height)
 	g_composite_vignette = glGetUniformLocation(g_composite_program, "u_VignetteEdge");
 	g_composite_position = glGetAttribLocation(g_composite_program, "a_Position");
 
+	g_upscale_source = glGetUniformLocation(g_upscale_program, "u_Source");
+	g_upscale_size = glGetUniformLocation(g_upscale_program, "u_ScreenSize");
+	g_upscale_position = glGetAttribLocation(g_upscale_program, "a_Position");
+
 	g_ready = true;
 
 	std::cout << "[ PostProcess - InitPostProcess ] : ready\n";
@@ -238,6 +260,7 @@ void ShutdownPostProcess()
 	DestroyRenderTarget(&g_bright);
 	DestroyRenderTarget(&g_ping);
 	DestroyRenderTarget(&g_pong);
+	DestroyRenderTarget(&g_post);
 
 	if (g_fullscreen_vbo != 0)
 	{
@@ -261,6 +284,12 @@ void ShutdownPostProcess()
 	{
 		glDeleteProgram(g_composite_program);
 		g_composite_program = 0;
+	}
+
+	if (g_upscale_program != 0)
+	{
+		glDeleteProgram(g_upscale_program);
+		g_upscale_program = 0;
 	}
 
 	g_ready = false;
@@ -309,8 +338,8 @@ void EndScenePassAndComposite()
 		BlurOnce(g_ping, g_pong, 0.f, 1.f);
 	}
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(0, 0, g_screen_width, g_screen_height);
+	glBindFramebuffer(GL_FRAMEBUFFER, g_post.m_fbo);
+	glViewport(0, 0, g_post.m_width, g_post.m_height);
 
 	glUseProgram(g_composite_program);
 
@@ -322,17 +351,45 @@ void EndScenePassAndComposite()
 	glBindTexture(GL_TEXTURE_2D, g_pong.m_texture);
 	glUniform1i(g_composite_bloom, 1);
 
-	glUniform2f(g_composite_size, static_cast<float>(g_screen_width), static_cast<float>(g_screen_height));
+	glUniform2f(g_composite_size, static_cast<float>(g_render_width), static_cast<float>(g_render_height));
 	glUniform1f(g_composite_strength, BLOOM_STRENGTH);
 	glUniform1f(g_composite_exposure, EXPOSURE);
 	glUniform1f(g_composite_blur_start, BLUR_START);
-	glUniform1f(g_composite_blur_radius, BLUR_RADIUS);
+	const float render_ratio = static_cast<float>(g_render_width) / static_cast<float>(g_window_width);
+	glUniform1f(g_composite_blur_radius, BLUR_RADIUS * render_ratio);
 	glUniform1f(g_composite_vignette, VIGNETTE_EDGE);
 
 	DrawFullScreen(g_composite_position);
 
 	// 다음 프레임의 도형 그리기가 0번 유닛을 기대하므로 되돌린다
 	glActiveTexture(GL_TEXTURE0);
+
+	// 저해상도 버퍼를 묶은 채로 나간다. HUD 가 여기 얹혀야 같은 격자를 탄다
+	glEnable(GL_BLEND);
+}
+
+void PresentUpscaled()
+{
+	if (!g_ready)
+	{
+		return;
+	}
+
+	// 복사라서 섞이면 안 된다
+	glDisable(GL_BLEND);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glViewport(0, 0, g_window_width, g_window_height);
+
+	glUseProgram(g_upscale_program);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, g_post.m_texture);
+	glUniform1i(g_upscale_source, 0);
+
+	glUniform2f(g_upscale_size, static_cast<float>(g_window_width), static_cast<float>(g_window_height));
+
+	DrawFullScreen(g_upscale_position);
 
 	glEnable(GL_BLEND);
 }

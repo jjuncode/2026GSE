@@ -32,7 +32,7 @@ struct GroundFrame
 	bool m_show_chunk_grid = false;
 };
 
-bool InitGround(int screen_width, int screen_height);
+bool InitGround(int screen_width, int screen_height, float pixel_scale);
 void ShutdownGround();
 
 // 화면 덮는 사각형 한 장. 색이 픽셀마다 정해지므로 칸 경계가 안 생긴다

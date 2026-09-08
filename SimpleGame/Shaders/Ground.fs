@@ -7,6 +7,7 @@ const int DOT_DIVISOR = 8;
 const int PATCH_PERIOD = 5;
 
 uniform vec2 u_ScreenSize;
+uniform float u_PixelScale;
 uniform vec2 u_TileSize;
 uniform ivec2 u_CameraTile;
 uniform vec2 u_CameraFrac;
@@ -52,7 +53,7 @@ int FloorMod(int value, int divisor)
 
 void main()
 {
-	vec2 screen = gl_FragCoord.xy - u_ScreenSize * 0.5;
+	vec2 screen = gl_FragCoord.xy * u_PixelScale - u_ScreenSize * 0.5;
 
 	float sum_axis = -screen.y / (u_TileSize.y * 0.5);
 	float diff_axis = screen.x / (u_TileSize.x * 0.5);
@@ -70,8 +71,8 @@ void main()
 	float grain = HashToUnit(HashInt(dot_index.x, dot_index.y));
 	float patch = HashToUnit(HashInt(FloorDiv(dot_index.x, PATCH_PERIOD), FloorDiv(dot_index.y, PATCH_PERIOD)));
 
-	vec3 color = vec3(0.050, 0.068, 0.042);
-	color += patch * vec3(0.042, 0.048, 0.026);
+	vec3 color = vec3(0.062, 0.082, 0.050);
+	color += patch * vec3(0.018, 0.020, 0.011);
 	color += grain * vec3(0.016, 0.018, 0.012);
 
 	if (u_ShowChunkGrid != 0)

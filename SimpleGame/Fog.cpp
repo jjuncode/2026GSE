@@ -10,6 +10,7 @@ namespace
 {
 	int g_screen_width = 0;
 	int g_screen_height = 0;
+	float g_pixel_scale = 1.f;
 	bool g_ready = false;
 
 	GLuint g_program = 0;
@@ -17,6 +18,7 @@ namespace
 
 	GLint g_position_attrib = -1;
 	GLint g_screen_size = -1;
+	GLint g_pixel_scale_uniform = -1;
 	GLint g_scroll = -1;
 
 	void CreateFullScreenQuad()
@@ -34,10 +36,11 @@ namespace
 	}
 }
 
-bool InitFog(int screen_width, int screen_height)
+bool InitFog(int screen_width, int screen_height, float pixel_scale)
 {
 	g_screen_width = screen_width;
 	g_screen_height = screen_height;
+	g_pixel_scale = pixel_scale;
 
 	g_program = CompileShaderProgram("./Shaders/FullScreen.vs", "./Shaders/Fog.fs");
 
@@ -55,6 +58,7 @@ bool InitFog(int screen_width, int screen_height)
 
 	g_position_attrib = glGetAttribLocation(g_program, "a_Position");
 	g_screen_size = glGetUniformLocation(g_program, "u_ScreenSize");
+	g_pixel_scale_uniform = glGetUniformLocation(g_program, "u_PixelScale");
 	g_scroll = glGetUniformLocation(g_program, "u_Scroll");
 
 	if (g_position_attrib < 0)
@@ -96,6 +100,7 @@ void DrawFogLayer(float scroll)
 	glUseProgram(g_program);
 
 	glUniform2f(g_screen_size, static_cast<float>(g_screen_width), static_cast<float>(g_screen_height));
+	glUniform1f(g_pixel_scale_uniform, g_pixel_scale);
 	glUniform1f(g_scroll, scroll);
 
 	glEnableVertexAttribArray(g_position_attrib);

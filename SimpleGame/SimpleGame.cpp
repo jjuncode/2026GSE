@@ -112,8 +112,10 @@ void RenderScene(void)
 
 	EndScenePassAndComposite();
 
-	// 후처리 뒤에 그려야 UI 가 흐려지지도 어두워지지도 않는다
+	// 후처리 뒤 저해상도 버퍼에 그린다. 흐림과 비네팅은 안 타면서 도트 격자는 같이 탄다
 	DrawHud(g_Renderer);
+
+	PresentUpscaled();
 
 	glutSwapBuffers();
 }
@@ -243,19 +245,27 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (!InitPostProcess(WINDOW_SIZE_X, WINDOW_SIZE_Y))
+	const bool post_ready = InitPostProcess(RENDER_SIZE_X, RENDER_SIZE_Y, WINDOW_SIZE_X, WINDOW_SIZE_Y);
+	if (!post_ready)
 	{
 		// 몸체는 그대로 돌고 톤매핑과 블뢸만 빠진다
 		std::cout << "[ SimpleGame - main ] : post process disabled";
 	}
 
-	if (!InitGround(WINDOW_SIZE_X, WINDOW_SIZE_Y))
+	// 후처리가 죽으면 씬이 창 해상도에 바로 그려진다. 그땐 배율을 되돌려야 좌표가 안 어긋난다
+	float pixel_scale = static_cast<float>(PIXEL_SCALE);
+	if (!post_ready)
+	{
+		pixel_scale = 1.f;
+	}
+
+	if (!InitGround(WINDOW_SIZE_X, WINDOW_SIZE_Y, pixel_scale))
 	{
 		// 바닥만 빠지고 물체와 HUD 는 그대로 나온다
 		std::cout << "[ SimpleGame - main ] : ground layer disabled";
 	}
 
-	if (!InitFog(WINDOW_SIZE_X, WINDOW_SIZE_Y))
+	if (!InitFog(WINDOW_SIZE_X, WINDOW_SIZE_Y, pixel_scale))
 	{
 		// 안개만 빠진다. 분위기 요소라 없어도 진행에 지장 없다
 		std::cout << "[ SimpleGame - main ] : fog layer disabled";

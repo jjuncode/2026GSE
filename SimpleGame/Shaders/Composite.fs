@@ -11,6 +11,23 @@ uniform float u_BlurStart;
 uniform float u_BlurRadius;
 uniform float u_VignetteEdge;
 
+float Bayer8(ivec2 pixel)
+{
+	int x = pixel.x & 7;
+	int y = pixel.y & 7;
+	int a = x ^ y;
+
+	int index = 0;
+	index = index * 2 + ((y >> 2) & 1);
+	index = index * 2 + ((a >> 2) & 1);
+	index = index * 2 + ((y >> 1) & 1);
+	index = index * 2 + ((a >> 1) & 1);
+	index = index * 2 + (y & 1);
+	index = index * 2 + (a & 1);
+
+	return float(index) / 64.0;
+}
+
 vec3 ToneMapACES(vec3 x)
 {
 	float a = 2.51;
@@ -49,6 +66,8 @@ void main()
 
 	float vignette = mix(1.0, u_VignetteEdge, clamp(edge_distance * edge_distance * 0.62, 0.0, 1.0));
 	color *= vignette;
+
+	color += (Bayer8(ivec2(gl_FragCoord.xy)) - 0.5) / 255.0;
 
 	FragColor = vec4(color, 1.0);
 }

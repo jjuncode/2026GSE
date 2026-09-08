@@ -197,6 +197,7 @@
     <None Include="Shaders\Composite.fs" />
     <None Include="Shaders\Ground.fs" />
     <None Include="Shaders\Fog.fs" />
+    <None Include="Shaders\Upscale.fs" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

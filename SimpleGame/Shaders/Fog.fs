@@ -10,6 +10,7 @@ const float CELL_WIDTH = 420.0;
 const float BAND_HEIGHT = 260.0;
 
 uniform vec2 u_ScreenSize;
+uniform float u_PixelScale;
 uniform float u_Scroll;
 
 uint HashInt(int x, int y)
@@ -48,7 +49,7 @@ float ValueNoise(vec2 point)
 
 void main()
 {
-	vec2 screen = gl_FragCoord.xy - u_ScreenSize * 0.5;
+	vec2 screen = gl_FragCoord.xy * u_PixelScale - u_ScreenSize * 0.5;
 
 	float total = ValueNoise(vec2((screen.x + u_Scroll * 0.35) / CELL_WIDTH,
 		screen.y / BAND_HEIGHT)) * 0.5;
