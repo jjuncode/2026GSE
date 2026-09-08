@@ -1,5 +1,23 @@
-#include "stdafx.h"
+ï»¿#include "stdafx.h"
 #include "Renderer.h"
+#include "WorldPos.h"
+#include "ShaderUtil.h"
+
+#include <vector>
+#include <cmath>
+
+namespace
+{
+	const int CIRCLE_SEGMENT_COUNT = 48;
+	const float PI = 3.14159265f;
+
+	void PushVertex(std::vector<float>* target, float x, float y)
+	{
+		target->push_back(x);
+		target->push_back(y);
+		target->push_back(0.f);
+	}
+}
 
 Renderer::Renderer(int windowSizeX, int windowSizeY)
 {
@@ -9,22 +27,50 @@ Renderer::Renderer(int windowSizeX, int windowSizeY)
 
 Renderer::~Renderer()
 {
+	if (m_VBORect != 0)
+	{
+		glDeleteBuffers(1, &m_VBORect);
+		m_VBORect = 0;
+	}
+
+	if (m_VBODiamond != 0)
+	{
+		glDeleteBuffers(1, &m_VBODiamond);
+		m_VBODiamond = 0;
+	}
+
+	if (m_VBOCircle != 0)
+	{
+		glDeleteBuffers(1, &m_VBOCircle);
+		m_VBOCircle = 0;
+	}
+
+	if (m_SolidRectShader != 0)
+	{
+		glDeleteProgram(m_SolidRectShader);
+		m_SolidRectShader = 0;
+	}
 }
 
 void Renderer::Initialize(int windowSizeX, int windowSizeY)
 {
 	//Set window size
-	m_WindowSizeX = windowSizeX;
-	m_WindowSizeY = windowSizeY;
+	m_WindowSizeX = static_cast<unsigned int>(windowSizeX);
+	m_WindowSizeY = static_cast<unsigned int>(windowSizeY);
+
+	// ì¼œë‘ì§€ ì•Šìœ¼ë©´ ì•ŒíŒŒ ì¸ìê°€ í†µì§¸ë¡œ ì£½ëŠ”ë‹¤
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	//Load shaders
-	m_SolidRectShader = CompileShaders("./Shaders/SolidRect.vs", "./Shaders/SolidRect.fs");
+	m_SolidRectShader = CompileShaderProgram("./Shaders/SolidRect.vs", "./Shaders/SolidRect.fs");
 	
 	//Create VBOs
 	CreateVertexBufferObjects();
 
-	if (m_SolidRectShader > 0 && m_VBORect > 0)
+	if (m_SolidRectShader > 0 && m_VBORect > 0 && m_VBODiamond > 0 && m_VBOCircle > 0)
 	{
+		CacheShaderLocations();
 		m_Initialized = true;
 	}
 }
@@ -35,6 +81,13 @@ bool Renderer::IsInitialized()
 }
 
 void Renderer::CreateVertexBufferObjects()
+{
+	CreateRectVertexBuffer();
+	CreateDiamondVertexBuffer();
+	CreateCircleVertexBuffer();
+}
+
+void Renderer::CreateRectVertexBuffer()
 {
 	float rect[]
 		=
@@ -48,121 +101,55 @@ void Renderer::CreateVertexBufferObjects()
 	glBufferData(GL_ARRAY_BUFFER, sizeof(rect), rect, GL_STATIC_DRAW);
 }
 
-void Renderer::AddShader(GLuint ShaderProgram, const char* pShaderText, GLenum ShaderType)
+void Renderer::CreateDiamondVertexBuffer()
 {
-	//½¦ÀÌ´õ ¿ÀºêÁ§Æ® »ı¼º
-	GLuint ShaderObj = glCreateShader(ShaderType);
+	// íƒ€ì¼ í¬ê¸°ë¥¼ ì •ì ì— ë¯¸ë¦¬ ë°•ì•„ ë‘ë©´ ìŠ¤ì¼€ì¼ 1 ì´ íƒ€ì¼ í•œ ì¹¸ì´ ëœë‹¤
+	const float half_width = TILE_PIXEL_WIDTH * 0.5f * 2.f / static_cast<float>(m_WindowSizeX);
+	const float half_height = TILE_PIXEL_HEIGHT * 0.5f * 2.f / static_cast<float>(m_WindowSizeY);
 
-	if (ShaderObj == 0) {
-		fprintf(stderr, "Error creating shader type %d\n", ShaderType);
-	}
-
-	const GLchar* p[1];
-	p[0] = pShaderText;
-	GLint Lengths[1];
-
-	size_t slen = strlen(pShaderText);
-	if (slen > INT_MAX) {
-		// Handle error
-	}
-	GLint len = (GLint)slen;
-
-	Lengths[0] = len;
-	//½¦ÀÌ´õ ÄÚµå¸¦ ½¦ÀÌ´õ ¿ÀºêÁ§Æ®¿¡ ÇÒ´ç
-	glShaderSource(ShaderObj, 1, p, Lengths);
-
-	//ÇÒ´çµÈ ½¦ÀÌ´õ ÄÚµå¸¦ ÄÄÆÄÀÏ
-	glCompileShader(ShaderObj);
-
-	GLint success;
-	// ShaderObj °¡ ¼º°øÀûÀ¸·Î ÄÄÆÄÀÏ µÇ¾ú´ÂÁö È®ÀÎ
-	glGetShaderiv(ShaderObj, GL_COMPILE_STATUS, &success);
-	if (!success) {
-		GLchar InfoLog[1024];
-
-		//OpenGL ÀÇ shader log µ¥ÀÌÅÍ¸¦ °¡Á®¿È
-		glGetShaderInfoLog(ShaderObj, 1024, NULL, InfoLog);
-		fprintf(stderr, "Error compiling shader type %d: '%s'\n", ShaderType, InfoLog);
-		printf("%s \n", pShaderText);
-	}
-
-	// ShaderProgram ¿¡ attach!!
-	glAttachShader(ShaderProgram, ShaderObj);
-}
-
-bool Renderer::ReadFile(char* filename, std::string *target)
-{
-	std::ifstream file(filename);
-	if (file.fail())
+	float diamond[]
+		=
 	{
-		std::cout << filename << " file loading failed.. \n";
-		file.close();
-		return false;
-	}
-	std::string line;
-	while (getline(file, line)) {
-		target->append(line.c_str());
-		target->append("\n");
-	}
-	return true;
+		0.f, half_height, 0.f, half_width, 0.f, 0.f, 0.f, -half_height, 0.f, //Triangle1
+		0.f, half_height, 0.f, 0.f, -half_height, 0.f, -half_width, 0.f, 0.f, //Triangle2
+	};
+
+	glGenBuffers(1, &m_VBODiamond);
+	glBindBuffer(GL_ARRAY_BUFFER, m_VBODiamond);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(diamond), diamond, GL_STATIC_DRAW);
 }
 
-GLuint Renderer::CompileShaders(char* filenameVS, char* filenameFS)
+void Renderer::CreateCircleVertexBuffer()
 {
-	GLuint ShaderProgram = glCreateProgram(); //ºó ½¦ÀÌ´õ ÇÁ·Î±×·¥ »ı¼º
+	// ê°€ë¡œì„¸ë¡œì— ê°ê° ë‹¤ë¥¸ í”½ì…€ ë‹¨ìœ„ë¥¼ ì“°ë¯€ë¡œ ì°½ ë¹„ìœ¨ì´ ë‹¬ë¼ë„ ì›ì´ ì•ˆ ì°Œê·¸ëŸ¬ì§„ë‹¤
+	const float unit_x = 2.f / static_cast<float>(m_WindowSizeX);
+	const float unit_y = 2.f / static_cast<float>(m_WindowSizeY);
 
-	if (ShaderProgram == 0) { //½¦ÀÌ´õ ÇÁ·Î±×·¥ÀÌ ¸¸µé¾îÁ³´ÂÁö È®ÀÎ
-		fprintf(stderr, "Error creating shader program\n");
+	std::vector<float> circle;
+	circle.reserve(CIRCLE_SEGMENT_COUNT * 3 * 3);
+
+	for (int segment = 0; segment < CIRCLE_SEGMENT_COUNT; ++segment)
+	{
+		const float angle_now = 2.f * PI * static_cast<float>(segment) / static_cast<float>(CIRCLE_SEGMENT_COUNT);
+		const float angle_next = 2.f * PI * static_cast<float>(segment + 1) / static_cast<float>(CIRCLE_SEGMENT_COUNT);
+
+		PushVertex(&circle, 0.f, 0.f);
+		PushVertex(&circle, std::cos(angle_now) * unit_x, std::sin(angle_now) * unit_y);
+		PushVertex(&circle, std::cos(angle_next) * unit_x, std::sin(angle_next) * unit_y);
 	}
 
-	std::string vs, fs;
+	m_circle_vertex_count = CIRCLE_SEGMENT_COUNT * 3;
 
-	//shader.vs °¡ vs ¾ÈÀ¸·Î ·ÎµùµÊ
-	if (!ReadFile(filenameVS, &vs)) {
-		printf("Error compiling vertex shader\n");
-		return -1;
-	};
+	glGenBuffers(1, &m_VBOCircle);
+	glBindBuffer(GL_ARRAY_BUFFER, m_VBOCircle);
+	glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(circle.size() * sizeof(float)), circle.data(), GL_STATIC_DRAW);
+}
 
-	//shader.fs °¡ fs ¾ÈÀ¸·Î ·ÎµùµÊ
-	if (!ReadFile(filenameFS, &fs)) {
-		printf("Error compiling fragment shader\n");
-		return -1;
-	};
-
-	// ShaderProgram ¿¡ vs.c_str() ¹öÅØ½º ½¦ÀÌ´õ¸¦ ÄÄÆÄÀÏÇÑ °á°ú¸¦ attachÇÔ
-	AddShader(ShaderProgram, vs.c_str(), GL_VERTEX_SHADER);
-
-	// ShaderProgram ¿¡ fs.c_str() ÇÁ·¹±×¸ÕÆ® ½¦ÀÌ´õ¸¦ ÄÄÆÄÀÏÇÑ °á°ú¸¦ attachÇÔ
-	AddShader(ShaderProgram, fs.c_str(), GL_FRAGMENT_SHADER);
-
-	GLint Success = 0;
-	GLchar ErrorLog[1024] = { 0 };
-
-	//Attach ¿Ï·áµÈ shaderProgram À» ¸µÅ·ÇÔ
-	glLinkProgram(ShaderProgram);
-
-	//¸µÅ©°¡ ¼º°øÇß´ÂÁö È®ÀÎ
-	glGetProgramiv(ShaderProgram, GL_LINK_STATUS, &Success);
-
-	if (Success == 0) {
-		// shader program ·Î±×¸¦ ¹Ş¾Æ¿È
-		glGetProgramInfoLog(ShaderProgram, sizeof(ErrorLog), NULL, ErrorLog);
-		std::cout << filenameVS << ", " << filenameFS << " Error linking shader program\n" << ErrorLog;
-		return -1;
-	}
-
-	glValidateProgram(ShaderProgram);
-	glGetProgramiv(ShaderProgram, GL_VALIDATE_STATUS, &Success);
-	if (!Success) {
-		glGetProgramInfoLog(ShaderProgram, sizeof(ErrorLog), NULL, ErrorLog);
-		std::cout << filenameVS << ", " << filenameFS << " Error validating shader program\n" << ErrorLog;
-		return -1;
-	}
-
-	glUseProgram(ShaderProgram);
-	std::cout << filenameVS << ", " << filenameFS << " Shader compiling is done.";
-
-	return ShaderProgram;
+void Renderer::CacheShaderLocations()
+{
+	m_trans_uniform = glGetUniformLocation(m_SolidRectShader, "u_Trans");
+	m_color_uniform = glGetUniformLocation(m_SolidRectShader, "u_Color");
+	m_position_attrib = glGetAttribLocation(m_SolidRectShader, "a_Position");
 }
 
 void Renderer::DrawSolidRect(float x, float y, float z, float size, float r, float g, float b, float a)
@@ -171,22 +158,57 @@ void Renderer::DrawSolidRect(float x, float y, float z, float size, float r, flo
 
 	GetGLPosition(x, y, &newX, &newY);
 
+	DrawTriangles(m_VBORect, 6, newX, newY, size, size, r, g, b, a);
+}
+
+void Renderer::DrawSolidBox(float x, float y, float width, float height, float r, float g, float b, float a)
+{
+	float newX, newY;
+
+	GetGLPosition(x, y, &newX, &newY);
+
+	DrawTriangles(m_VBORect, 6, newX, newY, width, height, r, g, b, a);
+}
+
+void Renderer::DrawSolidDiamond(float x, float y, float scale, float r, float g, float b, float a)
+{
+	float newX, newY;
+
+	GetGLPosition(x, y, &newX, &newY);
+
+	DrawTriangles(m_VBODiamond, 6, newX, newY, scale, scale, r, g, b, a);
+}
+
+void Renderer::DrawSolidCircle(float x, float y, float radius, float r, float g, float b, float a)
+{
+	float newX, newY;
+
+	GetGLPosition(x, y, &newX, &newY);
+
+	DrawTriangles(m_VBOCircle, m_circle_vertex_count, newX, newY, radius, radius, r, g, b, a);
+}
+
+void Renderer::DrawTriangles(GLuint vbo, int vertex_count, float newX, float newY, float scale_x, float scale_y, float r, float g, float b, float a)
+{
+	// ì†ì„±ì„ ëª» ì°¾ì•˜ìœ¼ë©´ ìŒìˆ˜ë¼ ê·¸ëŒ€ë¡œ ë„˜ê¸°ë©´ ì•ˆ ëœë‹¤
+	if (m_position_attrib < 0)
+	{
+		return;
+	}
+
 	//Program select
 	glUseProgram(m_SolidRectShader);
 
-	glUniform4f(glGetUniformLocation(m_SolidRectShader, "u_Trans"), newX, newY, 0, size);
-	glUniform4f(glGetUniformLocation(m_SolidRectShader, "u_Color"), r, g, b, a);
+	glUniform4f(m_trans_uniform, newX, newY, scale_x, scale_y);
+	glUniform4f(m_color_uniform, r, g, b, a);
 
-	int attribPosition = glGetAttribLocation(m_SolidRectShader, "a_Position");
-	glEnableVertexAttribArray(attribPosition);
-	glBindBuffer(GL_ARRAY_BUFFER, m_VBORect);
-	glVertexAttribPointer(attribPosition, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
+	glEnableVertexAttribArray(m_position_attrib);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glVertexAttribPointer(m_position_attrib, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
 
-	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glDrawArrays(GL_TRIANGLES, 0, vertex_count);
 
-	glDisableVertexAttribArray(attribPosition);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDisableVertexAttribArray(m_position_attrib);
 }
 
 void Renderer::GetGLPosition(float x, float y, float *newX, float *newY)
