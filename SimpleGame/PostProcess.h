@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-bool InitPostProcess(int render_width, int render_height, int window_width, int window_height);
+bool InitPostProcess(int32 render_width, int32 render_height, int32 window_width, int32 window_height);
 void ShutdownPostProcess();
 
 // 이 뒤에 그린 것은 8비트 백버퍼가 아니라 부동소수 텍스처로 들어간다.

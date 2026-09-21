@@ -1,9 +1,11 @@
 ﻿#include "stdafx.h"
 #include "PostProcess.h"
 #include "ShaderUtil.h"
+#include "Profiler.h"
 
 #include "Dependencies\glew.h"
 
+#include <array>
 #include <iostream>
 
 namespace
@@ -21,23 +23,23 @@ namespace
 	const float VIGNETTE_EDGE = 0.15f;
 
 	// 왕복 횟수를 늘리면 번짐이 넓어진다. 해상도를 낮춰 잡아 한 번이 싸다
-	const int BLUR_PASS_COUNT = 3;
+	const int32 BLUR_PASS_COUNT = 3;
 
 	// 씬 자체가 이미 절반이라 여기서 또 넷으로 나누면 번짐이 두 배로 퍼진다
-	const int BLOOM_DIVISOR = 2;
+	const int32 BLOOM_DIVISOR = 2;
 
 	struct RenderTarget
 	{
-		GLuint m_fbo = 0;
-		GLuint m_texture = 0;
-		int m_width = 0;
-		int m_height = 0;
+		GLuint fbo = 0;
+		GLuint texture = 0;
+		int32 width = 0;
+		int32 height = 0;
 	};
 
-	int g_render_width = 0;
-	int g_render_height = 0;
-	int g_window_width = 0;
-	int g_window_height = 0;
+	int32 g_render_width = 0;
+	int32 g_render_height = 0;
+	int32 g_window_width = 0;
+	int32 g_window_height = 0;
 	bool g_ready = false;
 
 	RenderTarget g_scene;
@@ -76,16 +78,16 @@ namespace
 	GLint g_upscale_size = -1;
 	GLint g_upscale_position = -1;
 
-	bool CreateRenderTarget(RenderTarget* target, int width, int height, GLint filter)
+	bool CreateRenderTarget(RenderTarget* target, int32 width, int32 height, GLint filter)
 	{
-		target->m_width = width;
-		target->m_height = height;
+		target->width = width;
+		target->height = height;
 
-		glGenTextures(1, &target->m_texture);
-		glBindTexture(GL_TEXTURE_2D, target->m_texture);
+		glGenTextures(1, &target->texture);
+		glBindTexture(GL_TEXTURE_2D, target->texture);
 
 		// 부동소수 포맷이라야 1 을 넘는 값이 저장된다. 8비트면 여기서 잘린다
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
 
 		// 블룸 축소본은 되키워 읽으니 선형, 도트 확대는 최근접이라야 블록이 안 뭉갠다
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
@@ -95,9 +97,9 @@ namespace
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-		glGenFramebuffers(1, &target->m_fbo);
-		glBindFramebuffer(GL_FRAMEBUFFER, target->m_fbo);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target->m_texture, 0);
+		glGenFramebuffers(1, &target->fbo);
+		glBindFramebuffer(GL_FRAMEBUFFER, target->fbo);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target->texture, 0);
 
 		const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -113,16 +115,16 @@ namespace
 
 	void DestroyRenderTarget(RenderTarget* target)
 	{
-		if (target->m_fbo != 0)
+		if (target->fbo != 0)
 		{
-			glDeleteFramebuffers(1, &target->m_fbo);
-			target->m_fbo = 0;
+			glDeleteFramebuffers(1, &target->fbo);
+			target->fbo = 0;
 		}
 
-		if (target->m_texture != 0)
+		if (target->texture != 0)
 		{
-			glDeleteTextures(1, &target->m_texture);
-			target->m_texture = 0;
+			glDeleteTextures(1, &target->texture);
+			target->texture = 0;
 		}
 	}
 
@@ -130,8 +132,7 @@ namespace
 	{
 		// 정규화 장치 좌표를 그대로 쓰므로 정점 셰이더가 통과만 시키면 된다.
 		// 텍스처 좌표는 gl_FragCoord 로 만들어 쓰기 때문에 속성이 필요 없다
-		const float quad[]
-			=
+		const std::array<float, 18> quad =
 		{
 			-1.f, -1.f, 0.f, 1.f, -1.f, 0.f, 1.f, 1.f, 0.f,
 			-1.f, -1.f, 0.f, 1.f, 1.f, 0.f, -1.f, 1.f, 0.f,
@@ -139,7 +140,7 @@ namespace
 
 		glGenBuffers(1, &g_fullscreen_vbo);
 		glBindBuffer(GL_ARRAY_BUFFER, g_fullscreen_vbo);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(float) * quad.size()), quad.data(), GL_STATIC_DRAW);
 	}
 
 	void DrawFullScreen(GLint position_attrib)
@@ -153,6 +154,7 @@ namespace
 		glBindBuffer(GL_ARRAY_BUFFER, g_fullscreen_vbo);
 		glVertexAttribPointer(position_attrib, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
 
+		CountDrawCall();
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 
 		glDisableVertexAttribArray(position_attrib);
@@ -160,53 +162,53 @@ namespace
 
 	void BlurOnce(const RenderTarget& source, const RenderTarget& target, float direction_x, float direction_y)
 	{
-		glBindFramebuffer(GL_FRAMEBUFFER, target.m_fbo);
-		glViewport(0, 0, target.m_width, target.m_height);
+		glBindFramebuffer(GL_FRAMEBUFFER, target.fbo);
+		glViewport(0, 0, target.width, target.height);
 
 		glUseProgram(g_blur_program);
 
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, source.m_texture);
+		glBindTexture(GL_TEXTURE_2D, source.texture);
 		glUniform1i(g_blur_source, 0);
 
-		glUniform2f(g_blur_size, static_cast<float>(target.m_width), static_cast<float>(target.m_height));
+		glUniform2f(g_blur_size, static_cast<float>(target.width), static_cast<float>(target.height));
 		glUniform2f(g_blur_direction, direction_x, direction_y);
 
 		DrawFullScreen(g_blur_position);
 	}
 }
 
-bool InitPostProcess(int render_width, int render_height, int window_width, int window_height)
+bool InitPostProcess(int32 render_width, int32 render_height, int32 window_width, int32 window_height)
 {
 	g_render_width = render_width;
 	g_render_height = render_height;
 	g_window_width = window_width;
 	g_window_height = window_height;
 
-	const int bloom_width = render_width / BLOOM_DIVISOR;
-	const int bloom_height = render_height / BLOOM_DIVISOR;
+	const int32 bloom_width = render_width / BLOOM_DIVISOR;
+	const int32 bloom_height = render_height / BLOOM_DIVISOR;
 
-	if (!CreateRenderTarget(&g_scene, render_width, render_height, GL_LINEAR))
+	if (CreateRenderTarget(&g_scene, render_width, render_height, GL_LINEAR) == false)
 	{
 		return false;
 	}
 
-	if (!CreateRenderTarget(&g_bright, bloom_width, bloom_height, GL_LINEAR))
+	if (CreateRenderTarget(&g_bright, bloom_width, bloom_height, GL_LINEAR) == false)
 	{
 		return false;
 	}
 
-	if (!CreateRenderTarget(&g_ping, bloom_width, bloom_height, GL_LINEAR))
+	if (CreateRenderTarget(&g_ping, bloom_width, bloom_height, GL_LINEAR) == false)
 	{
 		return false;
 	}
 
-	if (!CreateRenderTarget(&g_pong, bloom_width, bloom_height, GL_LINEAR))
+	if (CreateRenderTarget(&g_pong, bloom_width, bloom_height, GL_LINEAR) == false)
 	{
 		return false;
 	}
 
-	if (!CreateRenderTarget(&g_post, render_width, render_height, GL_NEAREST))
+	if (CreateRenderTarget(&g_post, render_width, render_height, GL_NEAREST) == false)
 	{
 		return false;
 	}
@@ -297,18 +299,18 @@ void ShutdownPostProcess()
 
 void BeginScenePass()
 {
-	if (!g_ready)
+	if (g_ready == false)
 	{
 		return;
 	}
 
-	glBindFramebuffer(GL_FRAMEBUFFER, g_scene.m_fbo);
-	glViewport(0, 0, g_scene.m_width, g_scene.m_height);
+	glBindFramebuffer(GL_FRAMEBUFFER, g_scene.fbo);
+	glViewport(0, 0, g_scene.width, g_scene.height);
 }
 
 void EndScenePassAndComposite()
 {
-	if (!g_ready)
+	if (g_ready == false)
 	{
 		return;
 	}
@@ -316,14 +318,14 @@ void EndScenePassAndComposite()
 	// 후처리는 덮어쓰기라 알파 혼합이 켜져 있으면 결과가 섞인다
 	glDisable(GL_BLEND);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, g_bright.m_fbo);
-	glViewport(0, 0, g_bright.m_width, g_bright.m_height);
+	glBindFramebuffer(GL_FRAMEBUFFER, g_bright.fbo);
+	glViewport(0, 0, g_bright.width, g_bright.height);
 
 	glUseProgram(g_bright_program);
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, g_scene.m_texture);
+	glBindTexture(GL_TEXTURE_2D, g_scene.texture);
 	glUniform1i(g_bright_scene, 0);
-	glUniform2f(g_bright_size, static_cast<float>(g_bright.m_width), static_cast<float>(g_bright.m_height));
+	glUniform2f(g_bright_size, static_cast<float>(g_bright.width), static_cast<float>(g_bright.height));
 	glUniform1f(g_bright_threshold, BLOOM_THRESHOLD);
 
 	DrawFullScreen(g_bright_position);
@@ -332,23 +334,23 @@ void EndScenePassAndComposite()
 	BlurOnce(g_bright, g_ping, 1.f, 0.f);
 	BlurOnce(g_ping, g_pong, 0.f, 1.f);
 
-	for (int pass = 1; pass < BLUR_PASS_COUNT; ++pass)
+	for (int32 pass = 1; pass < BLUR_PASS_COUNT; ++pass)
 	{
 		BlurOnce(g_pong, g_ping, 1.f, 0.f);
 		BlurOnce(g_ping, g_pong, 0.f, 1.f);
 	}
 
-	glBindFramebuffer(GL_FRAMEBUFFER, g_post.m_fbo);
-	glViewport(0, 0, g_post.m_width, g_post.m_height);
+	glBindFramebuffer(GL_FRAMEBUFFER, g_post.fbo);
+	glViewport(0, 0, g_post.width, g_post.height);
 
 	glUseProgram(g_composite_program);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, g_scene.m_texture);
+	glBindTexture(GL_TEXTURE_2D, g_scene.texture);
 	glUniform1i(g_composite_scene, 0);
 
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, g_pong.m_texture);
+	glBindTexture(GL_TEXTURE_2D, g_pong.texture);
 	glUniform1i(g_composite_bloom, 1);
 
 	glUniform2f(g_composite_size, static_cast<float>(g_render_width), static_cast<float>(g_render_height));
@@ -370,7 +372,7 @@ void EndScenePassAndComposite()
 
 void PresentUpscaled()
 {
-	if (!g_ready)
+	if (g_ready == false)
 	{
 		return;
 	}
@@ -384,7 +386,7 @@ void PresentUpscaled()
 	glUseProgram(g_upscale_program);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, g_post.m_texture);
+	glBindTexture(GL_TEXTURE_2D, g_post.texture);
 	glUniform1i(g_upscale_source, 0);
 
 	glUniform2f(g_upscale_size, static_cast<float>(g_window_width), static_cast<float>(g_window_height));

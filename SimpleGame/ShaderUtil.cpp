@@ -1,6 +1,7 @@
 ﻿#include "stdafx.h"
 #include "ShaderUtil.h"
 
+#include <array>
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -29,7 +30,6 @@ namespace
 
 	void AttachShader(GLuint program, const char* shader_text, GLenum shader_type)
 	{
-		//쉐이더 오브젝트 생성
 		GLuint shader_object = glCreateShader(shader_type);
 		if (shader_object == 0)
 		{
@@ -37,25 +37,21 @@ namespace
 			return;
 		}
 
-		const GLchar* sources[1];
-		sources[0] = shader_text;
+		const std::array<const GLchar*, 1> sources = { shader_text };
+		const std::array<GLint, 1> lengths = { static_cast<GLint>(strlen(shader_text)) };
 
-		GLint lengths[1];
-		lengths[0] = static_cast<GLint>(strlen(shader_text));
-
-		//쉐이더 코드를 쉐이더 오브젝트에 할당하고 컴파일
-		glShaderSource(shader_object, 1, sources, lengths);
+		glShaderSource(shader_object, 1, sources.data(), lengths.data());
 		glCompileShader(shader_object);
 
 		GLint success = 0;
 		glGetShaderiv(shader_object, GL_COMPILE_STATUS, &success);
 
-		if (!success)
+		if (success == 0)
 		{
-			GLchar info_log[1024] = { 0 };
-			glGetShaderInfoLog(shader_object, sizeof(info_log), NULL, info_log);
+			std::array<GLchar, 1024> info_log = {};
+			glGetShaderInfoLog(shader_object, static_cast<GLsizei>(info_log.size()), nullptr, info_log.data());
 
-			std::cout << "[ ShaderUtil - AttachShader ] : compile failed\n" << info_log << "\n";
+			std::cout << "[ ShaderUtil - AttachShader ] : compile failed\n" << info_log.data() << "\n";
 
 			glDeleteShader(shader_object);
 			return;
@@ -68,7 +64,7 @@ namespace
 	}
 }
 
-GLuint CompileShaderProgram(const char* filenameVS, const char* filenameFS)
+GLuint CompileShaderProgram(const char* filename_vs, const char* filename_fs)
 {
 	GLuint program = glCreateProgram();
 	if (program == 0)
@@ -80,13 +76,13 @@ GLuint CompileShaderProgram(const char* filenameVS, const char* filenameFS)
 	std::string vertex_source;
 	std::string fragment_source;
 
-	if (!ReadTextFile(filenameVS, &vertex_source))
+	if (ReadTextFile(filename_vs, &vertex_source) == false)
 	{
 		glDeleteProgram(program);
 		return 0;
 	}
 
-	if (!ReadTextFile(filenameFS, &fragment_source))
+	if (ReadTextFile(filename_fs, &fragment_source) == false)
 	{
 		glDeleteProgram(program);
 		return 0;
@@ -102,16 +98,16 @@ GLuint CompileShaderProgram(const char* filenameVS, const char* filenameFS)
 
 	if (success == 0)
 	{
-		GLchar error_log[1024] = { 0 };
-		glGetProgramInfoLog(program, sizeof(error_log), NULL, error_log);
+		std::array<GLchar, 1024> error_log = {};
+		glGetProgramInfoLog(program, static_cast<GLsizei>(error_log.size()), nullptr, error_log.data());
 
-		std::cout << "[ ShaderUtil - CompileShaderProgram ] : link failed " << filenameVS << "\n" << error_log << "\n";
+		std::cout << "[ ShaderUtil - CompileShaderProgram ] : link failed " << filename_vs << "\n" << error_log.data() << "\n";
 
 		glDeleteProgram(program);
 		return 0;
 	}
 
-	std::cout << "[ ShaderUtil - CompileShaderProgram ] : " << filenameVS << " ok\n";
+	std::cout << "[ ShaderUtil - CompileShaderProgram ] : " << filename_vs << " ok\n";
 
 	return program;
 }

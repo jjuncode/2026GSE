@@ -1,15 +1,17 @@
 ﻿#include "stdafx.h"
 #include "Fog.h"
 #include "ShaderUtil.h"
+#include "Profiler.h"
 
 #include "Dependencies\glew.h"
 
+#include <array>
 #include <iostream>
 
 namespace
 {
-	int g_screen_width = 0;
-	int g_screen_height = 0;
+	int32 g_screen_width = 0;
+	int32 g_screen_height = 0;
 	float g_pixel_scale = 1.f;
 	bool g_ready = false;
 
@@ -23,8 +25,7 @@ namespace
 
 	void CreateFullScreenQuad()
 	{
-		const float quad[]
-			=
+		const std::array<float, 18> quad =
 		{
 			-1.f, -1.f, 0.f, 1.f, -1.f, 0.f, 1.f, 1.f, 0.f,
 			-1.f, -1.f, 0.f, 1.f, 1.f, 0.f, -1.f, 1.f, 0.f,
@@ -32,11 +33,11 @@ namespace
 
 		glGenBuffers(1, &g_vbo);
 		glBindBuffer(GL_ARRAY_BUFFER, g_vbo);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(float) * quad.size()), quad.data(), GL_STATIC_DRAW);
 	}
 }
 
-bool InitFog(int screen_width, int screen_height, float pixel_scale)
+bool InitFog(int32 screen_width, int32 screen_height, float pixel_scale)
 {
 	g_screen_width = screen_width;
 	g_screen_height = screen_height;
@@ -92,7 +93,7 @@ void ShutdownFog()
 
 void DrawFogLayer(float scroll)
 {
-	if (!g_ready)
+	if (g_ready == false)
 	{
 		return;
 	}
@@ -107,6 +108,7 @@ void DrawFogLayer(float scroll)
 	glBindBuffer(GL_ARRAY_BUFFER, g_vbo);
 	glVertexAttribPointer(g_position_attrib, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 3, 0);
 
+	CountDrawCall();
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	glDisableVertexAttribArray(g_position_attrib);

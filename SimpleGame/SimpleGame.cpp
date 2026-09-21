@@ -24,13 +24,20 @@ but WITHOUT ANY WARRANTY.
 #include "Ground.h"
 #include "Fog.h"
 #include "PostProcess.h"
+#include "Player.h"
+#include "SpriteAtlas.h"
+#include "Text.h"
+#include "Profiler.h"
 
-const unsigned char KEY_ESCAPE = 27;
+const uint8 KEY_ESCAPE = 27;
+const uint8 KEY_ENTER = 13;
 
-Renderer *g_Renderer = nullptr;
+Renderer* g_renderer = nullptr;
 
 // 고정 간격으로 못 쪼갠 나머지. 다음 프레임으로 넘긴다
 float g_accumulated_seconds = 0.f;
+
+bool g_post_ready = false;
 
 static void ApplyInput(float delta_seconds)
 {
@@ -85,7 +92,7 @@ static void ApplyInput(float delta_seconds)
 	MovePlayerByWorldAxis(world_x, world_y, delta_seconds);
 }
 
-void Update(void)
+void Update()
 {
 	g_accumulated_seconds += PopElapsedSeconds();
 
@@ -95,12 +102,13 @@ void Update(void)
 	{
 		ApplyInput(FIXED_STEP_SECONDS);
 		UpdateScene(FIXED_STEP_SECONDS);
+		UpdateHud(FIXED_STEP_SECONDS);
 
 		g_accumulated_seconds -= FIXED_STEP_SECONDS;
 	}
 }
 
-void RenderScene(void)
+void RenderScene()
 {
 	// 상태 변경이라 지우기 전에 정해야 이번 프레임부터 먹는다
 	BeginScenePass();
@@ -108,53 +116,62 @@ void RenderScene(void)
 	glClearColor(0.012f, 0.014f, 0.018f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	DrawScene(g_Renderer);
+	// 씬 버퍼는 뒤에서 톤매핑을 타므로 그림 색을 미리 역변환한다. 후처리가 죽었으면 안 탄다
+	g_renderer->SetUndoToneMap(g_post_ready);
+	DrawScene(g_renderer);
 
 	EndScenePassAndComposite();
 
 	// 후처리 뒤 저해상도 버퍼에 그린다. 흐림과 비네팅은 안 타면서 도트 격자는 같이 탄다
-	DrawHud(g_Renderer);
+	g_renderer->SetUndoToneMap(false);
+	DrawSceneOverlay(g_renderer);
+	DrawHud(g_renderer);
 
 	PresentUpscaled();
 
 	glutSwapBuffers();
+
+	EndProfileFrame();
 }
 
-void Idle(void)
+void Idle()
 {
 	Update();
 
 	glutPostRedisplay();
 }
 
-void MouseInput(int button, int state, int x, int y)
+void MouseInput(int32 button, int32 state, int32 x, int32 y)
 {
 	if (button != GLUT_LEFT_BUTTON)
 	{
 		return;
 	}
 
+	SetMouseWindowPos(x, y);
+
 	if (state != GLUT_DOWN)
+	{
+		SetAttackHeld(false);
+		return;
+	}
+
+	const ScreenPos screen = GetMouseScreenPos();
+	if (HandleHudClick(screen.x, screen.y))
 	{
 		return;
 	}
 
-	// glut 은 좌상단 원점, 렌더러는 화면 정중앙 원점에 위쪽이 양수
-	ScreenPos screen;
-	screen.m_x = static_cast<float>(x) - static_cast<float>(WINDOW_SIZE_X) * 0.5f;
-	screen.m_y = static_cast<float>(WINDOW_SIZE_Y) * 0.5f - static_cast<float>(y);
-
-	WorldPos picked = ScreenToWorld(screen, GetCameraPos());
-
-	// 마름모가 칸 중심에 그려지므로 반올림해야 그 칸이 나온다
-	picked.m_local_x = std::floor(picked.m_local_x + 0.5f);
-	picked.m_local_y = std::floor(picked.m_local_y + 0.5f);
-	NormalizeWorldPos(&picked);
-
-	SetPickedTile(picked);
+	QueueAttack();
+	SetAttackHeld(true);
 }
 
-void KeyInput(unsigned char key, int x, int y)
+void MouseMotion(int32 x, int32 y)
+{
+	SetMouseWindowPos(x, y);
+}
+
+void KeyInput(uint8 key, int32 x, int32 y)
 {
 	SetKeyDown(key, true);
 
@@ -172,6 +189,50 @@ void KeyInput(unsigned char key, int x, int y)
 			ToggleLighting();
 			break;
 		}
+		case 'c':
+		case 'C':
+		{
+			ToggleStatWindow();
+			break;
+		}
+		case 'u':
+		case 'U':
+		{
+			ToggleEnhanceWindow();
+			break;
+		}
+		case 'e':
+		case 'E':
+		{
+			PickupMaterials();
+			break;
+		}
+		case 'n':
+		case 'N':
+		{
+			RegenerateZone();
+			break;
+		}
+		case '1':
+		{
+			TryStatUp(STAT_MAX_HP);
+			break;
+		}
+		case '2':
+		{
+			TryStatUp(STAT_ATTACK);
+			break;
+		}
+		case '3':
+		{
+			TryStatUp(STAT_DEFENCE);
+			break;
+		}
+		case KEY_ENTER:
+		{
+			RequestEnhance();
+			break;
+		}
 		case KEY_ESCAPE:
 		{
 			glutLeaveMainLoop();
@@ -184,22 +245,22 @@ void KeyInput(unsigned char key, int x, int y)
 	}
 }
 
-void KeyUpInput(unsigned char key, int x, int y)
+void KeyUpInput(uint8 key, int32 x, int32 y)
 {
 	SetKeyDown(key, false);
 }
 
-void SpecialKeyInput(int key, int x, int y)
+void SpecialKeyInput(int32 key, int32 x, int32 y)
 {
 	SetSpecialKeyDown(key, true);
 }
 
-void SpecialKeyUpInput(int key, int x, int y)
+void SpecialKeyUpInput(int32 key, int32 x, int32 y)
 {
 	SetSpecialKeyDown(key, false);
 }
 
-void WindowEntry(int state)
+void WindowEntry(int32 state)
 {
 	if (state == GLUT_LEFT)
 	{
@@ -208,9 +269,8 @@ void WindowEntry(int state)
 	}
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
-	// Initialize GL things
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
 	glutInitWindowPosition(0, 0);
@@ -226,49 +286,61 @@ int main(int argc, char **argv)
 	glewInit();
 	if (glewIsSupported("GL_VERSION_3_0"))
 	{
-		std::cout << " GLEW Version is 3.0\n ";
+		std::cout << "[ SimpleGame - main ] : glew 3.0 supported\n";
 	}
 	else
 	{
-		std::cout << "GLEW 3.0 not supported\n ";
+		std::cout << "[ SimpleGame - main ] : glew 3.0 not supported\n";
 	}
 
-	// Initialize Renderer
-	g_Renderer = new Renderer(WINDOW_SIZE_X, WINDOW_SIZE_Y);
-	if (!g_Renderer->IsInitialized())
+	g_renderer = new Renderer(WINDOW_SIZE_X, WINDOW_SIZE_Y);
+	if (g_renderer->IsInitialized() == false)
 	{
-		std::cout << "Renderer could not be initialized.. \n";
+		std::cout << "[ SimpleGame - main ] : renderer init failed\n";
 
-		delete g_Renderer;
-		g_Renderer = nullptr;
+		delete g_renderer;
+		g_renderer = nullptr;
 
 		return 1;
 	}
 
-	const bool post_ready = InitPostProcess(RENDER_SIZE_X, RENDER_SIZE_Y, WINDOW_SIZE_X, WINDOW_SIZE_Y);
-	if (!post_ready)
+	if (InitSpriteAtlas() == false)
 	{
-		// 몸체는 그대로 돌고 톤매핑과 블뢸만 빠진다
-		std::cout << "[ SimpleGame - main ] : post process disabled";
+		// 그림만 빠지고 판정과 HUD 도형은 그대로 돈다
+		std::cout << "[ SimpleGame - main ] : sprite atlas disabled\n";
+	}
+
+	if (InitText() == false)
+	{
+		std::cout << "[ SimpleGame - main ] : text disabled\n";
+	}
+
+	const bool post_ready = InitPostProcess(RENDER_SIZE_X, RENDER_SIZE_Y, WINDOW_SIZE_X, WINDOW_SIZE_Y);
+	g_post_ready = post_ready;
+
+	if (post_ready == false)
+	{
+		// 몸체는 그대로 돌고 톤매핑과 블룸만 빠진다
+		std::cout << "[ SimpleGame - main ] : post process disabled\n";
 	}
 
 	// 후처리가 죽으면 씬이 창 해상도에 바로 그려진다. 그땐 배율을 되돌려야 좌표가 안 어긋난다
 	float pixel_scale = static_cast<float>(PIXEL_SCALE);
-	if (!post_ready)
+	if (post_ready == false)
 	{
 		pixel_scale = 1.f;
 	}
 
-	if (!InitGround(WINDOW_SIZE_X, WINDOW_SIZE_Y, pixel_scale))
+	if (InitGround(WINDOW_SIZE_X, WINDOW_SIZE_Y, pixel_scale) == false)
 	{
 		// 바닥만 빠지고 물체와 HUD 는 그대로 나온다
-		std::cout << "[ SimpleGame - main ] : ground layer disabled";
+		std::cout << "[ SimpleGame - main ] : ground layer disabled\n";
 	}
 
-	if (!InitFog(WINDOW_SIZE_X, WINDOW_SIZE_Y, pixel_scale))
+	if (InitFog(WINDOW_SIZE_X, WINDOW_SIZE_Y, pixel_scale) == false)
 	{
 		// 안개만 빠진다. 분위기 요소라 없어도 진행에 지장 없다
-		std::cout << "[ SimpleGame - main ] : fog layer disabled";
+		std::cout << "[ SimpleGame - main ] : fog layer disabled\n";
 	}
 
 	InitScene();
@@ -276,8 +348,12 @@ int main(int argc, char **argv)
 
 	std::cout << "\nWASD  : screen axis move\n";
 	std::cout << "Arrow : world axis move\n";
-	std::cout << "Click : pick tile\n";
-	std::cout << "G     : chunk edge overlay\n";
+	std::cout << "Mouse : aim / left click (hold) swing\n";
+	std::cout << "E     : pick up materials\n";
+	std::cout << "C     : stat window (1 2 3 : hp atk def)\n";
+	std::cout << "U     : enhance window (Enter : try)\n";
+	std::cout << "N     : new zone seed\n";
+	std::cout << "G     : chunk edge / blocked tile overlay\n";
 	std::cout << "L     : lighting on/off\n";
 	std::cout << "ESC   : quit\n";
 
@@ -288,6 +364,8 @@ int main(int argc, char **argv)
 	glutSpecialFunc(SpecialKeyInput);
 	glutSpecialUpFunc(SpecialKeyUpInput);
 	glutMouseFunc(MouseInput);
+	glutMotionFunc(MouseMotion);
+	glutPassiveMotionFunc(MouseMotion);
 	glutEntryFunc(WindowEntry);
 
 	glutMainLoop();
@@ -295,9 +373,11 @@ int main(int argc, char **argv)
 	ShutdownFog();
 	ShutdownGround();
 	ShutdownPostProcess();
+	ShutdownText();
+	ShutdownSpriteAtlas();
 
-	delete g_Renderer;
-	g_Renderer = nullptr;
+	delete g_renderer;
+	g_renderer = nullptr;
 
 	return 0;
 }

@@ -1,0 +1,13 @@
+root = true
+
+# 셰이더에 BOM 이 붙으면 GLSL 컴파일이 깨진다
+[*.{h,cpp}]
+charset = utf-8-bom
+indent_style = tab
+end_of_line = lf
+insert_final_newline = true
+
+[*.{vs,fs}]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true

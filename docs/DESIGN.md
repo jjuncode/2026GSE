@@ -4,7 +4,7 @@
 `SimpleGame` 스켈레톤(freeglut + OpenGL 3.3) 위에 쌓는다.
 
 최초 작성: 2026-09-07
-마지막 갱신: 2026-09-08 (3차)
+마지막 갱신: 2026-09-14 (4차)
 
 ---
 
@@ -118,6 +118,8 @@
 
 ### 2.9 파밍이 주는 것은 무기가 아니라 재료다
 
+> 2026-09-14 레벨1 프로토타입에서 일부가 덮였다 — 2.15. "글자 없이"는 2.16 에서 폐기
+
 무기를 여러 자루 떨구면 이 사고가 난다. 15단계까지 올린 무기를 들고 있는데
 0단계짜리 더 좋은 무기가 떨어진다. 자동으로 바꿔 끼면 쌓아 올린 걸 통째로 날리고,
 안 바꾸면 그 드랍이 쓰레기가 된다. 강화를 옮겨 붙이는 시스템으로 때울 수 있지만
@@ -194,6 +196,8 @@
 
 ### 2.11 거리가 난이도이자 보상이다
 
+> 2026-09-14 레벨1 프로토타입에서 일부가 덮였다 — 2.15
+
 파밍과 강화가 서로를 먹여 줘도 하나가 빈다.
 **원점 근처에서 다 파밍되면 무한 월드를 걸어갈 이유가 없다.**
 지금까지 무한 월드는 기술적 도전이었지 게임적 이유가 없었다.
@@ -254,7 +258,7 @@ ACES 근사를 쓴다. 노출은 1.0인데, 1.5로 올렸더니 바닥이 0.15�
 
 **HUD는 후처리 뒤에 그린다.** 안 그러면 UI까지 흐려지고 어두워진다.
 
-**스스로 빛나는 것은 발광 배수로 낸다.** `GameObject`의 `m_emissive`를 색에 곱해
+**스스로 빛나는 것은 발광 배수로 낸다.** `GameObject`의 `emissive`를 색에 곱해
 1을 넘겨 두면 블룸이 알아서 번지게 한다. 2.9의 재료 드랍이 이 장치를 그대로 쓴다 —
 별가루는 배수 3, 별핵은 8이라 임계 초과분이 네 배 넘게 차이 나고,
 그래서 **흰 점은 눈에 안 밟히고 주황 점은 화면이 알아서 강조한다.**
@@ -303,6 +307,71 @@ HUD는 후처리 뒤 저해상도 버퍼에 그린다 — 흐림과 비네팅은
 값 노이즈 셰이더로 바꾸면 격자는 있는데 경계가 없다. 행 평균 최대 단차가 2.91 코드에서
 0.70으로 내려갔고, 안개를 아예 끈 상태가 0.69다. 즉 측정 바닥값까지 내려갔다.
 
+### 2.15 레벨1 프로토타입 — 사용자 요구가 2.9·2.11·9단계를 덮는다
+
+2026-09-14 방향 전환. 목표는 수업 과제가 아니라 **게임 프로토타입**이고, 무대는 **무한 월드의 시작 구역**이다.
+요구는 사용자가 직접 줬다.
+
+- 파밍을 익히는 레벨
+- 마우스로 바라보는 방향을 바꾸고 좌클릭으로 전방을 베는 칼 공격
+- 경험치, 레벨업마다 스탯포인트 4개, 스탯창에서 찍기
+- 사냥 시 돈·재료·경험치 드랍. 돈과 재료로 무기 강화. **경험치와 돈만 자동습득**
+- 랜덤 생성 맵, 디아블로풍, 갇히지 않게
+- 보스
+
+**덮이는 결정.**
+
+- 2.9 "파밍 보상은 재료뿐" — 돈이 붙는다. 강화 비용이 돈과 재료 둘이 된다
+- 2.11 "레벨·경험치는 따로 안 만든다" — 레벨과 스탯이 생긴다. 강화 단계는 오른쪽 구슬로 진행도를 계속 겸한다
+- 9단계 "클릭 이동" — 좌클릭이 공격이라 버린다. 이동은 WASD
+- 2.9 의 "글자 없이"는 유지한다. 스탯창과 강화창도 전부 칸과 막대로 낸다
+
+**구현하며 정한 것.**
+
+- 스탯은 서버와 같은 셋(체력·공격력·방어력). 한 포인트에 체력 10, 공격력 2, 방어력 1. 찍어도 현재 체력은 안 올린다
+- 시작 구역은 원점 청크 둘레 3 곱하기 3 청크, 96 곱하기 96칸을 한 번에 만든다. 씨앗은 실행마다 바꾸고 콘솔에 찍는다. N 키가 새 씨앗
+- **갇힘 방지는 4방향 연결로만 센다.** 8방향으로 세면 모서리로만 닿은 빈 칸 둘을 이어진 걸로 치는데,
+  사각형 몸은 그 틈을 못 지나가서 갇힌다. 스폰에서 안 닿는 빈 터가 24칸 이상이면 통로를 파서 잇고, 작으면 메운다.
+  마지막에 한 번 더 메우므로 연결 패스 횟수가 모자라도 안 닿는 빈 칸은 절대 안 남는다
+- **묘비와 기둥은 여덟 이웃이 전부 빈 자리에만 박는다.** 외딴 막힌 칸 하나는 둘레 여덟 칸이 고리로 이어져 있어 길을 못 끊는다.
+  그래서 연결 보장을 다시 돌리지 않아도 된다
+- 보스는 걸어서 제일 먼 칸에 둔다. 직선 거리로 고르면 벽 너머 코앞일 수 있다
+- 드랍과 강화 난수는 지형 씨앗과 가른다. 근거는 2.9 그대로다
+- 청크 표가 없는 곳은 막힌 걸로 친다. 시작 구역 밖으로 걸어 나가지 못하게 하는 장치이고, 7단계 청크 로드가 오면 푼다
+- 수치는 `Balance.h` 와 각 모듈 맨 위에 모았다. 돌려 보고 고친다
+
+### 2.16 레벨1 비주얼 — 해질녘 사막, 도트 그림, 한글
+
+2026-09-14. 사용자가 디아블로 2 리저렉션 사막 스크린샷을 참고로 줬고 추천안을 그대로 골랐다.
+
+**그림은 원점과 두 축으로 늘인 사각형 하나로 그린다.** 렌더러가 단색 도형만 그리던 상태에서
+도트 캐릭터, 회전하는 칼, 누운 그림자, 한글 글자가 전부 필요해졌다. 넷 다 "그림을 입힌 기울어진 사각형"이라
+셰이더 하나(`Affine.vs/fs`)에 원점과 가로축, 세로축을 넘기는 방식으로 묶었다.
+
+**도트 한 칸은 렌더 좌표 2다.** 씬과 HUD가 640 곱하기 360 에 그려지는데 렌더러 좌표는 1280 곱하기 720 기준이라,
+한 칸을 2로 찍어야 저해상도 한 픽셀에 맞는다.
+
+**씬 버퍼의 그림은 톤매핑을 거꾸로 풀어 넣는다.** 합성 셰이더가 ACES 로 누르는데,
+팔레트 색을 그대로 넣으면 중간 밝기가 1.35배쯤 부풀어 그린 색과 달라진다.
+그래서 그림 셰이더와 바닥 셰이더가 역변환을 먼저 한다. HUD 는 톤매핑 뒤라 끈다.
+
+**그림은 코드 속 문자열 격자로 적는다.** `tools/sprite_art.py` 가 폭과 팔레트를 검사하고 `SpriteArt.cpp` 를 만든다.
+좌우 2방향에 걷기 2프레임. 네 방향은 나중에 한다(2.2).
+
+**글자는 굴림 12 픽셀을 윈도우 GDI 로 처음 쓸 때 그려 캐시한다.** 굴림은 작은 크기용 비트맵이 글꼴에 박혀 있어
+흐린 가장자리 없이 찍힌다. 맑은 고딕은 12 픽셀에서도 윤곽을 흐리게 칠해 도트 격자와 섞인다.
+2.9 의 "글자 없이"는 폐기한다 — 사용자가 한글을 요구했다.
+
+**낭떠러지는 솟은 벽이 아니라 꺼진 땅이다.** 솟은 벽은 뒤에 선 캐릭터를 가리므로 벽 조각까지 깊이 정렬에 넣어야 한다.
+꺼진 쪽은 아무것도 안 가려서 바닥 셰이더 안에서 끝난다. 픽셀마다 화면 위쪽(월드 -1,-1)으로 거슬러 올라가
+처음 만나는 빈 칸 경계가 벽 윗선이고, 거슬러 간 거리가 벽 높이다. 경계가 x 축이면 해를 받는 면, y 축이면 그늘 면.
+
+**구역 테두리에 붙은 막힌 덩어리는 낭떠러지, 가운데 덩어리는 30퍼센트만 물웅덩이.** 전부 물로 만들었더니
+씨앗 다섯 개에서 웅덩이가 30에서 43개가 나와 사막이 늪이 됐다. 30퍼센트로 줄이자 4에서 10개가 됐다(오프라인 시뮬).
+막힘 여부는 안 바꾸므로 갇힘 방지 보장은 그대로다.
+
+**그림자는 같은 그림을 검게 칠해 왼쪽 아래로 눕힌다.** 해가 오른쪽 위에 있는 참고 이미지를 따랐다.
+
 ---
 
 ## 3. 현재 코드 상태
@@ -320,9 +389,24 @@ BaseProject_SE/
     WorldPos.cpp / .h     좌표계 4층과 아이소 변환 (1단계)
     GameTime.cpp / .h     프레임 시간 재기와 상한 (2단계)
     Input.cpp / .h        키 눌림 상태 기록 (2단계)
-    Scene.cpp / .h        오브젝트 목록, 배회, 바닥 조명, 깊이 정렬 (3·5단계)
+    Scene.cpp / .h        구역 짓기, 액터 올리기, 바닥 조명 (3·5단계)
     Hud.cpp / .h          하단 구슬과 막대. 전부 도형
     GameConfig.h          창 크기
+    Types.h               정수 별칭. 서버 `ServerCore/Types.h` 에서 정수만 가져왔다
+    Balance.h             레벨1 수치 모음
+    Actor.cpp / .h        화면에 놓이는 것 하나. 자기를 그린다 (액터 1)
+    SceneGraph.cpp / .h   그릴 액터를 모아 깊이 순으로 낸다 (액터 1)
+    World.cpp / .h        청크별 막힘 표와 충돌 이동 (레벨1-1)
+    ZoneGen.cpp / .h      시작 구역 생성과 연결 보장 (레벨1-2)
+    Player.cpp / .h       플레이어 상태, 조준, 휘두르기, 경험치, 스탯 (레벨1-3·6)
+    Monster.cpp / .h      좀비·해골·보스 AI, 부채꼴 판정 (레벨1-4·8)
+    Drop.cpp / .h         드랍, 자동습득, 재료 줍기 (레벨1-5)
+    Enhance.cpp / .h      강화 비용·확률·결과 (레벨1-7)
+    SpriteId.h            그림 번호
+    SpriteArt.cpp / .h    코드 속 도트 그림과 팔레트. tools/sprite_art.py 가 만든다
+    SpriteAtlas.cpp / .h  도트 그림을 한 장 텍스처로 굽고 그린다
+    Text.cpp / .h         굴림 12 픽셀 글자 캐시와 그리기
+    FloatingText.cpp / .h 떠오르는 데미지 숫자와 획득 메시지
     stdafx.h / .cpp       미리 컴파일된 헤더
     Shaders/
       SolidRect.vs/.fs    도형용. 위치와 가로세로 배율을 유니폼 하나로 받는다
@@ -472,22 +556,22 @@ BaseProject_SE/
 ```cpp
 #pragma once
 
-inline constexpr int CHUNK_TILE_COUNT = 32;
-inline constexpr float TILE_PIXEL_WIDTH = 64.f;
-inline constexpr float TILE_PIXEL_HEIGHT = 32.f;
+constexpr int32 CHUNK_TILE_COUNT = 32;
+constexpr float TILE_PIXEL_WIDTH = 64.f;
+constexpr float TILE_PIXEL_HEIGHT = 32.f;
 
 struct WorldPos
 {
-    int m_chunk_x = 0;
-    int m_chunk_y = 0;
-    float m_local_x = 0.f;
-    float m_local_y = 0.f;
+    int32 chunk_x = 0;
+    int32 chunk_y = 0;
+    float local_x = 0.f;
+    float local_y = 0.f;
 };
 
 struct ScreenPos
 {
-    float m_x = 0.f;
-    float m_y = 0.f;
+    float x = 0.f;
+    float y = 0.f;
 };
 
 void NormalizeWorldPos(WorldPos* pos);
@@ -512,38 +596,38 @@ WorldPos ScreenToWorld(const ScreenPos& screen, const WorldPos& camera);
 void NormalizeWorldPos(WorldPos* pos)
 {
     // 음수 방향 floor 나눗셈
-    const float chunk_step_x = std::floor(pos->m_local_x / static_cast<float>(CHUNK_TILE_COUNT));
-    const float chunk_step_y = std::floor(pos->m_local_y / static_cast<float>(CHUNK_TILE_COUNT));
+    const float chunk_step_x = std::floor(pos->local_x / static_cast<float>(CHUNK_TILE_COUNT));
+    const float chunk_step_y = std::floor(pos->local_y / static_cast<float>(CHUNK_TILE_COUNT));
 
-    pos->m_chunk_x += static_cast<int>(chunk_step_x);
-    pos->m_chunk_y += static_cast<int>(chunk_step_y);
+    pos->chunk_x += static_cast<int32>(chunk_step_x);
+    pos->chunk_y += static_cast<int32>(chunk_step_y);
 
-    pos->m_local_x -= chunk_step_x * static_cast<float>(CHUNK_TILE_COUNT);
-    pos->m_local_y -= chunk_step_y * static_cast<float>(CHUNK_TILE_COUNT);
+    pos->local_x -= chunk_step_x * static_cast<float>(CHUNK_TILE_COUNT);
+    pos->local_y -= chunk_step_y * static_cast<float>(CHUNK_TILE_COUNT);
 }
 
 void MoveWorldPos(WorldPos* pos, float delta_x, float delta_y)
 {
-    pos->m_local_x += delta_x;
-    pos->m_local_y += delta_y;
+    pos->local_x += delta_x;
+    pos->local_y += delta_y;
 
     NormalizeWorldPos(pos);
 }
 
 float GetTileDistanceX(const WorldPos& from, const WorldPos& to)
 {
-    const int chunk_diff = to.m_chunk_x - from.m_chunk_x;
+    const int32 chunk_diff = to.chunk_x - from.chunk_x;
     const float chunk_part = static_cast<float>(chunk_diff * CHUNK_TILE_COUNT);
-    const float local_part = to.m_local_x - from.m_local_x;
+    const float local_part = to.local_x - from.local_x;
 
     return chunk_part + local_part;
 }
 
 float GetTileDistanceY(const WorldPos& from, const WorldPos& to)
 {
-    const int chunk_diff = to.m_chunk_y - from.m_chunk_y;
+    const int32 chunk_diff = to.chunk_y - from.chunk_y;
     const float chunk_part = static_cast<float>(chunk_diff * CHUNK_TILE_COUNT);
-    const float local_part = to.m_local_y - from.m_local_y;
+    const float local_part = to.local_y - from.local_y;
 
     return chunk_part + local_part;
 }
@@ -559,8 +643,8 @@ ScreenPos WorldToScreen(const WorldPos& target, const WorldPos& camera)
     const float tile_y = GetTileDistanceY(camera, target);
 
     ScreenPos screen;
-    screen.m_x = (tile_x - tile_y) * (TILE_PIXEL_WIDTH * 0.5f);
-    screen.m_y = -(tile_x + tile_y) * (TILE_PIXEL_HEIGHT * 0.5f);
+    screen.x = (tile_x - tile_y) * (TILE_PIXEL_WIDTH * 0.5f);
+    screen.y = -(tile_x + tile_y) * (TILE_PIXEL_HEIGHT * 0.5f);
 
     return screen;
 }
@@ -568,8 +652,8 @@ ScreenPos WorldToScreen(const WorldPos& target, const WorldPos& camera)
 WorldPos ScreenToWorld(const ScreenPos& screen, const WorldPos& camera)
 {
     // 정변환 두 식을 더하고 빼서 푼 결과
-    const float sum_axis = -screen.m_y / (TILE_PIXEL_HEIGHT * 0.5f);
-    const float diff_axis = screen.m_x / (TILE_PIXEL_WIDTH * 0.5f);
+    const float sum_axis = -screen.y / (TILE_PIXEL_HEIGHT * 0.5f);
+    const float diff_axis = screen.x / (TILE_PIXEL_WIDTH * 0.5f);
 
     const float tile_x = (sum_axis + diff_axis) * 0.5f;
     const float tile_y = (sum_axis - diff_axis) * 0.5f;
@@ -682,7 +766,78 @@ AI를 쓰면 코드 생산량은 나온다. 아껴야 할 건 **직접 확인하
       → 바닥과 물체가 같은 격자에 남는 스냅 규칙을 먼저 정해야 한다.
         바닥만 스냅하면 물체가 바닥에 대해 한 도트씩 떤다. 미착수
 
-- [ ] **6단계 — 텍스처 스프라이트**  ← **다음에 할 것**
+### 레벨1 트랙 — 2.15 (2026-09-14 구현, 빌드·실행 확인 전)
+
+- [ ] **레벨1-1 — 벽과 이동 충돌** (`World`)
+      아픔: 묘비와 울타리를 뚫고 지나가서 "갇히지 않게"가 성립조차 안 한다
+      → 청크마다 32 곱하기 32 막힘 표, 반경 0.3 사각형 몸의 모서리 넷 검사, 축을 나눈 이동
+
+- [ ] **레벨1-2 — 시작 구역 절차 생성과 연결 보장** (`ZoneGen`)
+      아픔: 손으로 박은 묘지는 매번 같고, 벽을 무작위로 뿌리면 빈 터가 닫혀 갇힌다
+      → 셀룰러 오토마타로 숲 덩어리를 만들고 4방향 연결을 보장한다 (2.15)
+
+- [ ] **레벨1-3 — 마우스 조준과 칼 휘두르기** (`Player`, `Input`)
+      아픔: 몬스터를 때릴 수단이 없다
+      → 커서 아래 바닥이 조준점. 좌우 60도, 1.7칸 부채꼴. 쿨 중 클릭은 버리지 않고 대기
+
+- [ ] **레벨1-4 — 체력, 추적, 피격** (`Monster`)
+      아픔: 때려도 안 죽고 쫓아오지도 않는다
+      → 좀비·해골. 어그로, 리쉬 복귀, 내려치기 예고, 플레이어 사망과 부활, 사냥터 재생성
+
+- [ ] **레벨1-5 — 드랍과 자동습득** (`Drop`)
+      아픔: 잡아도 남는 게 없다
+      → 경험치 구슬과 돈은 끌려와 먹히고, 재료는 E 로 줍는다
+
+- [ ] **레벨1-6 — 경험치, 레벨업, 스탯창** (`Player`, `Hud`)
+      아픔: 쌓여도 강해지지 않는다
+      → C 창. 1·2·3 키나 + 버튼으로 찍는다
+
+- [ ] **레벨1-7 — 강화** (`Enhance`, `Hud`)
+      아픔: 돈과 재료가 쌓여도 쓸 데가 없다
+      → 2.10 의 세 구간. U 창, Enter 나 버튼
+
+- [ ] **레벨1-8 — 보스** (`Monster`)
+      아픔: 레벨에 끝나는 지점이 없다
+      → 걸어서 제일 먼 칸. 2.3칸 내려찍기 예고, 상단 체력 막대
+
+### 레벨1 비주얼 트랙 — 2.16 (2026-09-14 구현, 빌드·실행 확인 전)
+
+- [ ] **비주얼 1 — 그리기 도구** (`Affine.vs/fs`, `Renderer::DrawAffine`, `SpriteAtlas`)
+      아픔: 단색 도형만 그려서 캐릭터도 칼도 글자도 못 그린다
+- [ ] **비주얼 2 — 캐릭터·몬스터·드랍 도트 그림** (`SpriteArt`)
+      아픔: 색깔 네모로는 좀비와 해골이 안 갈린다
+- [ ] **비주얼 3 — 검 휘두르기**
+      아픔: 점 몇 개가 부채꼴로 켜질 뿐 칼을 휘두르는 것으로 안 읽힌다
+- [ ] **비주얼 4 — 한글 글자** (`Text`, `FloatingText`, `Hud`)
+      아픔: 칸과 막대만으로는 스탯창과 강화창의 숫자를 못 읽는다
+- [ ] **비주얼 5 — 사막 바닥** (`Ground.fs`, `Fog.fs`)
+      아픔: 밤 이끼색 바닥이 참고 이미지와 다르다
+- [ ] **비주얼 6 — 낭떠러지, 물웅덩이, 야자수·바위·덤불, 그림자** (`ZoneGen`, `Ground.fs`, `Scene`)
+      아픔: 막힌 칸이 까만 덤불 마름모라 지형으로 안 읽힌다
+
+### 액터 트랙 — 화면에 놓이는 것을 클래스로
+
+화면에 놓이는 것이 네 모듈에 흩어져 있고, 붙어 다니는 것은 부모 좌표를 상수로 베낀다.
+계단은 "아픔 → 해결책" 쌍이고, 3계단이 씬그래프 본체다.
+
+- [x] **액터 1 — `GameObject` 를 `Actor` 클래스로, 그리기를 가상 함수로** (2026-09-21, 빌드·실행 확인 전)
+      아픔: 그리는 쪽이 종류를 몰라 `object == player_body` 포인터 비교로 칼을 골라낸다
+      → 몸과 그림자 기본 구현은 `Actor.cpp`, 그릴 순서는 `SceneGraph.cpp`, 칼은 `PlayerActor::Draw`
+
+- [ ] **액터 2 — 소유를 씬의 액터 목록 하나로, 갱신도 가상 함수로**
+      아픔: 종류 하나 늘 때마다 `Clear`·`Update`·`Collect` 세 벌을 새로 짜야 한다
+
+- [ ] **액터 3 — 부모-자식 트리와 변환 누적 (씬그래프 본체)**
+      아픔: 칼 손자리(발밑에서 11.5칸)와 화로 불빛을 상수로 베껴 부모가 바뀌면 따라 고쳐야 한다
+      → 루트만 `WorldPos` 를 들고, 그 아래는 부모 화면 좌표 기준 픽셀 오프셋·회전·배율
+
+- [ ] **액터 4 — 깊이 정렬을 트리 기준으로**
+      아픔: 평평하게 정렬하면 깊이 키가 같은 칼과 몸의 순서가 안 정해져 칼이 몸 뒤로 넘어간다
+
+- [ ] **액터 5 — 후처리 뒤 오버레이도 액터가 낸다**
+      아픔: 체력바·이름표·떠오르는 글자 패스가 종류마다 따로 돈다
+
+- [ ] **6단계 — 텍스처 스프라이트** (도트 그림으로 일부 대체됨 — 2.16)
       아픔: 색깔 네모로는 몬스터 종류가 구분 안 된다
       → 선행 조건: 에셋 팩 확보. 도트 트랙 4의 스프라이트가 여기로 합류한다
 
@@ -696,7 +851,7 @@ AI를 쓰면 코드 생산량은 나온다. 아껴야 할 건 **직접 확인하
 
       ***== 세로 슬라이스 2 — 무한히 걸어 다녀진다 ==***
 
-- [ ] **9단계 — 클릭 이동과 제한 범위 길찾기**
+- [ ] **9단계 — 클릭 이동과 제한 범위 길찾기** (클릭 이동은 2.15 로 폐기. 몬스터 길찾기로만 남는다)
       아픔: 벽을 뚫고 직선으로 걸어간다
       → 클릭은 화면 안만 가능하므로 목적지가 항상 몇 청크 안이다.
         전역 길찾기를 고민할 필요가 없고 네비메시까지 갈 것도 없다
@@ -742,13 +897,12 @@ AI를 쓰면 코드 생산량은 나온다. 아껴야 할 건 **직접 확인하
 - **타일 픽셀 크기** — 잠정 64 곱하기 32. 에셋 팩을 먼저 고르면 그쪽 규격에 맞추는 게 낫다.
   나중에 바꿔도 상수 두 개만 고치면 된다
 - **창 크기** — 1280 곱하기 720을 제안했으나 확정 아님
-- **월드 씨앗을 어떻게 정할 것인가** — 고정할지 실행마다 바꿀지 (8단계에서 결정)
 - **지형 종류** — 어떤 바이옴을 생성할지 (8단계에서 결정)
 - **구간별 성공률 실제 숫자** — 2.10은 구간의 성격만 잡았고 값은 안 박았다.
-  돌려 보고 정하는 게 맞다
+  돌려 보고 정하는 게 맞다. 레벨1 잠정값은 90·50·30퍼센트, 도박 구간 실패 중 4분의 1이 0단계
 - **보호 재료를 어디서 얻나** — 파밍 드랍인지, 하위 재료를 합쳐서 만드는지
 - **몬스터 한 마리당 재료 수익** — 이게 정해져야 강화 비용이 정해진다.
-  10단계까지 몇 마리를 잡아야 하는지가 여기서 나온다
+  10단계까지 몇 마리를 잡아야 하는지가 여기서 나온다. 레벨1 잠정값은 한 마리당 별가루 40·별조각 5·별핵 0.8퍼센트
 
 ---
 
@@ -764,3 +918,7 @@ AI를 쓰면 코드 생산량은 나온다. 아껴야 할 건 **직접 확인하
 | 2026-09-08 | **도트 1 — 바닥 셰이더.** 칸마다 마름모를 그리던 `DrawGround`를 화면 덮는 사각형 한 장으로 교체(`Ground` 모듈, `Shaders/Ground.fs`). 색 단위를 칸에서 칸의 8분의 1 도트로 내리고 조명을 픽셀 단위로 옮겼다. `Scene.cpp`에서 `GetGroundColor`·`AddLightContribution`·`IsChunkEdgeTile`·`GetNearbyTile` 제거. 화면 네 구석 바닥 누락도 같이 사라졌다 |
 | 2026-09-08 | **도트 2 — 안개 셰이더.** 사각형 다섯 장이 만들던 가로 경계선 여덟 줄을 값 노이즈 한 장으로 교체(`Fog` 모듈). 행 평균 최대 단차 2.91 -> 0.70 코드로, 안개를 끈 상태(0.69)와 같아졌다. 처음엔 바닥 얼룩을 범인으로 잘못 짚었다 — 바닥 셰이더가 만드는 경계는 전부 45도 마름모라 화면 가로선을 만들 수 없다는 게 판별 근거였다 |
 | 2026-09-08 | **도트 3 — 픽셀화.** 씬을 640 곱하기 360에 그리고 최근접으로 확대(`Shaders/Upscale.fs`). HUD도 저해상도 버퍼에 그려 같은 격자에 얹었다. 합성 마지막에 8 곱하기 8 정렬 디더 추가. 넓은 얼룩 진폭 0.048 -> 0.020으로 낮춤(이웃 덩어리 단차 22 -> 9 코드). 블룸 축소 배수는 씬이 이미 절반이라 4에서 2로, 가장자리 흐림 반경은 렌더 배율만큼 줄여 두께를 유지. 카메라 도트 스냅은 미착수 |
+| 2026-09-14 | **코드 컨벤션을 서버 `GameServer` 기준으로 통일.** `Types.h` 정수 별칭(`int` -> `int32` 등), 구조체 필드의 `m_` 제거(클래스 멤버만 `m_`), `!x` -> `x == false`, raw 배열 -> `std::array`, `NULL` -> `nullptr`, 교수 원본 `Renderer` 카멜 이름 정리, 영어·재서술 주석 삭제, 로그 형식 통일. 출력 포인터 인자는 4.5 규칙이라 유지. 동작 변화는 로그 줄바꿈뿐 |
+| 2026-09-14 | **레벨1 프로토타입 1~8 구현(빌드·실행 확인 전).** 2.15 요구대로 충돌(`World`), 시작 구역 생성(`ZoneGen`), 조준·휘두르기·경험치·스탯(`Player`), 몬스터·보스(`Monster`), 드랍(`Drop`), 강화(`Enhance`), 스탯창·강화창(`Hud`). 손으로 박은 묘지와 칸 찍기는 걷어냈다. `GameObject` 는 `Scene.h` 에서 `GameObject.h` 로 옮기고 배회 필드는 `Monster` 로 뺐다 |
+| 2026-09-14 | **레벨1 비주얼 1~6 구현(빌드·실행 확인 전).** 2.16. 기울여 늘이는 사각형 셰이더, 코드 속 도트 그림 18종 아틀라스, 굴림 12 픽셀 한글 캐시, 떠오르는 숫자, 칼 회전과 잔상, 모래 바닥, 꺼진 낭떠러지와 물웅덩이, 야자수·바위·덤불, 기운 그림자. HUD 전 항목에 한글 라벨과 숫자. 물웅덩이 비율은 오프라인 시뮬로 30퍼센트로 낮췄다 |
+| 2026-09-21 | **액터 1 구현(빌드·실행 확인 전).** `GameObject` 구조체를 `Actor` 클래스로 올리고 몸·그림자 그리기를 가상 함수로 열었다(`Actor.cpp/.h`). `Scene.cpp` 의 `DrawSortedBodies` 는 `SceneGraph.cpp/.h` 로 떼어 그릴 액터를 모아 깊이 순으로 내는 곳이 됐다 — 아직 평평한 목록이고 부모-자식은 액터 3. 칼 그리기가 `Scene.cpp` 에서 `Player.cpp` 의 `PlayerActor::Draw` 로 옮겨가 `object == player_body` 특례 분기가 사라졌다. 필드는 클래스 규칙대로 `m_` 접두사를 붙이되 공개로 뒀다 — 감추는 건 소유가 액터로 들어오는 액터 2에서 |

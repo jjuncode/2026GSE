@@ -18,7 +18,7 @@ void ResetFrameClock()
 
 float PopElapsedSeconds()
 {
-	if (!g_clock_started)
+	if (g_clock_started == false)
 	{
 		ResetFrameClock();
 		return 0.f;

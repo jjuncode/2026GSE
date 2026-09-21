@@ -166,6 +166,22 @@
     <ClInclude Include="PostProcess.h" />
     <ClInclude Include="Ground.h" />
     <ClInclude Include="Fog.h" />
+    <ClInclude Include="Types.h" />
+    <ClInclude Include="Balance.h" />
+    <ClInclude Include="Actor.h" />
+    <ClInclude Include="SceneGraph.h" />
+    <ClInclude Include="Profiler.h" />
+    <ClInclude Include="World.h" />
+    <ClInclude Include="ZoneGen.h" />
+    <ClInclude Include="Player.h" />
+    <ClInclude Include="Enhance.h" />
+    <ClInclude Include="Drop.h" />
+    <ClInclude Include="Monster.h" />
+    <ClInclude Include="SpriteId.h" />
+    <ClInclude Include="SpriteArt.h" />
+    <ClInclude Include="SpriteAtlas.h" />
+    <ClInclude Include="Text.h" />
+    <ClInclude Include="FloatingText.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
@@ -174,12 +190,25 @@
     <ClCompile Include="WorldPos.cpp" />
     <ClCompile Include="GameTime.cpp" />
     <ClCompile Include="Input.cpp" />
+    <ClCompile Include="Actor.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="SceneGraph.cpp" />
+    <ClCompile Include="Profiler.cpp" />
     <ClCompile Include="Hud.cpp" />
     <ClCompile Include="ShaderUtil.cpp" />
     <ClCompile Include="PostProcess.cpp" />
     <ClCompile Include="Ground.cpp" />
     <ClCompile Include="Fog.cpp" />
+    <ClCompile Include="World.cpp" />
+    <ClCompile Include="ZoneGen.cpp" />
+    <ClCompile Include="Player.cpp" />
+    <ClCompile Include="Enhance.cpp" />
+    <ClCompile Include="Drop.cpp" />
+    <ClCompile Include="Monster.cpp" />
+    <ClCompile Include="SpriteArt.cpp" />
+    <ClCompile Include="SpriteAtlas.cpp" />
+    <ClCompile Include="Text.cpp" />
+    <ClCompile Include="FloatingText.cpp" />
     <ClCompile Include="SimpleGame.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
@@ -198,6 +227,8 @@
     <None Include="Shaders\Ground.fs" />
     <None Include="Shaders\Fog.fs" />
     <None Include="Shaders\Upscale.fs" />
+    <None Include="Shaders\Affine.vs" />
+    <None Include="Shaders\Affine.fs" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
