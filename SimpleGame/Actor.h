@@ -23,6 +23,7 @@ public:
 	int32 m_frame = 0;
 	bool m_flip = false;	// 그림은 오른쪽을 본다. 켜면 왼쪽
 	float m_shade = 1.f;	// 같은 그림을 조금씩 다른 밝기로
+	float m_foot_offset_y = 0.f;	// 그림 발밑을 위치에서 이만큼 띄운다 ( 픽셀 )
 
 	// 0 보다 크면 바닥을 밝히고 빛무리를 낸다
 	float m_light_radius = 0.f;

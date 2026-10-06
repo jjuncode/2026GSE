@@ -21,7 +21,7 @@ void Actor::Draw(Renderer* renderer, const WorldPos& camera) const
 	const ScreenPos screen = WorldToScreen(m_pos, camera);
 	const float glow = m_shade * m_emissive;
 
-	DrawSprite(renderer, m_sprite, m_frame, screen.x, screen.y, 1.f, m_flip, glow, glow, glow, 1.f);
+	DrawSprite(renderer, m_sprite, m_frame, screen.x, screen.y + m_foot_offset_y, 1.f, m_flip, glow, glow, glow, 1.f);
 }
 
 void Actor::DrawShadow(Renderer* renderer, const WorldPos& camera) const

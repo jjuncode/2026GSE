@@ -28,6 +28,20 @@ namespace Balance
 	constexpr float MONSTER_RESPAWN_MIN_DISTANCE = 12.f;	// 눈앞에서는 안 살아난다
 	constexpr float MONSTER_LEASH = 14.f;	// 스폰 자리에서 이만큼 끌려가면 돌아간다
 
+	constexpr int32 BOSS_UNLOCK_LEVEL = 5;	// 이 레벨이 돼야 성문파쇄자가 깨어난다
+
+	constexpr float WEAK_POINT_MULTIPLIER = 2.5f;	// 거식귀 등 뒤에서 벤 배수
+	constexpr float ELITE_HP_RATE = 2.2f;
+	constexpr float ELITE_ATTACK_RATE = 1.35f;
+	constexpr float ELITE_EXP_RATE = 2.5f;
+	constexpr float ELITE_CHANCE_FIELD = 0.10f;
+	constexpr float ELITE_CHANCE_OUTER = 0.18f;
+
+	// 띠마다 몬스터 수치에 곱한다. 멀리 갈수록 세고 많이 준다
+	constexpr float BAND_POWER_INTRO = 0.6f;
+	constexpr float BAND_POWER_FIELD = 1.f;
+	constexpr float BAND_POWER_OUTER = 1.6f;
+
 	constexpr float MAGNET_RANGE = 2.5f;
 	constexpr float MAGNET_ACCEL = 14.f;
 	constexpr float MAGNET_MAX_SPEED = 10.f;

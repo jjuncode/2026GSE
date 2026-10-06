@@ -3,9 +3,9 @@
 layout(location=0) out vec4 FragColor;
 
 in vec2 v_Uv;
+in vec4 v_Color;
 
 uniform sampler2D u_Texture;
-uniform vec4 u_Color;
 uniform int u_UndoToneMap;
 
 vec3 UndoToneMapACES(vec3 display)
@@ -34,5 +34,5 @@ void main()
 		color = UndoToneMapACES(color);
 	}
 
-	FragColor = vec4(color * u_Color.rgb, u_Color.a);
+	FragColor = vec4(color * v_Color.rgb, v_Color.a);
 }

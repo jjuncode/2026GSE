@@ -1,5 +1,6 @@
 ﻿#include "stdafx.h"
 #include "PostProcess.h"
+#include "Renderer.h"
 #include "ShaderUtil.h"
 #include "Profiler.h"
 
@@ -299,6 +300,9 @@ void ShutdownPostProcess()
 
 void BeginScenePass()
 {
+	// 앞 프레임이 남긴 것이 새 버퍼에 딸려 들어가면 안 된다
+	FlushRenderBatch();
+
 	if (g_ready == false)
 	{
 		return;
@@ -310,10 +314,15 @@ void BeginScenePass()
 
 void EndScenePassAndComposite()
 {
+	// 씬에 그린 것이 전부 나간 뒤라야 밝은 부분을 뽑을 수 있다
+	FlushRenderBatch();
+
 	if (g_ready == false)
 	{
 		return;
 	}
+
+	BeginProfileStage(PROFILE_STAGE_POST);
 
 	// 후처리는 덮어쓰기라 알파 혼합이 켜져 있으면 결과가 섞인다
 	glDisable(GL_BLEND);
@@ -368,14 +377,21 @@ void EndScenePassAndComposite()
 
 	// 저해상도 버퍼를 묶은 채로 나간다. HUD 가 여기 얹혀야 같은 격자를 탄다
 	glEnable(GL_BLEND);
+
+	EndProfileStage();
 }
 
 void PresentUpscaled()
 {
+	// HUD 까지 전부 내보낸 뒤에 확대한다
+	FlushRenderBatch();
+
 	if (g_ready == false)
 	{
 		return;
 	}
+
+	BeginProfileStage(PROFILE_STAGE_POST);
 
 	// 복사라서 섞이면 안 된다
 	glDisable(GL_BLEND);
@@ -394,4 +410,6 @@ void PresentUpscaled()
 	DrawFullScreen(g_upscale_position);
 
 	glEnable(GL_BLEND);
+
+	EndProfileStage();
 }

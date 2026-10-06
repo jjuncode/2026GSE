@@ -16,5 +16,6 @@ WorldPos GetCameraPos();
 void MovePlayerByScreenAxis(float screen_right, float screen_up, float delta_seconds);
 void MovePlayerByWorldAxis(float world_x, float world_y, float delta_seconds);
 void PickupMaterials();
+void SelectNpcAtCursor();	// 커서 아래 NPC 를 관찰창에. 없으면 닫는다
 void ToggleChunkGrid();
 void ToggleLighting();

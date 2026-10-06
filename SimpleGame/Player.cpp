@@ -89,10 +89,10 @@ namespace
 			side = -1.f;
 		}
 
-		// 그림 속 손 위치 ( 오른쪽을 볼 때 가운데에서 4칸 오른쪽, 발에서 11칸 위 )
+		// 그림 속 손 위치 ( 오른쪽을 볼 때 가운데에서 3칸 오른쪽, 발에서 10칸 위 )
 		const float unit = static_cast<float>(PIXEL_SCALE);
-		const float hand_x = foot.x + side * 4.f * unit;
-		const float hand_y = foot.y + 11.5f * unit;
+		const float hand_x = foot.x + side * 3.f * unit;
+		const float hand_y = foot.y + 10.5f * unit;
 
 		if (g_player.swing_timer <= 0.f)
 		{
@@ -291,6 +291,19 @@ void DamagePlayer(int32 damage)
 	}
 }
 
+int32 TakePlayerGold(int32 amount)
+{
+	int32 taken = amount;
+	if (taken > g_player.gold)
+	{
+		taken = g_player.gold;
+	}
+
+	g_player.gold -= taken;
+
+	return taken;
+}
+
 int32 GetPlayerMaxHp()
 {
 	return Balance::PLAYER_BASE_HP + g_player.stats[static_cast<size_t>(STAT_MAX_HP)] * Balance::PLAYER_HP_PER_POINT;
@@ -353,15 +366,15 @@ const wchar_t* GetMaterialName(int32 material)
 {
 	if (material == MATERIAL_CORE)
 	{
-		return L"별핵";
+		return L"심장석";
 	}
 
 	if (material == MATERIAL_FRAGMENT)
 	{
-		return L"별조각";
+		return L"푸른 마석";
 	}
 
-	return L"별가루";
+	return L"재가루";
 }
 
 const wchar_t* GetStatName(int32 stat)

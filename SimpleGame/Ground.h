@@ -5,9 +5,15 @@
 
 constexpr int32 GROUND_MAX_LIGHT_COUNT = 8;
 
-constexpr uint8 GROUND_CODE_OPEN = 0;
+constexpr uint8 GROUND_CODE_OPEN = 0;	// 잿빛 흙
 constexpr uint8 GROUND_CODE_CLIFF = 1;
-constexpr uint8 GROUND_CODE_WATER = 2;
+constexpr uint8 GROUND_CODE_WATER = 2;	// 검은 늪
+constexpr uint8 GROUND_CODE_ROAD = 3;
+constexpr uint8 GROUND_CODE_PLAZA = 4;	// 돌길
+constexpr uint8 GROUND_CODE_FIELD = 5;	// 성 안 밭
+constexpr uint8 GROUND_CODE_FIELD_DEAD = 6;	// 버려진 밭
+constexpr uint8 GROUND_CODE_BLIGHT = 7;	// 재에 물든 땅
+constexpr uint8 GROUND_CODE_YARD = 8;	// 성 안 다져진 흙
 
 // 카메라 기준 칸 오프셋. 절대 좌표로 넘기면 멀리서 float 눈금이 벌어진다
 struct GroundLight

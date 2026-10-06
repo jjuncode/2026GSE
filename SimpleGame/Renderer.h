@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <vector>
 
 #include "Dependencies\glew.h"
 
@@ -35,8 +36,6 @@ public:
 
 	bool IsInitialized() const;
 
-	// 정사각형. size 는 픽셀
-	void DrawSolidRect(float x, float y, float z, float size, float r, float g, float b, float a);
 	// 가로세로가 다른 사각형. 막대와 패널용
 	void DrawSolidBox(float x, float y, float width, float height, float r, float g, float b, float a);
 	// 아이소 타일. scale 1 이 타일 한 칸
@@ -50,19 +49,28 @@ public:
 	// 씬 버퍼는 톤매핑 전이라 그림 색을 역변환해야 그린 색 그대로 나온다. HUD 는 끈다
 	void SetUndoToneMap(bool undo);
 
+	// 쌓아 둔 것을 한 번에 내보낸다. 깊이 버퍼가 없어 덮임 순서가 곧 그린 순서라,
+	// 다른 층이 자기 셰이더로 그리기 전에 반드시 비워야 한다
+	void FlushBatch();
+
 private:
 	void Initialize(int32 window_size_x, int32 window_size_y);
 	void CreateVertexBufferObjects();
-	void CreateRectVertexBuffer();
-	void CreateDiamondVertexBuffer();
-	void CreateCircleVertexBuffer();
-	void CreateUnitQuadVertexBuffer();
+	void CreateInstanceBuffer();
 	void CacheShaderLocations();
 	void GetGLPosition(float x, float y, float* new_x, float* new_y);
-	void DrawTriangles(GLuint vbo, int32 vertex_count, float new_x, float new_y, float scale_x, float scale_y, float r, float g, float b, float a);
+
+	void PushSolidInstance(GLuint mesh_vbo, int32 mesh_vertex_count, float new_x, float new_y, float scale_x, float scale_y, float r, float g, float b, float a);
+
+	void FlushCurrentBatch(int32 reason);
+	void FlushSolidBatch();
+	void FlushAffineBatch();
+	void UploadInstanceBuffer();
+	void BindInstanceAttrib(GLint location, int32 component_count, size_t float_offset, int32 stride_float_count);
+	void ReleaseInstanceAttrib(GLint location);
 
 	bool m_initialized = false;
-	
+
 	int32 m_window_size_x = 0;
 	int32 m_window_size_y = 0;
 
@@ -70,6 +78,7 @@ private:
 	GLuint m_vbo_diamond = 0;
 	GLuint m_vbo_circle = 0;
 	GLuint m_vbo_unit_quad = 0;
+	GLuint m_vbo_instance = 0;
 	GLuint m_solid_rect_shader = 0;
 	GLuint m_affine_shader = 0;
 
@@ -77,17 +86,31 @@ private:
 
 	int32 m_circle_vertex_count = 0;
 
-	// 그리기마다 문자열로 찾으면 프레임당 수천 번 검색이라 링크 시점에 받아 둔다
-	GLint m_trans_uniform = -1;
-	GLint m_color_uniform = -1;
-	GLint m_position_attrib = -1;
+	// 모아 둔 인스턴스. 종류가 섞이지 않게 바뀔 때마다 비우고 다시 채운다
+	std::vector<float> m_instances;
+	int32 m_batch_kind = 0;
+	int32 m_batch_instance_count = 0;
 
-	GLint m_affine_origin = -1;
-	GLint m_affine_axis_x = -1;
-	GLint m_affine_axis_y = -1;
-	GLint m_affine_region = -1;
-	GLint m_affine_color = -1;
+	GLuint m_batch_mesh_vbo = 0;
+	int32 m_batch_mesh_vertex_count = 0;
+	GLuint m_batch_texture = 0;
+	bool m_batch_undo_tone_map = false;
+
+	// 그리기마다 문자열로 찾으면 프레임당 수천 번 검색이라 링크 시점에 받아 둔다
+	GLint m_position_attrib = -1;
+	GLint m_solid_trans_attrib = -1;
+	GLint m_solid_color_attrib = -1;
+
 	GLint m_affine_texture = -1;
 	GLint m_affine_undo = -1;
 	GLint m_affine_position = -1;
+	GLint m_affine_origin_attrib = -1;
+	GLint m_affine_axis_x_attrib = -1;
+	GLint m_affine_axis_y_attrib = -1;
+	GLint m_affine_region_attrib = -1;
+	GLint m_affine_color_attrib = -1;
 };
+
+// 바닥, 안개, 후처리처럼 자기 셰이더로 직접 그리는 층이 그리기 전에 부른다.
+// 안 부르면 쌓아 둔 그림이 그 층 뒤로 밀려 덮임 순서가 뒤집힌다
+void FlushRenderBatch();

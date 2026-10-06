@@ -2,8 +2,8 @@
 
 layout(location=0) out vec4 FragColor;
 
-const vec3 FOG_COLOR = vec3(0.55, 0.45, 0.30);
-const float FOG_DENSITY = 0.07;
+const vec3 FOG_COLOR = vec3(0.40, 0.40, 0.43);
+const float FOG_DENSITY = 0.09;
 const float THRESHOLD_LOW = 0.45;
 const float THRESHOLD_HIGH = 0.66;
 const float CELL_WIDTH = 420.0;

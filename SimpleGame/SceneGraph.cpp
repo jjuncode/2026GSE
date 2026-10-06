@@ -1,6 +1,7 @@
 ﻿#include "stdafx.h"
 #include "SceneGraph.h"
 #include "Actor.h"
+#include "Profiler.h"
 
 #include <algorithm>
 #include <vector>
@@ -22,6 +23,9 @@ void AddSceneActor(const Actor* actor)
 
 void DrawSceneGraph(Renderer* renderer, const WorldPos& camera)
 {
+	// 드로우콜과 따로 움직인다. 정렬 비용은 액터 수를 따라가고 드로우콜은 배치를 따라간다
+	CountSceneActor(static_cast<int32>(g_actors.size()));
+
 	// 그림자는 전부 몸보다 먼저. 앞 물체 그림자가 뒤 물체 발을 덮는 건 괜찮지만 몸을 덮으면 안 된다
 	for (const Actor* actor : g_actors)
 	{

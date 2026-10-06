@@ -1,8 +1,11 @@
 ﻿#include "stdafx.h"
 #include "SpriteAtlas.h"
+#include "AssetCache.h"
 #include "GameConfig.h"
+#include "Profiler.h"
 #include "SpriteArt.h"
 
+#include <chrono>
 #include <cstring>
 #include <iostream>
 #include <utility>
@@ -10,8 +13,10 @@
 
 namespace
 {
-	constexpr int32 ATLAS_SIZE = 256;
+	constexpr int32 ATLAS_SIZE = 512;
 	constexpr int32 PADDING = 1;	// 최근접으로 읽어도 경계에서 옆 그림을 집지 않게
+
+	const char* ATLAS_CACHE_NAME = "sprite_atlas";
 
 	struct SpriteEntry
 	{
@@ -60,70 +65,214 @@ namespace
 			}
 		}
 	}
+
+	// 그림 원본의 지문. tools/sprite_art.py 로 그림을 다시 뽑으면 여기가 달라져 캐시가 저절로 버려진다
+	uint64 MakeArtSignature(const std::vector<SpriteArt>& arts)
+	{
+		uint64 signature = HashValue(static_cast<uint64>(ATLAS_SIZE), 1469598103934665603ull);
+		signature = HashValue(static_cast<uint64>(PADDING), signature);
+		signature = HashValue(static_cast<uint64>(arts.size()), signature);
+
+		for (const SpriteArt& art : arts)
+		{
+			signature = HashValue(static_cast<uint64>(art.width), signature);
+			signature = HashValue(static_cast<uint64>(art.height), signature);
+			signature = HashValue(static_cast<uint64>(art.frames.size()), signature);
+
+			for (const std::vector<const char*>& rows : art.frames)
+			{
+				for (const char* line : rows)
+				{
+					signature = HashBytes(line, std::strlen(line), signature);
+				}
+			}
+		}
+
+		return signature;
+	}
+
+	void UploadAtlasTexture(const std::vector<uint8>& pixels)
+	{
+		glGenTextures(1, &g_texture);
+		glBindTexture(GL_TEXTURE_2D, g_texture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, ATLAS_SIZE, ATLAS_SIZE, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+		// 선형으로 읽으면 도트 경계가 번진다
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	}
+
+	std::vector<uint8> EncodeAtlas(const std::vector<uint8>& pixels)
+	{
+		BlobWriter writer;
+		writer.WriteUint(static_cast<uint32>(g_entries.size()));
+
+		for (const SpriteEntry& entry : g_entries)
+		{
+			writer.WriteInt(entry.width);
+			writer.WriteInt(entry.height);
+			writer.WriteUint(static_cast<uint32>(entry.frames.size()));
+
+			for (const TexRegion& region : entry.frames)
+			{
+				writer.WriteFloat(region.u0);
+				writer.WriteFloat(region.v0);
+				writer.WriteFloat(region.u1);
+				writer.WriteFloat(region.v1);
+			}
+		}
+
+		writer.WriteUint(static_cast<uint32>(ATLAS_SIZE));
+		writer.WriteRaw(pixels.data(), pixels.size());
+
+		return writer.bytes;
+	}
+
+	bool DecodeAtlas(const std::vector<uint8>& blob, std::vector<uint8>* pixels)
+	{
+		BlobReader reader;
+		reader.bytes = &blob;
+
+		const uint32 sprite_count = reader.ReadUint();
+
+		if (reader.failed || sprite_count == 0 || sprite_count > 4096)
+		{
+			return false;
+		}
+
+		std::vector<SpriteEntry> entries(static_cast<size_t>(sprite_count));
+
+		for (size_t sprite = 0; sprite < entries.size(); ++sprite)
+		{
+			SpriteEntry& entry = entries[sprite];
+			entry.width = reader.ReadInt();
+			entry.height = reader.ReadInt();
+
+			const uint32 frame_count = reader.ReadUint();
+
+			if (reader.failed || frame_count > 64)
+			{
+				return false;
+			}
+
+			for (uint32 frame = 0; frame < frame_count; ++frame)
+			{
+				TexRegion region;
+				region.u0 = reader.ReadFloat();
+				region.v0 = reader.ReadFloat();
+				region.u1 = reader.ReadFloat();
+				region.v1 = reader.ReadFloat();
+
+				entry.frames.push_back(region);
+			}
+		}
+
+		const uint32 atlas_size = reader.ReadUint();
+
+		if (reader.failed || atlas_size != static_cast<uint32>(ATLAS_SIZE))
+		{
+			return false;
+		}
+
+		pixels->assign(static_cast<size_t>(ATLAS_SIZE * ATLAS_SIZE * 4), 0);
+		reader.ReadRaw(pixels->data(), pixels->size());
+
+		if (reader.failed)
+		{
+			return false;
+		}
+
+		g_entries.swap(entries);
+
+		return true;
+	}
+
+	// 캐시가 없을 때만 도는 길. 도트를 한 칸씩 팔레트로 바꿔 칸에 올린다
+	void BakeAtlas(const std::vector<SpriteArt>& arts, std::vector<uint8>* pixels)
+	{
+		g_entries.assign(arts.size(), SpriteEntry());
+
+		int32 cursor_x = PADDING;
+		int32 cursor_y = PADDING;
+		int32 shelf_height = 0;
+		const float atlas_size = static_cast<float>(ATLAS_SIZE);
+
+		for (size_t sprite = 0; sprite < arts.size(); ++sprite)
+		{
+			const SpriteArt& art = arts[sprite];
+			SpriteEntry& entry = g_entries[sprite];
+			entry.width = art.width;
+			entry.height = art.height;
+
+			for (const std::vector<const char*>& rows : art.frames)
+			{
+				if (cursor_x + art.width + PADDING > ATLAS_SIZE)
+				{
+					cursor_x = PADDING;
+					cursor_y += shelf_height + PADDING;
+					shelf_height = 0;
+				}
+
+				if (cursor_y + art.height + PADDING > ATLAS_SIZE)
+				{
+					std::cout << "[ SpriteAtlas - BakeAtlas ] : atlas full\n";
+					return;
+				}
+
+				BlitFrame(pixels, art, rows, cursor_x, cursor_y);
+
+				TexRegion region;
+				region.u0 = static_cast<float>(cursor_x) / atlas_size;
+				region.v0 = static_cast<float>(cursor_y) / atlas_size;
+				region.u1 = static_cast<float>(cursor_x + art.width) / atlas_size;
+				region.v1 = static_cast<float>(cursor_y + art.height) / atlas_size;
+				entry.frames.push_back(region);
+
+				cursor_x += art.width + PADDING;
+				if (art.height > shelf_height)
+				{
+					shelf_height = art.height;
+				}
+			}
+		}
+	}
 }
 
 bool InitSpriteAtlas()
 {
+	const std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
 	const std::vector<SpriteArt> arts = MakeSpriteArts();
-	std::vector<uint8> pixels(static_cast<size_t>(ATLAS_SIZE * ATLAS_SIZE * 4), 0);
+	const uint64 signature = MakeArtSignature(arts);
 
-	g_entries.assign(arts.size(), SpriteEntry());
+	std::vector<uint8> pixels;
+	std::vector<uint8> blob;
+	bool from_cache = false;
 
-	int32 cursor_x = PADDING;
-	int32 cursor_y = PADDING;
-	int32 shelf_height = 0;
-	const float atlas_size = static_cast<float>(ATLAS_SIZE);
-
-	for (size_t sprite = 0; sprite < arts.size(); ++sprite)
+	if (LoadCachedBlob(ATLAS_CACHE_NAME, signature, &blob))
 	{
-		const SpriteArt& art = arts[sprite];
-		SpriteEntry& entry = g_entries[sprite];
-		entry.width = art.width;
-		entry.height = art.height;
-
-		for (const std::vector<const char*>& rows : art.frames)
-		{
-			if (cursor_x + art.width + PADDING > ATLAS_SIZE)
-			{
-				cursor_x = PADDING;
-				cursor_y += shelf_height + PADDING;
-				shelf_height = 0;
-			}
-
-			if (cursor_y + art.height + PADDING > ATLAS_SIZE)
-			{
-				std::cout << "[ SpriteAtlas - InitSpriteAtlas ] : atlas full\n";
-				return false;
-			}
-
-			BlitFrame(&pixels, art, rows, cursor_x, cursor_y);
-
-			TexRegion region;
-			region.u0 = static_cast<float>(cursor_x) / atlas_size;
-			region.v0 = static_cast<float>(cursor_y) / atlas_size;
-			region.u1 = static_cast<float>(cursor_x + art.width) / atlas_size;
-			region.v1 = static_cast<float>(cursor_y + art.height) / atlas_size;
-			entry.frames.push_back(region);
-
-			cursor_x += art.width + PADDING;
-			if (art.height > shelf_height)
-			{
-				shelf_height = art.height;
-			}
-		}
+		from_cache = DecodeAtlas(blob, &pixels);
 	}
 
-	glGenTextures(1, &g_texture);
-	glBindTexture(GL_TEXTURE_2D, g_texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, ATLAS_SIZE, ATLAS_SIZE, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+	if (from_cache == false)
+	{
+		pixels.assign(static_cast<size_t>(ATLAS_SIZE * ATLAS_SIZE * 4), 0);
+		BakeAtlas(arts, &pixels);
 
-	// 선형으로 읽으면 도트 경계가 번진다
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		if (g_entries.empty())
+		{
+			return false;
+		}
 
-	std::cout << "[ SpriteAtlas - InitSpriteAtlas ] : ready\n";
+		SaveCachedBlob(ATLAS_CACHE_NAME, signature, EncodeAtlas(pixels));
+	}
+
+	UploadAtlasTexture(pixels);
+
+	const std::chrono::duration<float> elapsed = std::chrono::steady_clock::now() - begin;
+	LogAssetLoad(ATLAS_CACHE_NAME, from_cache, pixels.size(), elapsed.count() * 1000.f);
 
 	return true;
 }

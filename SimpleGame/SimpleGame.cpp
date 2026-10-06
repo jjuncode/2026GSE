@@ -28,9 +28,13 @@ but WITHOUT ANY WARRANTY.
 #include "SpriteAtlas.h"
 #include "Text.h"
 #include "Profiler.h"
+#include "Minimap.h"
+#include "Npc.h"
+#include "NpcHud.h"
 
 const uint8 KEY_ESCAPE = 27;
 const uint8 KEY_ENTER = 13;
+const uint8 KEY_TAB = 9;
 
 Renderer* g_renderer = nullptr;
 
@@ -94,6 +98,8 @@ static void ApplyInput(float delta_seconds)
 
 void Update()
 {
+	BeginProfileStage(PROFILE_STAGE_UPDATE);
+
 	g_accumulated_seconds += PopElapsedSeconds();
 
 	// 남은 시간을 고정 간격으로 쪼개 그 횟수만큼 돌린다.
@@ -106,7 +112,10 @@ void Update()
 
 		g_accumulated_seconds -= FIXED_STEP_SECONDS;
 	}
+
+	EndProfileStage();
 }
+
 
 void RenderScene()
 {
@@ -129,9 +138,15 @@ void RenderScene()
 
 	PresentUpscaled();
 
+	// 프레임 경계. 남은 것이 있으면 다음 프레임 첫 층 뒤로 밀린다
+	FlushRenderBatch();
+
 	glutSwapBuffers();
 
 	EndProfileFrame();
+
+	// 새 글자를 구운 프레임에만 실제로 쓴다
+	SaveTextCache();
 }
 
 void Idle()
@@ -143,12 +158,23 @@ void Idle()
 
 void MouseInput(int32 button, int32 state, int32 x, int32 y)
 {
+	SetMouseWindowPos(x, y);
+
+	// 오른쪽은 관찰. 공격 키와 겹치지 않게 떼어 둔다
+	if (button == GLUT_RIGHT_BUTTON)
+	{
+		if (state == GLUT_DOWN)
+		{
+			SelectNpcAtCursor();
+		}
+
+		return;
+	}
+
 	if (button != GLUT_LEFT_BUTTON)
 	{
 		return;
 	}
-
-	SetMouseWindowPos(x, y);
 
 	if (state != GLUT_DOWN)
 	{
@@ -213,6 +239,41 @@ void KeyInput(uint8 key, int32 x, int32 y)
 			RegenerateZone();
 			break;
 		}
+		case 'p':
+		case 'P':
+		{
+			ToggleProfileDetail();
+			break;
+		}
+		case 'f':
+		case 'F':
+		{
+			ToggleFollowNpc();
+			break;
+		}
+		case 'v':
+		case 'V':
+		{
+			CycleNpcLabelMode();
+			break;
+		}
+		case 'j':
+		case 'J':
+		{
+			ToggleNpcJournal();
+			break;
+		}
+		case 'm':
+		case 'M':
+		{
+			ToggleMinimap();
+			break;
+		}
+		case KEY_TAB:
+		{
+			SelectNextNpc();
+			break;
+		}
 		case '1':
 		{
 			TryStatUp(STAT_MAX_HP);
@@ -271,11 +332,14 @@ void WindowEntry(int32 state)
 
 int main(int argc, char** argv)
 {
+	// 파일로 넘기면 버퍼에 갇혀 있다가 강제 종료 때 통째로 날아간다
+	std::cout << std::unitbuf;
+
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
 	glutInitWindowPosition(0, 0);
 	glutInitWindowSize(WINDOW_SIZE_X, WINDOW_SIZE_Y);
-	glutCreateWindow("Game Software Engineering KPU");
+	glutCreateWindow("Ashen Walls - Game Software Engineering KPU");
 
 	// 이걸 줘야 glutMainLoop 가 돌아와서 뒤쪽 정리 코드가 실행된다
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
@@ -292,6 +356,9 @@ int main(int argc, char** argv)
 	{
 		std::cout << "[ SimpleGame - main ] : glew 3.0 not supported\n";
 	}
+
+	InitProfiler();
+	LogGraphicsCaps();
 
 	g_renderer = new Renderer(WINDOW_SIZE_X, WINDOW_SIZE_Y);
 	if (g_renderer->IsInitialized() == false)
@@ -352,9 +419,12 @@ int main(int argc, char** argv)
 	std::cout << "E     : pick up materials\n";
 	std::cout << "C     : stat window (1 2 3 : hp atk def)\n";
 	std::cout << "U     : enhance window (Enter : try)\n";
+	std::cout << "RMB   : inspect npc ( Tab next, F follow )\n";
+	std::cout << "V J M : npc labels / journal / map\n";
 	std::cout << "N     : new zone seed\n";
 	std::cout << "G     : chunk edge / blocked tile overlay\n";
 	std::cout << "L     : lighting on/off\n";
+	std::cout << "P     : profiler detail log\n";
 	std::cout << "ESC   : quit\n";
 
 	glutDisplayFunc(RenderScene);
@@ -370,11 +440,13 @@ int main(int argc, char** argv)
 
 	glutMainLoop();
 
+	ShutdownMinimap();
 	ShutdownFog();
 	ShutdownGround();
 	ShutdownPostProcess();
 	ShutdownText();
 	ShutdownSpriteAtlas();
+	ShutdownProfiler();
 
 	delete g_renderer;
 	g_renderer = nullptr;

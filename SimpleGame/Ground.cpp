@@ -1,5 +1,6 @@
 ﻿#include "stdafx.h"
 #include "Ground.h"
+#include "Renderer.h"
 #include "ShaderUtil.h"
 #include "Profiler.h"
 #include "WorldPos.h"
@@ -223,10 +224,15 @@ void SetGroundZone(const std::vector<uint8>& codes, int32 size, int32 origin_til
 
 void DrawGroundLayer(const GroundFrame& frame)
 {
+	// 모아 둔 그림을 먼저 내보내야 바닥이 그 위를 덮지 않는다
+	FlushRenderBatch();
+
 	if (g_ready == false)
 	{
 		return;
 	}
+
+	BeginProfileStage(PROFILE_STAGE_GROUND);
 
 	glUseProgram(g_program);
 
@@ -265,4 +271,6 @@ void DrawGroundLayer(const GroundFrame& frame)
 
 	glDisableVertexAttribArray(g_position_attrib);
 	glActiveTexture(GL_TEXTURE0);
+
+	EndProfileStage();
 }

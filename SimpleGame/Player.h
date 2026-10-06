@@ -10,9 +10,9 @@ constexpr int32 STAT_ATTACK = 1;
 constexpr int32 STAT_DEFENCE = 2;
 constexpr int32 STAT_COUNT = 3;
 
-constexpr int32 MATERIAL_DUST = 0;	// 별가루
-constexpr int32 MATERIAL_FRAGMENT = 1;	// 별조각
-constexpr int32 MATERIAL_CORE = 2;	// 별핵
+constexpr int32 MATERIAL_DUST = 0;	// 재가루
+constexpr int32 MATERIAL_FRAGMENT = 1;	// 푸른 마석
+constexpr int32 MATERIAL_CORE = 2;	// 심장석
 constexpr int32 MATERIAL_COUNT = 3;
 
 // 몸을 그린 뒤 손에 쥔 칼을 이어 그린다
@@ -61,6 +61,7 @@ void MovePlayer(float velocity_x, float velocity_y, float delta_seconds);	// 초
 void AimPlayer(float world_dir_x, float world_dir_y);
 bool TryStartSwing();	// 쿨이 돌았으면 휘두르기 시작
 void DamagePlayer(int32 damage);
+int32 TakePlayerGold(int32 amount);	// 실제로 빼앗긴 양
 
 int32 GetPlayerMaxHp();
 int32 GetPlayerAttack();

@@ -2,8 +2,12 @@
 #include "Hud.h"
 #include "Enhance.h"
 #include "GameConfig.h"
+#include "Minimap.h"
 #include "Monster.h"
+#include "Npc.h"
+#include "NpcHud.h"
 #include "Player.h"
+#include "Profiler.h"
 #include "Renderer.h"
 #include "SpriteAtlas.h"
 #include "Text.h"
@@ -558,6 +562,8 @@ void UpdateHud(float delta_seconds)
 
 void DrawHud(Renderer* renderer)
 {
+	BeginProfileStage(PROFILE_STAGE_HUD);
+
 	const PlayerState& player = GetPlayer();
 	const float bottom = GetScreenBottom();
 	const float top = GetScreenTop();
@@ -568,10 +574,10 @@ void DrawHud(Renderer* renderer)
 	if (IsPlayerDead())
 	{
 		renderer->DrawSolidBox(0.f, 0.f, window_width, static_cast<float>(WINDOW_SIZE_Y), 0.25f, 0.f, 0.f, 0.35f);
-		DrawStringShadow(renderer, L"쓰러졌다... 곧 모닥불 곁에서 깨어난다", 0.f, 60.f, TEXT_ALIGN_CENTER, 1.f, 0.55f, 0.45f, 1.f);
+		DrawStringShadow(renderer, L"쓰러졌다... 곧 성채 광장에서 깨어난다", 0.f, 60.f, TEXT_ALIGN_CENTER, 1.f, 0.55f, 0.45f, 1.f);
 	}
 
-	DrawString(renderer, L"[C] 능력치   [U] 강화   [E] 재료 줍기   [N] 새 지역", -half_width + 16.f, top - 10.f, TEXT_ALIGN_LEFT, 0.80f, 0.74f, 0.62f, 0.9f);
+	DrawString(renderer, L"[C] 능력치 [U] 강화 [E] 줍기 [우클릭] NPC 보기 [Tab] 다음 NPC [F] 따라가기 [V] 표시 [J] 일지 [M] 지도", -half_width + 16.f, top - 10.f, TEXT_ALIGN_LEFT, 0.80f, 0.74f, 0.62f, 0.9f);
 
 	// 하단 패널
 	renderer->DrawSolidBox(0.f, panel_center_y, window_width, PANEL_HEIGHT, 0.075f, 0.060f, 0.045f, 1.f);
@@ -617,6 +623,10 @@ void DrawHud(Renderer* renderer)
 		DrawBar(renderer, 0.f, top - 76.f, 340.f, 9.f, boss_ratio, 0.480f, 0.055f, 0.055f);
 	}
 
+	// 오른쪽 자리를 강화 창 > 관찰창 > 지도 순으로 양보한다
+	DrawMinimap(renderer, g_enhance_window_open || GetSelectedNpc() >= 0);
+	DrawNpcPanels(renderer, g_enhance_window_open);
+
 	if (g_stat_window_open)
 	{
 		DrawStatWindow(renderer);
@@ -626,6 +636,8 @@ void DrawHud(Renderer* renderer)
 	{
 		DrawEnhanceWindow(renderer);
 	}
+
+	EndProfileStage();
 }
 
 void ToggleStatWindow()

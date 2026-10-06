@@ -1,5 +1,6 @@
 ﻿#include "stdafx.h"
 #include "Fog.h"
+#include "Renderer.h"
 #include "ShaderUtil.h"
 #include "Profiler.h"
 
@@ -93,10 +94,15 @@ void ShutdownFog()
 
 void DrawFogLayer(float scroll)
 {
+	// 안개는 물체 위에 얹히는 층이라 쌓아 둔 그림이 먼저 나가야 한다
+	FlushRenderBatch();
+
 	if (g_ready == false)
 	{
 		return;
 	}
+
+	BeginProfileStage(PROFILE_STAGE_FOG);
 
 	glUseProgram(g_program);
 
@@ -112,4 +118,6 @@ void DrawFogLayer(float scroll)
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	glDisableVertexAttribArray(g_position_attrib);
+
+	EndProfileStage();
 }

@@ -84,7 +84,7 @@ namespace
 			return;
 		}
 
-		// 등급은 색과 밝기로 낸다 ( 2.9 ). 별핵이 화면에서 제일 밝아야 한다
+		// 등급은 색과 밝기로 낸다 ( 2.9 ). 심장석이 화면에서 제일 밝아야 한다
 		if (drop->value == MATERIAL_CORE)
 		{
 			body.m_sprite = SPRITE_CORE;
@@ -145,7 +145,7 @@ void ClearDrops()
 	g_drops.clear();
 }
 
-void SpawnMonsterDrops(const WorldPos& pos, int32 exp, int32 gold_min, int32 gold_max, bool is_boss)
+void SpawnMonsterDrops(const WorldPos& pos, int32 exp, int32 gold_min, int32 gold_max, int32 tier)
 {
 	int32 remain_exp = exp;
 	while (remain_exp > 0)
@@ -160,7 +160,7 @@ void SpawnMonsterDrops(const WorldPos& pos, int32 exp, int32 gold_min, int32 gol
 		remain_exp -= orb;
 	}
 
-	if (is_boss)
+	if (tier == DROP_TIER_BOSS)
 	{
 		const int32 gold = RollInt(gold_min, gold_max);
 
@@ -178,6 +178,30 @@ void SpawnMonsterDrops(const WorldPos& pos, int32 exp, int32 gold_min, int32 gol
 		AddDrop(pos, DROP_MATERIAL, MATERIAL_FRAGMENT);
 
 		if (RollChance(0.4f))
+		{
+			AddDrop(pos, DROP_MATERIAL, MATERIAL_CORE);
+		}
+
+		return;
+	}
+
+	// 정예는 돈이 반드시 나오고 상위 재료 확률이 몇 배다. 빛나는 적을 쫓을 이유가 된다
+	if (tier == DROP_TIER_ELITE)
+	{
+		AddDrop(pos, DROP_GOLD, RollInt(gold_min, gold_max));
+		AddDrop(pos, DROP_MATERIAL, MATERIAL_DUST);
+
+		if (RollChance(0.6f))
+		{
+			AddDrop(pos, DROP_MATERIAL, MATERIAL_DUST);
+		}
+
+		if (RollChance(0.3f))
+		{
+			AddDrop(pos, DROP_MATERIAL, MATERIAL_FRAGMENT);
+		}
+
+		if (RollChance(0.04f))
 		{
 			AddDrop(pos, DROP_MATERIAL, MATERIAL_CORE);
 		}
@@ -204,6 +228,16 @@ void SpawnMonsterDrops(const WorldPos& pos, int32 exp, int32 gold_min, int32 gol
 	{
 		AddDrop(pos, DROP_MATERIAL, MATERIAL_CORE);
 	}
+}
+
+void SpawnGoldDrop(const WorldPos& pos, int32 gold)
+{
+	if (gold <= 0)
+	{
+		return;
+	}
+
+	AddDrop(pos, DROP_GOLD, gold);
 }
 
 void UpdateDrops(float delta_seconds)

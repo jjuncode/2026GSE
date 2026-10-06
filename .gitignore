@@ -11,4 +11,5 @@
 *.lastbuildstate 
 *.suo 
 *.db 
-
+/SimpleGame/Cache 
+/SimpleGame/Logs 
