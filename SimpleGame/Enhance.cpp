@@ -1,5 +1,7 @@
 ﻿#include "stdafx.h"
 #include "Enhance.h"
+#include "GameData.h"
+#include "Player.h"
 
 #include <chrono>
 #include <iostream>
@@ -7,151 +9,128 @@
 
 namespace
 {
-	// 10 과 15 에서 크게 뛰어야 "일단 10 만 찍자" 가 생긴다
-	const std::array<int32, MAX_ENHANCE_LEVEL + 1> ATTACK_BONUS = { 0, 2, 4, 6, 8, 10, 13, 16, 19, 22, 34, 38, 42, 46, 50, 72 };
-
-	constexpr float RESET_SHARE_OF_FAIL = 0.25f;	// 도박 구간 실패 중 0단계로 가는 몫
-
-	// 지형 씨앗과 갈라 둔다. 같이 쓰면 같은 자리 같은 결과가 반복된다
+	// 지형 씨앗과 갈라 둔다. 같은 자리에서 다시 눌러도 결과가 달라야 한다 ( 설계 2.9 )
 	std::mt19937& GetRandom()
 	{
-		static std::mt19937 random(static_cast<uint32>(std::chrono::steady_clock::now().time_since_epoch().count()));
+		static std::mt19937 random(static_cast<uint32>(std::chrono::steady_clock::now().time_since_epoch().count()) ^ 0x2545f491u);
 		return random;
 	}
 
-	float RollUnit()
+	int32 RollPercent()
 	{
-		std::uniform_real_distribution<float> distribution(0.f, 1.f);
+		std::uniform_int_distribution<int32> distribution(1, 100);
 		return distribution(GetRandom());
 	}
+
+	int32 ReadTable(const std::vector<int32>& table, int32 index, int32 fallback)
+	{
+		if (table.empty())
+		{
+			return fallback;
+		}
+
+		if (index < 0)
+		{
+			return table.front();
+		}
+
+		if (index >= static_cast<int32>(table.size()))
+		{
+			return table.back();
+		}
+
+		return table[static_cast<size_t>(index)];
+	}
+}
+
+int32 GetMaxEnhanceLevel()
+{
+	return GetConfig().enhance_max_level;
 }
 
 EnhanceCost GetEnhanceCost(int32 level)
 {
-	EnhanceCost cost;
-	cost.gold = 15 + level * 10;
+	const GameConfig& config = GetConfig();
 
-	if (level < 5)
-	{
-		cost.materials[static_cast<size_t>(MATERIAL_DUST)] = 1 + level / 2;
-	}
-	else if (level < 10)
-	{
-		cost.materials[static_cast<size_t>(MATERIAL_DUST)] = 2;
-		cost.materials[static_cast<size_t>(MATERIAL_FRAGMENT)] = 1;
-	}
-	else
-	{
-		cost.materials[static_cast<size_t>(MATERIAL_FRAGMENT)] = 2;
-		cost.materials[static_cast<size_t>(MATERIAL_CORE)] = 1;
-	}
+	EnhanceCost cost;
+	cost.trace = ReadTable(config.enhance_trace_cost, level, 1);
+	cost.gold = ReadTable(config.enhance_gold_cost, level, 0);
 
 	return cost;
 }
 
-float GetEnhanceSuccessRate(int32 level)
+int32 GetEnhanceSuccessRate(int32 level)
 {
-	if (level < 5)
-	{
-		return 0.9f;
-	}
-
-	if (level < 10)
-	{
-		return 0.5f;
-	}
-
-	return 0.3f;
+	return ReadTable(GetConfig().enhance_success_rate, level, 50);
 }
 
 bool CanDropOnFail(int32 level)
 {
-	return level >= 5;
+	return level >= GetConfig().enhance_fail_down_from;
 }
 
 bool CanResetOnFail(int32 level)
 {
-	return level >= 10;
-}
-
-bool CanPayEnhance(const PlayerState& player, const EnhanceCost& cost)
-{
-	if (player.gold < cost.gold)
-	{
-		return false;
-	}
-
-	for (size_t index = 0; index < cost.materials.size(); ++index)
-	{
-		if (player.materials[index] < cost.materials[index])
-		{
-			return false;
-		}
-	}
-
-	return true;
+	return level >= GetConfig().enhance_reset_from;
 }
 
 int32 GetEnhanceAttackBonus(int32 level)
 {
-	if (level < 0)
+	if (level <= 0)
 	{
 		return 0;
 	}
 
-	if (level > MAX_ENHANCE_LEVEL)
-	{
-		return ATTACK_BONUS[static_cast<size_t>(MAX_ENHANCE_LEVEL)];
-	}
-
-	return ATTACK_BONUS[static_cast<size_t>(level)];
+	return ReadTable(GetConfig().enhance_attack_bonus, level, 0);
 }
 
-int32 TryEnhance()
+int32 TryEnhanceWeapon()
 {
-	PlayerState& player = MutablePlayer();
+	Player& player = MutablePlayer();
+	ItemSlot* weapon = player.m_inventory.MutableEquip(EQUIP_AREA_WEAPON);
 
-	if (player.enhance_level >= MAX_ENHANCE_LEVEL)
+	if (weapon == nullptr || player.m_inventory.IsEmptySlot(*weapon))
 	{
-		return ENHANCE_RESULT_NONE;
+		return ENHANCE_RESULT_NO_WEAPON;
 	}
 
-	const EnhanceCost cost = GetEnhanceCost(player.enhance_level);
-	if (CanPayEnhance(player, cost) == false)
+	const int32 level = weapon->enhance;
+	if (level >= GetMaxEnhanceLevel())
 	{
-		return ENHANCE_RESULT_NONE;
+		return ENHANCE_RESULT_MAX_LEVEL;
 	}
 
-	player.gold -= cost.gold;
-	for (size_t index = 0; index < cost.materials.size(); ++index)
+	const EnhanceCost cost = GetEnhanceCost(level);
+	if (player.m_gold < cost.gold || player.m_inventory.CountItem(ITEM_ID_SPELL_TRACE) < cost.trace)
 	{
-		player.materials[index] -= cost.materials[index];
+		return ENHANCE_RESULT_NO_MATERIAL;
 	}
 
-	const int32 before = player.enhance_level;
+	player.m_gold -= cost.gold;
+	player.m_inventory.RemoveItem(ITEM_ID_SPELL_TRACE, cost.trace);
 
-	if (RollUnit() < GetEnhanceSuccessRate(before))
+	int32 result = ENHANCE_RESULT_KEEP;
+
+	if (RollPercent() <= GetEnhanceSuccessRate(level))
 	{
-		player.enhance_level = before + 1;
-		std::cout << "[ Enhance - TryEnhance ] : " << before << " -> " << player.enhance_level << " success\n";
-		return ENHANCE_RESULT_SUCCESS;
+		weapon->enhance = level + 1;
+		result = ENHANCE_RESULT_SUCCESS;
+	}
+	else if (CanResetOnFail(level) && RollPercent() <= GetConfig().enhance_reset_share)
+	{
+		// 무기는 남기고 쌓은 단계만 날린다. 무기가 사라지면 게임이 멈춘다
+		weapon->enhance = 0;
+		result = ENHANCE_RESULT_RESET;
+	}
+	else if (CanDropOnFail(level))
+	{
+		weapon->enhance = level - 1;
+		result = ENHANCE_RESULT_DOWN;
 	}
 
-	// 무기는 안 사라지고 쌓은 단계만 날린다
-	if (CanResetOnFail(before) && RollUnit() < RESET_SHARE_OF_FAIL)
-	{
-		player.enhance_level = 0;
-		std::cout << "[ Enhance - TryEnhance ] : " << before << " -> 0 reset\n";
-		return ENHANCE_RESULT_RESET;
-	}
+	player.RecalcStat();
 
-	if (CanDropOnFail(before))
-	{
-		player.enhance_level = before - 1;
-		std::cout << "[ Enhance - TryEnhance ] : " << before << " -> " << player.enhance_level << " down\n";
-		return ENHANCE_RESULT_DOWN;
-	}
+	std::cout << "[ Enhance - TryEnhanceWeapon ] : +" << level << " -> +" << weapon->enhance << " result " << result << "\n";
 
-	std::cout << "[ Enhance - TryEnhance ] : " << before << " keep\n";
-	return ENHANCE_RESULT_KEEP;
+	return result;
 }

@@ -18,7 +18,7 @@ namespace
 	const float CENTER_Y = 40.f;	// 오른쪽 가운데. 아래는 경험치 글자, 위는 조작 안내가 있다
 
 	GLuint g_texture = 0;
-	bool g_visible = true;
+	bool g_visible = false;
 	std::vector<ZoneSite> g_sites;
 
 	struct DotContext
@@ -278,7 +278,7 @@ void DrawMinimap(Renderer* renderer, bool hidden)
 
 	float player_x = 0.f;
 	float player_y = 0.f;
-	ProjectWorld(GetPlayer().body.m_pos, &player_x, &player_y);
+	ProjectWorld(GetPlayer().m_pos, &player_x, &player_y);
 
 	renderer->DrawSolidBox(player_x, player_y, 9.f, 9.f, 0.02f, 0.02f, 0.02f, 1.f);
 	renderer->DrawSolidBox(player_x, player_y, 6.f, 6.f, 1.f, 1.f, 1.f, 1.f);

@@ -1,0 +1,89 @@
+{
+    "world": {
+        "cm_per_tile": 150.0
+    },
+    "guard": {
+        "damage_rate": 0.15,
+        "gage_usage_per_sec": 0.05,
+        "gage_recover_per_sec": 0.1,
+        "gage_recover_delay_sec": 3.0,
+        "gage_cost_rate": 0.8,
+        "angle_half": 60.0,
+        "break_duration_sec": 2.2,
+        "move_speed_rate": 0.4
+    },
+    "player": {
+        "hit_radius": 30,
+        "body_radius": 40,
+        "hit_freeze_cool_sec": 0.6,
+        "parry_success_sec": 1.0,
+        "parry_success_lock_sec": 0.3,
+        "interrupted_sec": 1.0,
+        "move_speed": 600.0,
+        "respawn_sec": 2.0,
+        "level_up_stat_point": 3,
+        "level_up_skill_point": 1,
+        "inventory_slot_count": 20,
+        "combo_buffer_sec": 0.4,
+        "combo_reset_sec": 0.5
+    },
+    "audio": {
+        "master_volume": 0.3,
+        "volume_step": 0.1
+    },
+    "item": {
+        "drop_lifetime_sec": 60.0,
+        "pickup_range": 160,
+        "gold_magnet_range": 330
+    },
+    "stat": {
+        "base_max_hp": 100,
+        "base_attack": 10,
+        "base_defence": 0,
+        "base_max_mp": 100,
+        "base_spell_power": 10,
+        "base_crit_rate": 5,
+        "base_crit_damage": 150,
+        "level_max_hp": 10,
+        "level_attack": 0,
+        "level_defence": 0,
+        "level_max_mp": 2,
+        "level_spell_power": 0,
+        "point_max_hp": 10,
+        "point_attack": 1,
+        "point_defence": 1,
+        "point_max_mp": 5,
+        "point_spell_power": 1,
+        "base_penetration": 0,
+        "base_toughness": 0
+    },
+    "monster": {
+        "return_heal_per_sec": 0.2,
+        "hit_radius": 30,
+        "chase_margin": 2.0,
+        "standoff_step_deg": 30.0,
+        "hit_recovery_sec": 0.4,
+        "elite_hit_react_cool_sec": 2.0,
+        "boss_hit_react_cool_sec": 4.0,
+        "corpse_sec": 5.0,
+        "respawn_min_distance": 1800,
+        "pack_alert_range": 750,
+        "track_turn_deg_per_sec": 220.0,
+        "track_lock_lead_sec": 0.3
+    },
+    "hit": {
+        "hit_freeze_sec": 0.4,
+        "defence_equation_constant": 100.0,
+        "toughness_max": 40
+    },
+    "enhance": {
+        "max_level": 15,
+        "success_rate": [95, 90, 85, 80, 75, 60, 55, 50, 45, 40, 33, 30, 27, 24, 20],
+        "fail_down_from": 6,
+        "reset_from": 11,
+        "reset_share": 25,
+        "trace_cost": [1, 1, 2, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20],
+        "gold_cost": [20, 30, 45, 60, 80, 120, 160, 210, 270, 340, 450, 560, 700, 860, 1050],
+        "attack_bonus": [0, 2, 4, 6, 8, 10, 13, 16, 19, 22, 32, 36, 40, 44, 48, 64]
+    }
+}

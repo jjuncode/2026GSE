@@ -21,6 +21,36 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="GameData.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Combat.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="SpriteSheet.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="CombatDraw.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Feel.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Inventory.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="UiDraw.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Monitor.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="UiWindows.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
     <ClInclude Include="stdafx.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -90,9 +120,6 @@
     <ClInclude Include="SpriteId.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
-    <ClInclude Include="SpriteArt.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="SpriteAtlas.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -138,6 +165,36 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="GameData.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Combat.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="SpriteSheet.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="CombatDraw.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Feel.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Inventory.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="UiDraw.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Monitor.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="UiWindows.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="SimpleGame.cpp">
@@ -221,9 +278,6 @@
     <ClCompile Include="Minimap.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="SpriteArt.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="SpriteAtlas.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
@@ -235,6 +289,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Monitor\index.html">
+      <Filter>리소스 파일</Filter>
+    </None>
     <None Include="Shaders\SolidRect.fs">
       <Filter>소스 파일\Shaders</Filter>
     </None>
@@ -267,6 +324,30 @@
     </None>
     <None Include="Shaders\Affine.fs">
       <Filter>소스 파일\Shaders</Filter>
+    </None>
+    <None Include="Data\Game.config.json">
+      <Filter>리소스 파일</Filter>
+    </None>
+    <None Include="Data\SkillData.json">
+      <Filter>리소스 파일</Filter>
+    </None>
+    <None Include="Data\SkillTree.json">
+      <Filter>리소스 파일</Filter>
+    </None>
+    <None Include="Data\ItemData.json">
+      <Filter>리소스 파일</Filter>
+    </None>
+    <None Include="Data\MonsterData.json">
+      <Filter>리소스 파일</Filter>
+    </None>
+    <None Include="Data\AnimationData.json">
+      <Filter>리소스 파일</Filter>
+    </None>
+    <None Include="Data\LevelTable.json">
+      <Filter>리소스 파일</Filter>
+    </None>
+    <None Include="Data\NewPlayerPreset.json">
+      <Filter>리소스 파일</Filter>
     </None>
   </ItemGroup>
 </Project>

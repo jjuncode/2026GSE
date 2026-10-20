@@ -1,0 +1,13 @@
+{
+  "level": 1,
+  "exp": 0,
+  "gold": 0,
+  "stat_invest": { "max_hp": 0, "attack": 0, "defence": 0, "max_mp": 0, "spell_power": 0 },
+  "stat_point": 0,
+  "skill_point": 0,
+  "skill_ids": [],
+  "items": [
+    { "area": "SLOT_AREA_INVENTORY", "slot_idx": 0, "item_id": 1, "count": 1 },
+    { "area": "SLOT_AREA_INVENTORY", "slot_idx": 1, "item_id": 3, "count": 3 }
+  ]
+}

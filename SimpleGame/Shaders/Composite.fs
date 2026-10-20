@@ -10,6 +10,8 @@ uniform float u_Exposure;
 uniform float u_BlurStart;
 uniform float u_BlurRadius;
 uniform float u_VignetteEdge;
+uniform float u_Zoom;
+uniform vec4 u_Flash;
 
 float Bayer8(ivec2 pixel)
 {
@@ -41,9 +43,10 @@ vec3 ToneMapACES(vec3 x)
 
 void main()
 {
-	vec2 uv = gl_FragCoord.xy / u_ScreenSize;
+	vec2 screen_uv = gl_FragCoord.xy / u_ScreenSize;
+	vec2 uv = (screen_uv - 0.5) / max(u_Zoom, 0.01) + 0.5;
 
-	vec2 centered = uv * 2.0 - 1.0;
+	vec2 centered = screen_uv * 2.0 - 1.0;
 	float edge_distance = length(centered);
 
 	float blur_amount = clamp((edge_distance - u_BlurStart) / (1.0 - u_BlurStart), 0.0, 1.0);
@@ -66,6 +69,8 @@ void main()
 
 	float vignette = mix(1.0, u_VignetteEdge, clamp(edge_distance * edge_distance * 0.62, 0.0, 1.0));
 	color *= vignette;
+
+	color = mix(color, u_Flash.rgb, clamp(u_Flash.a, 0.0, 1.0));
 
 	color += (Bayer8(ivec2(gl_FragCoord.xy)) - 0.5) / 255.0;
 

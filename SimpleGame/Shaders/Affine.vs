@@ -7,9 +7,11 @@ in vec2 a_AxisX;
 in vec2 a_AxisY;
 in vec4 a_Region;
 in vec4 a_Color;
+in float a_Flash;
 
 out vec2 v_Uv;
 out vec4 v_Color;
+out float v_Flash;
 
 void main()
 {
@@ -17,6 +19,7 @@ void main()
 
 	v_Uv = vec2(mix(a_Region.x, a_Region.z, a_Position.x), mix(a_Region.y, a_Region.w, a_Position.y));
 	v_Color = a_Color;
+	v_Flash = a_Flash;
 
 	gl_Position = vec4(position, 0.0, 1.0);
 }

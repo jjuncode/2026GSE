@@ -31,8 +31,8 @@ namespace
 	const float JOURNAL_FADE_START = 12.f;
 	const float JOURNAL_FADE_SEC = 6.f;
 
-	int32 g_label_mode = LABEL_TASK;
-	bool g_journal_open = true;
+	int32 g_label_mode = LABEL_OFF;
+	bool g_journal_open = false;
 
 	std::array<float, 3> GetJobColor(const Npc& npc)
 	{
@@ -368,7 +368,7 @@ void DrawNpcOverlay(Renderer* renderer, const WorldPos& camera)
 		}
 
 		const bool is_selected = static_cast<int32>(index) == selected;
-		const float head_y = screen.y + static_cast<float>(GetSpriteHeight(npc.body.m_sprite) * PIXEL_SCALE) + 4.f;
+		const float head_y = screen.y + npc.body.GetArtHeight() * static_cast<float>(PIXEL_SCALE) + 4.f;
 		float label_y = head_y + 22.f;
 
 		if (npc.hp < npc.max_hp)

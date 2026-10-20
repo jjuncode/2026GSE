@@ -1,0 +1,36 @@
+{
+  "items": [
+    {
+      "item_id": 1,
+      "name": "초보자의 검",
+      "category": "EQUIPMENT",
+      "equip_area": "EQUIP_WEAPON",
+      "max_stack": 1,
+      "stat": { "attack": 10, "crit_rate": 0, "penetration": 0 },
+      "icon": "Beginner_Sword.png",
+      "desc": "개척대가 신병에게 쥐여 주는 검. 주문의 흔적으로 벼릴 수 있다"
+    },
+    {
+      "item_id": 2,
+      "name": "주문의 흔적",
+      "category": "ETC",
+      "equip_area": "NONE",
+      "max_stack": 99,
+      "icon": "주문의_흔적.jpg",
+      "desc": "재에 물든 것들이 남기는 희미한 주문 조각. 무기 강화 재료"
+    },
+    {
+      "item_id": 3,
+      "name": "체력 물약",
+      "category": "CONSUMABLE",
+      "equip_area": "NONE",
+      "max_stack": 99,
+      "icon": "체력_물약.jpg",
+      "cooldown_sec": 5.0,
+      "effects": [
+        { "type": "HEAL_HP", "value": 50 }
+      ],
+      "desc": "마시면 체력을 50 회복한다"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "SpriteId.h"
+#include "SpriteSheet.h"
 #include "WorldPos.h"
 
 class Renderer;
@@ -17,9 +18,14 @@ public:
 	// 같은 그림을 검게 칠해 바닥에 눕힌다
 	virtual void DrawShadow(Renderer* renderer, const WorldPos& camera) const;
 
+	// 그림 크기 ( 도트 칸 ). 시트면 서 있는 정면 모습 기준
+	float GetArtWidth() const;
+	float GetArtHeight() const;
+
 	WorldPos m_pos;
 
 	int32 m_sprite = SPRITE_NONE;
+	int32 m_sheet = SHEET_NONE;	// 있으면 m_frame 은 이 시트의 프레임 번호
 	int32 m_frame = 0;
 	bool m_flip = false;	// 그림은 오른쪽을 본다. 켜면 왼쪽
 	float m_shade = 1.f;	// 같은 그림을 조금씩 다른 밝기로

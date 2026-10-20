@@ -21,11 +21,16 @@ namespace
 	constexpr int32 BATCH_KIND_NONE = 0;
 	constexpr int32 BATCH_KIND_SOLID = 1;
 	constexpr int32 BATCH_KIND_AFFINE = 2;
+	constexpr int32 BATCH_KIND_TRIANGLE = 3;
 
 	// trans 4 + color 4
 	constexpr int32 SOLID_INSTANCE_FLOAT_COUNT = 8;
-	// origin 2 + axis_x 2 + axis_y 2 + region 4 + color 4
-	constexpr int32 AFFINE_INSTANCE_FLOAT_COUNT = 14;
+	// origin 2 + axis_x 2 + axis_y 2 + region 4 + color 4 + flash 1
+	constexpr int32 AFFINE_INSTANCE_FLOAT_COUNT = 15;
+
+	// 위치 2 + 색 4. 인스턴스 칸을 그대로 빌려 쓴다
+	constexpr int32 TRIANGLE_VERTEX_FLOAT_COUNT = 6;
+	constexpr int32 MAX_TRIANGLE_VERTEX_COUNT = MAX_BATCH_INSTANCE_COUNT * AFFINE_INSTANCE_FLOAT_COUNT / TRIANGLE_VERTEX_FLOAT_COUNT;
 
 	// 다른 층이 비워 달라고 부를 수 있게 지금 살아 있는 것을 들고 있는다
 	Renderer* g_active_renderer = nullptr;
@@ -236,6 +241,8 @@ void Renderer::CreateInstanceBuffer()
 
 void Renderer::CacheShaderLocations()
 {
+	m_solid_pixel_mode = glGetUniformLocation(m_solid_rect_shader, "u_PixelMode");
+
 	m_affine_texture = glGetUniformLocation(m_affine_shader, "u_Texture");
 	m_affine_undo = glGetUniformLocation(m_affine_shader, "u_UndoToneMap");
 
@@ -245,6 +252,7 @@ void Renderer::CacheShaderLocations()
 	m_affine_axis_y_attrib = glGetAttribLocation(m_affine_shader, "a_AxisY");
 	m_affine_region_attrib = glGetAttribLocation(m_affine_shader, "a_Region");
 	m_affine_color_attrib = glGetAttribLocation(m_affine_shader, "a_Color");
+	m_affine_flash_attrib = glGetAttribLocation(m_affine_shader, "a_Flash");
 
 	m_position_attrib = glGetAttribLocation(m_solid_rect_shader, "a_Position");
 	m_solid_trans_attrib = glGetAttribLocation(m_solid_rect_shader, "a_Trans");
@@ -315,6 +323,11 @@ void Renderer::PushSolidInstance(GLuint mesh_vbo, int32 mesh_vertex_count, float
 
 void Renderer::DrawAffine(GLuint texture, const TexRegion& region, const AffineQuad& quad, float r, float g, float b, float a)
 {
+	DrawAffineFlash(texture, region, quad, r, g, b, a, 0.f);
+}
+
+void Renderer::DrawAffineFlash(GLuint texture, const TexRegion& region, const AffineQuad& quad, float r, float g, float b, float a, float flash)
+{
 	if (m_affine_position < 0 || m_affine_origin_attrib < 0)
 	{
 		return;
@@ -347,6 +360,7 @@ void Renderer::DrawAffine(GLuint texture, const TexRegion& region, const AffineQ
 	m_instances.push_back(g);
 	m_instances.push_back(b);
 	m_instances.push_back(a);
+	m_instances.push_back(flash);
 
 	m_batch_instance_count += 1;
 	CountQuadSubmit();
@@ -355,6 +369,55 @@ void Renderer::DrawAffine(GLuint texture, const TexRegion& region, const AffineQ
 	{
 		FlushCurrentBatch(FLUSH_REASON_FULL);
 	}
+}
+
+void Renderer::PushColorVertex(const ColorVertex& vertex)
+{
+	float new_x, new_y;
+	GetGLPosition(vertex.x, vertex.y, &new_x, &new_y);
+
+	m_instances.push_back(new_x);
+	m_instances.push_back(new_y);
+	m_instances.push_back(vertex.r);
+	m_instances.push_back(vertex.g);
+	m_instances.push_back(vertex.b);
+	m_instances.push_back(vertex.a);
+}
+
+void Renderer::DrawTriangle(const ColorVertex& first, const ColorVertex& second, const ColorVertex& third)
+{
+	if (m_position_attrib < 0 || m_solid_trans_attrib < 0 || m_solid_color_attrib < 0)
+	{
+		return;
+	}
+
+	if (m_batch_kind != BATCH_KIND_TRIANGLE || m_batch_pixel_triangles != m_pixel_triangles)
+	{
+		FlushCurrentBatch(FLUSH_REASON_STATE);
+		m_batch_kind = BATCH_KIND_TRIANGLE;
+		m_batch_pixel_triangles = m_pixel_triangles;
+	}
+
+	// 셋 단위로 끊어야 다음 묶음이 남은 꼭짓점을 이어받지 않는다
+	if (m_batch_instance_count + 3 > MAX_TRIANGLE_VERTEX_COUNT)
+	{
+		FlushCurrentBatch(FLUSH_REASON_FULL);
+		m_batch_kind = BATCH_KIND_TRIANGLE;
+		m_batch_pixel_triangles = m_pixel_triangles;
+	}
+
+	PushColorVertex(first);
+	PushColorVertex(second);
+	PushColorVertex(third);
+
+	m_batch_instance_count += 3;
+	CountQuadSubmit();
+}
+
+void Renderer::DrawQuad(const ColorVertex& first, const ColorVertex& second, const ColorVertex& third, const ColorVertex& fourth)
+{
+	DrawTriangle(first, second, third);
+	DrawTriangle(first, third, fourth);
 }
 
 void Renderer::FlushBatch()
@@ -379,6 +442,10 @@ void Renderer::FlushCurrentBatch(int32 reason)
 	else if (m_batch_kind == BATCH_KIND_AFFINE)
 	{
 		FlushAffineBatch();
+	}
+	else if (m_batch_kind == BATCH_KIND_TRIANGLE)
+	{
+		FlushTriangleBatch();
 	}
 
 	CountBatchFlush(reason, m_batch_instance_count);
@@ -469,6 +536,7 @@ void Renderer::FlushAffineBatch()
 	BindInstanceAttrib(m_affine_axis_y_attrib, 2, 4, AFFINE_INSTANCE_FLOAT_COUNT);
 	BindInstanceAttrib(m_affine_region_attrib, 4, 6, AFFINE_INSTANCE_FLOAT_COUNT);
 	BindInstanceAttrib(m_affine_color_attrib, 4, 10, AFFINE_INSTANCE_FLOAT_COUNT);
+	BindInstanceAttrib(m_affine_flash_attrib, 1, 14, AFFINE_INSTANCE_FLOAT_COUNT);
 
 	glEnableVertexAttribArray(static_cast<GLuint>(m_affine_position));
 	glBindBuffer(GL_ARRAY_BUFFER, m_vbo_unit_quad);
@@ -483,12 +551,54 @@ void Renderer::FlushAffineBatch()
 	ReleaseInstanceAttrib(m_affine_axis_y_attrib);
 	ReleaseInstanceAttrib(m_affine_region_attrib);
 	ReleaseInstanceAttrib(m_affine_color_attrib);
+	ReleaseInstanceAttrib(m_affine_flash_attrib);
+}
+
+void Renderer::FlushTriangleBatch()
+{
+	glUseProgram(m_solid_rect_shader);
+
+	UploadInstanceBuffer();
+
+	const GLsizei stride = static_cast<GLsizei>(sizeof(float) * static_cast<size_t>(TRIANGLE_VERTEX_FLOAT_COUNT));
+
+	// 위치와 색은 꼭짓점마다, 옮김과 배율은 고정값 하나 ( 도형 셰이더를 그대로 빌린다 )
+	glEnableVertexAttribArray(static_cast<GLuint>(m_position_attrib));
+	glVertexAttribPointer(static_cast<GLuint>(m_position_attrib), 2, GL_FLOAT, GL_FALSE, stride, BufferOffset(0));
+
+	glEnableVertexAttribArray(static_cast<GLuint>(m_solid_color_attrib));
+	glVertexAttribPointer(static_cast<GLuint>(m_solid_color_attrib), 4, GL_FLOAT, GL_FALSE, stride, BufferOffset(sizeof(float) * 2));
+
+	glDisableVertexAttribArray(static_cast<GLuint>(m_solid_trans_attrib));
+	glVertexAttrib4f(static_cast<GLuint>(m_solid_trans_attrib), 0.f, 0.f, 1.f, 1.f);
+
+	if (m_batch_pixel_triangles)
+	{
+		glUniform1i(m_solid_pixel_mode, 1);
+	}
+
+	CountDrawCall();
+	glDrawArrays(GL_TRIANGLES, 0, m_batch_instance_count);
+
+	// 상자 · 원도 같은 셰이더라 바로 되돌린다
+	if (m_batch_pixel_triangles)
+	{
+		glUniform1i(m_solid_pixel_mode, 0);
+	}
+
+	glDisableVertexAttribArray(static_cast<GLuint>(m_position_attrib));
+	glDisableVertexAttribArray(static_cast<GLuint>(m_solid_color_attrib));
 }
 
 void Renderer::GetGLPosition(float x, float y, float* new_x, float* new_y)
 {
 	*new_x = x * 2.f / static_cast<float>(m_window_size_x);
 	*new_y = y * 2.f / static_cast<float>(m_window_size_y);
+}
+
+void Renderer::SetPixelTriangles(bool on)
+{
+	m_pixel_triangles = on;
 }
 
 void Renderer::SetUndoToneMap(bool undo)

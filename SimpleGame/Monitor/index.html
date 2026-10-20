@@ -1,0 +1,1708 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>잿빛 성벽 관측대</title>
+<link rel="icon" href="data:,">
+<style>
+	:root {
+		--soot: #1b1814;
+		--hearth: #231f1a;
+		--seam: #3a332b;
+		--seam-soft: #2b261f;
+		--bone: #e8dfcf;
+		--dust: #a3967f;
+		--dim: #6e6455;
+		--amber: #d9a441;
+		--ember: #e2763f;
+		--blood: #cf4a3c;
+		--serif: "Batang", "바탕", "Noto Serif KR", serif;
+		--sans: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+	}
+
+	* {
+		box-sizing: border-box;
+	}
+
+	html,
+	body {
+		margin: 0;
+		background: var(--soot);
+		color: var(--bone);
+		font-family: var(--sans);
+		font-size: 14px;
+		line-height: 1.5;
+		font-variant-numeric: tabular-nums;
+	}
+
+	button {
+		font: inherit;
+		color: inherit;
+	}
+
+	:focus-visible {
+		outline: 2px solid var(--amber);
+		outline-offset: 2px;
+	}
+
+	h1,
+	h2 {
+		font-family: var(--serif);
+		font-weight: 700;
+		margin: 0;
+	}
+
+	h1 {
+		font-size: 26px;
+		letter-spacing: 0.02em;
+	}
+
+	h2 {
+		font-size: 17px;
+	}
+
+	.muted {
+		color: var(--dust);
+	}
+
+	/* 머리 */
+	.top {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-end;
+		justify-content: space-between;
+		gap: 12px 32px;
+		padding: 20px 24px 16px;
+		border-bottom: 1px solid var(--seam);
+	}
+
+	.conn {
+		margin: 4px 0 0;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		color: var(--dust);
+	}
+
+	.lamp {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--dim);
+	}
+
+	.conn[data-state="open"] .lamp {
+		background: #7fc48a;
+	}
+
+	.conn[data-state="stale"] .lamp {
+		background: var(--amber);
+	}
+
+	.conn[data-state="error"] .lamp {
+		background: var(--blood);
+	}
+
+	.tally {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 22px;
+		margin: 0;
+	}
+
+	.tally div {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+	}
+
+	.tally dt {
+		color: var(--dust);
+	}
+
+	.tally dd {
+		margin: 0;
+		font-size: 18px;
+		font-weight: 700;
+	}
+
+	.tally dd small {
+		font-size: 13px;
+		font-weight: 400;
+		color: var(--dust);
+	}
+
+	.tally .warn dd {
+		color: var(--ember);
+	}
+
+	/* 판 배치 */
+	.grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr);
+		grid-template-areas:
+			"map sites"
+			"npcs log";
+		gap: 0;
+	}
+
+	.map-pane {
+		grid-area: map;
+	}
+
+	.sites-pane {
+		grid-area: sites;
+	}
+
+	.npc-pane {
+		grid-area: npcs;
+	}
+
+	.log-pane {
+		grid-area: log;
+	}
+
+	.grid > section {
+		padding: 18px 24px 20px;
+		min-width: 0;
+		border-bottom: 1px solid var(--seam);
+	}
+
+	.sites-pane,
+	.log-pane {
+		border-left: 1px solid var(--seam);
+		background: var(--hearth);
+	}
+
+	.pane-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		justify-content: space-between;
+		gap: 8px 16px;
+		margin-bottom: 12px;
+	}
+
+	.pane-head p {
+		margin: 0;
+	}
+
+	/* 지도 */
+	.map-wrap {
+		position: relative;
+		width: 100%;
+		aspect-ratio: 2 / 1.08;
+	}
+
+	#map {
+		display: block;
+		width: 100%;
+		height: 100%;
+		cursor: crosshair;
+	}
+
+	.map-empty {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-content: center;
+		text-align: center;
+		color: var(--dust);
+		padding: 24px;
+	}
+
+	.map-empty[hidden],
+	.tip[hidden] {
+		display: none;
+	}
+
+	.map-empty strong {
+		display: block;
+		color: var(--bone);
+		font-family: var(--serif);
+		font-size: 18px;
+		margin-bottom: 6px;
+	}
+
+	.tip {
+		position: absolute;
+		pointer-events: none;
+		background: rgba(20, 17, 14, 0.94);
+		border: 1px solid var(--seam);
+		padding: 6px 10px;
+		font-size: 13px;
+		white-space: nowrap;
+		transform: translate(12px, -50%);
+	}
+
+	.tip b {
+		font-family: var(--serif);
+	}
+
+	.legend {
+		list-style: none;
+		margin: 10px 0 0;
+		padding: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 16px;
+		color: var(--dust);
+		font-size: 13px;
+	}
+
+	.legend li {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+	}
+
+	.swatch {
+		width: 9px;
+		height: 9px;
+		border-radius: 50%;
+		background: var(--c);
+	}
+
+	.swatch.square {
+		border-radius: 0;
+	}
+
+	.npc-detail {
+		margin-top: 12px;
+		padding-top: 10px;
+		border-top: 1px solid var(--seam-soft);
+		min-height: 48px;
+		color: var(--dust);
+	}
+
+	.npc-detail b {
+		color: var(--bone);
+		font-family: var(--serif);
+		font-size: 16px;
+	}
+
+	.npc-detail p {
+		margin: 2px 0 0;
+	}
+
+	/* 마을 목록 */
+	.seg {
+		display: inline-flex;
+		border: 1px solid var(--seam);
+	}
+
+	.seg button {
+		background: none;
+		border: 0;
+		padding: 3px 10px;
+		color: var(--dust);
+		cursor: pointer;
+	}
+
+	.seg button[aria-pressed="true"] {
+		background: var(--seam);
+		color: var(--bone);
+	}
+
+	.sites {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		max-height: 640px;
+		overflow-y: auto;
+	}
+
+	.site {
+		display: grid;
+		grid-template-columns: 14px 1fr auto;
+		gap: 2px 10px;
+		width: 100%;
+		text-align: left;
+		background: none;
+		border: 0;
+		border-top: 1px solid var(--seam-soft);
+		padding: 10px 6px 10px 2px;
+		cursor: pointer;
+	}
+
+	.site:hover {
+		background: rgba(255, 240, 210, 0.03);
+	}
+
+	.site[aria-pressed="true"] {
+		background: rgba(217, 164, 65, 0.09);
+		box-shadow: inset 2px 0 0 var(--amber);
+	}
+
+	.mark {
+		width: 10px;
+		height: 10px;
+		margin-top: 6px;
+		background: var(--c);
+		transform: rotate(45deg);
+	}
+
+	.site-name {
+		font-family: var(--serif);
+		font-size: 16px;
+		font-weight: 700;
+	}
+
+	.site-walk {
+		color: var(--dim);
+		font-size: 12px;
+		margin-left: 8px;
+		font-weight: 400;
+		font-family: var(--sans);
+	}
+
+	.threat {
+		justify-self: end;
+		font-size: 13px;
+		color: var(--dim);
+	}
+
+	.threat.t1 {
+		color: var(--amber);
+	}
+
+	.threat.t2 {
+		color: var(--ember);
+	}
+
+	.threat.t3 {
+		color: var(--blood);
+		font-weight: 700;
+	}
+
+	.site-line {
+		grid-column: 2 / 4;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 2px 12px;
+		color: var(--dust);
+		font-size: 13px;
+	}
+
+	.site-line b {
+		color: var(--bone);
+		font-size: 15px;
+		margin-left: 3px;
+	}
+
+	.jobbar {
+		grid-column: 2 / 4;
+		display: flex;
+		height: 5px;
+		margin: 3px 0 1px;
+		background: var(--seam-soft);
+	}
+
+	.jobbar span {
+		background: var(--c);
+	}
+
+	/* NPC 명부 */
+	.filters {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px 14px;
+	}
+
+	.filters input[type="search"] {
+		background: var(--hearth);
+		border: 1px solid var(--seam);
+		color: var(--bone);
+		padding: 4px 8px;
+		width: 140px;
+		font: inherit;
+	}
+
+	.filters label {
+		color: var(--dust);
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		cursor: pointer;
+	}
+
+	.site-filter {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		background: rgba(217, 164, 65, 0.12);
+		border: 1px solid rgba(217, 164, 65, 0.4);
+		padding: 2px 4px 2px 10px;
+	}
+
+	.site-filter button {
+		background: none;
+		border: 0;
+		color: var(--dust);
+		cursor: pointer;
+		padding: 0 6px;
+	}
+
+	.table-wrap {
+		max-height: 560px;
+		overflow: auto;
+		border-top: 1px solid var(--seam);
+	}
+
+	table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 13px;
+	}
+
+	th {
+		position: sticky;
+		top: 0;
+		background: var(--soot);
+		text-align: left;
+		font-weight: 400;
+		color: var(--dust);
+		padding: 0;
+		border-bottom: 1px solid var(--seam);
+		white-space: nowrap;
+	}
+
+	th button {
+		background: none;
+		border: 0;
+		padding: 7px 7px;
+		color: inherit;
+		cursor: pointer;
+		width: 100%;
+		text-align: inherit;
+	}
+
+	th[aria-sort] button {
+		color: var(--bone);
+	}
+
+	th[aria-sort="ascending"] button::after {
+		content: " ▲";
+		font-size: 9px;
+	}
+
+	th[aria-sort="descending"] button::after {
+		content: " ▼";
+		font-size: 9px;
+	}
+
+	td {
+		padding: 6px 7px;
+		border-bottom: 1px solid var(--seam-soft);
+		white-space: nowrap;
+	}
+
+	tbody tr {
+		cursor: pointer;
+	}
+
+	tbody tr:hover {
+		background: rgba(255, 240, 210, 0.03);
+	}
+
+	tbody tr.is-selected {
+		background: rgba(217, 164, 65, 0.1);
+	}
+
+	tbody tr.is-dead {
+		color: var(--dim);
+	}
+
+	.num {
+		text-align: right;
+	}
+
+	.who {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.who .chip {
+		width: 4px;
+		height: 16px;
+		background: var(--c);
+	}
+
+	.who .nm {
+		font-family: var(--serif);
+		font-weight: 700;
+		font-size: 14px;
+	}
+
+	.badge {
+		font-size: 11px;
+		color: var(--blood);
+		border: 1px solid currentColor;
+		padding: 0 4px;
+	}
+
+	.bar {
+		display: inline-block;
+		width: 40px;
+		height: 5px;
+		background: var(--seam-soft);
+		vertical-align: middle;
+		margin-right: 6px;
+	}
+
+	.bar span {
+		display: block;
+		height: 100%;
+		background: var(--c);
+	}
+
+	.task.fight {
+		color: var(--ember);
+		font-weight: 700;
+	}
+
+	.task.flee {
+		color: var(--amber);
+	}
+
+	.brain {
+		color: var(--dim);
+		max-width: 170px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.table-empty {
+		color: var(--dust);
+		padding: 18px 8px;
+		white-space: normal;
+	}
+
+	/* 일지 */
+	.log {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		max-height: 560px;
+		overflow-y: auto;
+	}
+
+	.log li {
+		display: grid;
+		grid-template-columns: 46px 1fr;
+		gap: 8px;
+		padding: 5px 0;
+		border-top: 1px solid var(--seam-soft);
+		font-size: 13px;
+	}
+
+	.log time {
+		color: var(--dim);
+	}
+
+	.log li.zone-line {
+		color: var(--dust);
+		font-family: var(--serif);
+	}
+
+	.foot {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px 22px;
+		padding: 12px 24px 20px;
+		color: var(--dim);
+		font-size: 12px;
+	}
+
+	@media (max-width: 960px) {
+		.grid {
+			grid-template-columns: minmax(0, 1fr);
+			grid-template-areas:
+				"map"
+				"sites"
+				"npcs"
+				"log";
+		}
+
+		.grid > section {
+			padding: 16px;
+		}
+
+		.sites-pane,
+		.log-pane {
+			border-left: 0;
+		}
+
+		.top {
+			padding: 16px;
+		}
+
+		.sites {
+			max-height: none;
+		}
+	}
+</style>
+</head>
+<body>
+<header class="top">
+	<div>
+		<h1>잿빛 성벽 관측대</h1>
+		<p class="conn" id="conn" data-state="connecting"><span class="lamp"></span><span id="conn-text">게임을 찾는 중</span></p>
+	</div>
+	<dl class="tally" id="tally"></dl>
+</header>
+
+<main class="grid">
+	<section class="map-pane" aria-labelledby="map-title">
+		<div class="pane-head">
+			<h2 id="map-title">구역 지도</h2>
+			<p class="muted" id="map-note">점을 누르면 그 사람이나 마을을 고른다</p>
+		</div>
+		<div class="map-wrap" id="map-wrap">
+			<canvas id="map" aria-label="구역 지도. 마을과 NPC, 몬스터 위치"></canvas>
+			<div class="map-empty" id="map-empty">
+				<div><strong>아직 지도를 받지 못했다</strong>SimpleGame 을 켜면 1 초 안에 저절로 붙는다. 게임 안에서 B 키를 누르면 이 페이지가 열린다.</div>
+			</div>
+			<div class="tip" id="tip" hidden></div>
+		</div>
+		<ul class="legend" id="legend"></ul>
+		<div class="npc-detail" id="npc-detail">명부나 지도에서 NPC 를 고르면 성향과 행동 트리가 여기 나온다.</div>
+	</section>
+
+	<section class="sites-pane" aria-labelledby="sites-title">
+		<div class="pane-head">
+			<h2 id="sites-title">마을별 상태</h2>
+			<div class="seg" role="group" aria-label="마을 정렬">
+				<button type="button" data-order="kind" aria-pressed="true">종류별</button>
+				<button type="button" data-order="threat" aria-pressed="false">위협순</button>
+			</div>
+		</div>
+		<ul class="sites" id="sites"></ul>
+	</section>
+
+	<section class="npc-pane" aria-labelledby="npc-title">
+		<div class="pane-head">
+			<h2 id="npc-title">NPC 명부</h2>
+			<div class="filters">
+				<span id="site-filter"></span>
+				<div class="seg" role="group" aria-label="직업" id="job-filter"></div>
+				<label><input type="checkbox" id="alive-only" checked>산 사람만</label>
+				<input type="search" id="search" placeholder="이름 찾기" aria-label="이름 찾기">
+			</div>
+		</div>
+		<div class="table-wrap">
+			<table>
+				<thead><tr id="npc-head"></tr></thead>
+				<tbody id="npc-body"></tbody>
+			</table>
+		</div>
+	</section>
+
+	<section class="log-pane" aria-labelledby="log-title">
+		<div class="pane-head">
+			<h2 id="log-title">변경 일지</h2>
+			<p class="muted" id="log-note"></p>
+		</div>
+		<ol class="log" id="log"></ol>
+	</section>
+</main>
+
+<footer class="foot" id="foot"></footer>
+
+<script>
+	"use strict";
+
+	// 게임 쪽 번호와 같은 순서 ( NpcData.h · Monster.h · ZoneGen.h )
+	const JOBS = [
+		{ name: "사냥꾼", color: "#93d26f" },
+		{ name: "약탈자", color: "#e0574a" },
+		{ name: "행상", color: "#cf98e3" },
+		{ name: "채집꾼", color: "#e2cf8c" },
+		{ name: "순찰병", color: "#62cdbf" },
+	];
+	const MONSTER_NAMES = ["타락자", "재늑대", "소거식귀", "성문파쇄자"];
+	const SITE_COLORS = ["#d6cdbd", "#9f9686", "#4fb3a6", "#cf4a3c", "#a8a190", "#c24bc2"];
+	const SITE_RANK = [0, 1, 2, 4, 3, 5];	// 성채 성문 초소 폐촌 소굴 둥지
+	const TASK_FIGHT = 11;
+	const TASK_FLEE = 12;
+	const TASK_ENGAGE = 13;
+	const TASK_AVOID = 14;
+	const LOG_MAX = 150;
+	const STALE_MS = 3000;
+
+	// 미니맵 ( Minimap.cpp GetTileColor ) 과 같은 색. 균열은 비워서 바탕이 보이게
+	const TILE_COLORS = {
+		0: [52, 48, 44],
+		1: [102, 84, 60],
+		2: [128, 122, 114],
+		3: [84, 66, 40],
+		4: [76, 36, 76],
+		10: null,
+		11: [16, 30, 30],
+		12: [100, 100, 100],
+		13: [26, 34, 22],
+		14: [178, 172, 162],
+		15: [204, 198, 188],
+		16: [132, 76, 60],
+		17: [106, 106, 92],
+	};
+
+	const view = {
+		zone: null,
+		snap: null,
+		terrain: null,
+		selectedSite: -1,
+		selectedNpc: -1,
+		jobFilter: -1,
+		aliveOnly: true,
+		search: "",
+		siteOrder: "kind",
+		sortKey: "job",
+		sortDir: 1,
+		lastEventSerial: 0,
+		log: [],
+		lastMessageAt: 0,
+		lastBytes: 0,
+		connState: "connecting",
+		mapView: null,
+		hover: null,
+	};
+
+	const $ = (id) => document.getElementById(id);
+
+	function esc(value) {
+		return String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]));
+	}
+
+	function clamp01(value) {
+		return Math.max(0, Math.min(1, value));
+	}
+
+	function formatClock(seconds) {
+		const total = Math.floor(seconds);
+		const minutes = Math.floor(total / 60);
+		const rest = String(total % 60).padStart(2, "0");
+		return minutes + ":" + rest;
+	}
+
+	function siteName(index) {
+		if (view.snap === null || index < 0 || index >= view.snap.sites.length) {
+			return "-";
+		}
+		return view.snap.sites[index].name;
+	}
+
+	// 거점 위협. 교전이 제일 위, 그다음 둘레 몬스터 수
+	function threatOf(site) {
+		if (site.monster.fighting > 0 || site.npc.fighting > 0) {
+			return { level: 3, word: "교전 중" };
+		}
+		if (site.monster.near >= 3 || (site.monster.near > 0 && site.monster.elite > 0)) {
+			return { level: 2, word: "위험" };
+		}
+		if (site.monster.near > 0) {
+			return { level: 1, word: "주의" };
+		}
+		return { level: 0, word: "평온" };
+	}
+
+	// ------------------------------------------------------------ 연결
+
+	const params = new URLSearchParams(location.search);
+	let base = "";
+	if (location.protocol === "file:") {
+		base = "http://127.0.0.1:" + (params.get("port") || "7788");
+	}
+
+	function setConn(state, text) {
+		view.connState = state;
+		$("conn").dataset.state = state;
+		$("conn-text").textContent = text;
+	}
+
+	function connect() {
+		const source = new EventSource(base + "/events");
+
+		source.onopen = () => {
+			setConn("open", "연결됨  " + (base || location.host));
+		};
+
+		// 게임이 꺼지면 브라우저가 1 초마다 다시 붙어 본다 ( 서버가 보낸 retry )
+		source.onerror = () => {
+			setConn("error", "끊김  게임을 다시 켜면 저절로 붙는다");
+		};
+
+		source.addEventListener("zone", (event) => {
+			onZone(JSON.parse(event.data));
+		});
+
+		source.onmessage = (event) => {
+			onState(JSON.parse(event.data), event.data.length);
+		};
+	}
+
+	setInterval(() => {
+		if (view.connState !== "open" && view.connState !== "stale") {
+			return;
+		}
+		const quiet = Date.now() - view.lastMessageAt;
+		if (view.lastMessageAt > 0 && quiet > STALE_MS) {
+			setConn("stale", "멈춤  마지막 메시지 " + Math.floor(quiet / 1000) + "초 전");
+		}
+	}, 500);
+
+	// ------------------------------------------------------------ 메시지
+
+	function onZone(zone) {
+		const isNewZone = view.zone === null || view.zone.seed !== zone.seed;
+		view.zone = zone;
+		view.terrain = buildTerrain(zone);
+		$("map-empty").hidden = true;
+
+		if (isNewZone) {
+			view.selectedSite = -1;
+			view.selectedNpc = -1;
+			pushLogLine({ zone: true, text: "새 구역  씨앗 " + zone.seed + "  거점 " + zone.sites.length + "곳", time: 0 });
+		}
+
+		drawMap();
+	}
+
+	function onState(snap, bytes) {
+		// 순번이 줄었으면 게임을 새로 켠 것. 일지 번호도 처음부터 다시 센다
+		if (view.snap !== null && snap.seq < view.snap.seq) {
+			view.lastEventSerial = 0;
+		}
+
+		view.snap = snap;
+		view.lastMessageAt = Date.now();
+		view.lastBytes = bytes;
+
+		if (view.connState === "stale") {
+			setConn("open", "연결됨  " + (base || location.host));
+		}
+
+		for (const event of snap.events) {
+			if (event.serial <= view.lastEventSerial) {
+				continue;
+			}
+			view.lastEventSerial = event.serial;
+			pushLogLine({ text: event.text, color: event.color, time: snap.time });
+		}
+
+		renderTally();
+		renderSites();
+		renderNpcs();
+		renderDetail();
+		renderLog();
+		renderFoot();
+		drawMap();
+	}
+
+	function pushLogLine(line) {
+		view.log.unshift(line);
+		if (view.log.length > LOG_MAX) {
+			view.log.length = LOG_MAX;
+		}
+		renderLog();
+	}
+
+	// ------------------------------------------------------------ 머리 · 바닥
+
+	function renderTally() {
+		const s = view.snap.summary;
+		const boss = view.snap.boss;
+		let bossWord = "잠듦";
+		if (boss.dead) {
+			bossWord = "쓰러짐";
+		} else if (boss.summoned) {
+			bossWord = "깨어남";
+		}
+
+		const items = [
+			["주민", s.npc_alive, "/ " + s.npc_slots, false],
+			["무법자", s.outlaws, "", s.outlaws > 0],
+			["몬스터", s.monster_alive, "/ " + s.monster_slots, false],
+			["교전 중", s.monster_fighting, "", s.monster_fighting > 0],
+			["정예", s.elite_alive, "", false],
+			["성채 금고", s.treasury, "", s.treasury <= 0],
+			["사망", s.deaths, "", false],
+			["약탈", s.robberies, "", false],
+			["성문파쇄자", bossWord, "", boss.summoned && !boss.dead],
+		];
+
+		$("tally").innerHTML = items.map(([label, value, rest, warn]) =>
+			`<div class="${warn ? "warn" : ""}"><dt>${label}</dt><dd>${esc(value)}${rest ? ` <small>${esc(rest)}</small>` : ""}</dd></div>`
+		).join("");
+	}
+
+	function renderFoot() {
+		const snap = view.snap;
+		const kb = (view.lastBytes / 1024).toFixed(1);
+		const perSecond = (1 / snap.interval).toFixed(0);
+		$("foot").innerHTML = [
+			`구역 시간 ${formatClock(snap.time)}`,
+			`메시지 ${snap.seq}번째  ${kb}KB  초당 ${perSecond}번`,
+			`게임 스레드 복사 ${snap.gather_us}µs`,
+			`JSON 짓기 ${snap.json_us}µs`,
+			`NPC 갱신 ${snap.summary.npc_tick_us}µs`,
+			`씨앗 ${snap.seed}`,
+		].map((text) => `<span>${esc(text)}</span>`).join("");
+	}
+
+	// ------------------------------------------------------------ 마을
+
+	function renderSites() {
+		const sites = view.snap.sites.map((site) => ({ site, threat: threatOf(site) }));
+
+		if (view.siteOrder === "threat") {
+			sites.sort((a, b) => b.threat.level - a.threat.level || b.site.monster.near - a.site.monster.near || a.site.walk - b.site.walk);
+		} else {
+			sites.sort((a, b) => SITE_RANK[a.site.kind] - SITE_RANK[b.site.kind] || a.site.walk - b.site.walk);
+		}
+
+		$("sites").innerHTML = sites.map(({ site, threat }) => {
+			const npc = site.npc;
+			const monster = site.monster;
+			const walk = site.walk > 0 ? `<span class="site-walk">광장에서 ${site.walk}걸음</span>` : "";
+
+			let jobBar = "";
+			if (npc.here > 0) {
+				jobBar = npc.jobs.map((count, job) => count > 0
+					? `<span style="--c:${JOBS[job].color};width:${(count / npc.here) * 100}%" title="${JOBS[job].name} ${count}"></span>`
+					: "").join("");
+			}
+
+			const kinds = monster.kinds
+				.map((count, kind) => count > 0 ? `${MONSTER_NAMES[kind]} ${count}` : "")
+				.filter(Boolean).join("  ");
+
+			const people = [`<span>사람<b>${npc.here}</b></span>`, `<span>주민 ${npc.residents} / ${npc.resident_slots}</span>`];
+			if (npc.outlaws > 0) {
+				people.push(`<span>무법 ${npc.outlaws}</span>`);
+			}
+			if (npc.fleeing > 0) {
+				people.push(`<span>도망 ${npc.fleeing}</span>`);
+			}
+
+			const beasts = [`<span>몬스터<b>${monster.here}</b></span>`];
+			if (monster.elite > 0) {
+				beasts.push(`<span>정예 ${monster.elite}</span>`);
+			}
+			beasts.push(`<span>둘레 ${view.zone ? view.zone.threat_radius : 12}칸 안 ${monster.near}</span>`);
+			if (monster.respawning > 0) {
+				beasts.push(`<span>다시 나올 ${monster.respawning}</span>`);
+			}
+
+			const pressed = view.selectedSite === site.id;
+
+			return `<li><button type="button" class="site" data-site="${site.id}" aria-pressed="${pressed}">
+				<span class="mark" style="--c:${SITE_COLORS[site.kind]}"></span>
+				<span class="site-name">${esc(site.name)}${walk}</span>
+				<span class="threat t${threat.level}">${threat.word}</span>
+				<span class="jobbar" title="지금 이 구역에 있는 사람의 직업">${jobBar}</span>
+				<span class="site-line">${people.join("")}</span>
+				<span class="site-line">${beasts.join("")}${kinds ? `<span>${esc(kinds)}</span>` : ""}</span>
+			</button></li>`;
+		}).join("");
+	}
+
+	$("sites").addEventListener("click", (event) => {
+		const button = event.target.closest("[data-site]");
+		if (button === null) {
+			return;
+		}
+		selectSite(Number(button.dataset.site));
+	});
+
+	document.querySelectorAll(".sites-pane .seg button").forEach((button) => {
+		button.addEventListener("click", () => {
+			view.siteOrder = button.dataset.order;
+			document.querySelectorAll(".sites-pane .seg button").forEach((other) => {
+				other.setAttribute("aria-pressed", String(other === button));
+			});
+			if (view.snap !== null) {
+				renderSites();
+			}
+		});
+	});
+
+	function selectSite(index) {
+		if (view.selectedSite === index) {
+			view.selectedSite = -1;
+		} else {
+			view.selectedSite = index;
+		}
+		refreshSelection();
+	}
+
+	function selectNpc(index) {
+		if (view.selectedNpc === index) {
+			view.selectedNpc = -1;
+		} else {
+			view.selectedNpc = index;
+		}
+		refreshSelection();
+	}
+
+	function refreshSelection() {
+		if (view.snap === null) {
+			return;
+		}
+		renderSites();
+		renderNpcs();
+		renderDetail();
+		drawMap();
+	}
+
+	// ------------------------------------------------------------ NPC 명부
+
+	const COLUMNS = [
+		{ key: "name", label: "이름", value: (n) => n.name },
+		{ key: "job", label: "직업", value: (n) => n.job },
+		{ key: "level", label: "Lv", value: (n) => n.level, num: true },
+		{ key: "hp", label: "체력", value: (n) => n.max_hp > 0 ? n.hp / n.max_hp : 0 },
+		{ key: "hunger", label: "허기", value: (n) => n.hunger },
+		{ key: "task", label: "지금 하는 일", value: (n) => n.task },
+		{ key: "brain", label: "행동 트리 줄기", value: (n) => n.brain },
+		{ key: "region", label: "있는 곳", value: (n) => siteName(n.region) },
+		{ key: "home", label: "거처", value: (n) => siteName(n.home) },
+		{ key: "gold", label: "골드", value: (n) => n.gold, num: true },
+		{ key: "goods", label: "짐", value: (n) => n.goods, num: true },
+		{ key: "kills", label: "처치", value: (n) => n.kills, num: true },
+	];
+
+	function renderHead() {
+		$("npc-head").innerHTML = COLUMNS.map((column) => {
+			let sort = "";
+			if (column.key === view.sortKey) {
+				sort = ` aria-sort="${view.sortDir > 0 ? "ascending" : "descending"}"`;
+			}
+			return `<th${sort}${column.num ? ' class="num"' : ""}><button type="button" data-sort="${column.key}">${column.label}</button></th>`;
+		}).join("");
+	}
+
+	$("npc-head").addEventListener("click", (event) => {
+		const button = event.target.closest("[data-sort]");
+		if (button === null) {
+			return;
+		}
+		const key = button.dataset.sort;
+		if (view.sortKey === key) {
+			view.sortDir = -view.sortDir;
+		} else {
+			view.sortKey = key;
+			view.sortDir = 1;
+		}
+		renderHead();
+		if (view.snap !== null) {
+			renderNpcs();
+		}
+	});
+
+	function renderJobFilter() {
+		const options = [{ job: -1, name: "전체" }].concat(JOBS.map((job, index) => ({ job: index, name: job.name })));
+		$("job-filter").innerHTML = options.map((option) =>
+			`<button type="button" data-job="${option.job}" aria-pressed="${view.jobFilter === option.job}">${option.name}</button>`
+		).join("");
+	}
+
+	$("job-filter").addEventListener("click", (event) => {
+		const button = event.target.closest("[data-job]");
+		if (button === null) {
+			return;
+		}
+		view.jobFilter = Number(button.dataset.job);
+		renderJobFilter();
+		if (view.snap !== null) {
+			renderNpcs();
+		}
+	});
+
+	$("alive-only").addEventListener("change", (event) => {
+		view.aliveOnly = event.target.checked;
+		if (view.snap !== null) {
+			renderNpcs();
+		}
+	});
+
+	$("search").addEventListener("input", (event) => {
+		view.search = event.target.value.trim();
+		if (view.snap !== null) {
+			renderNpcs();
+		}
+	});
+
+	function bar(ratio, color) {
+		return `<span class="bar"><span style="--c:${color};width:${clamp01(ratio) * 100}%"></span></span>`;
+	}
+
+	function renderNpcs() {
+		const snap = view.snap;
+
+		let rows = snap.npcs.filter((npc) => {
+			if (view.aliveOnly && !npc.alive) {
+				return false;
+			}
+			if (view.jobFilter >= 0 && npc.job !== view.jobFilter) {
+				return false;
+			}
+			if (view.selectedSite >= 0 && npc.region !== view.selectedSite) {
+				return false;
+			}
+			if (view.search !== "" && !npc.name.includes(view.search)) {
+				return false;
+			}
+			return true;
+		});
+
+		const column = COLUMNS.find((c) => c.key === view.sortKey) || COLUMNS[1];
+		rows.sort((a, b) => {
+			const left = column.value(a);
+			const right = column.value(b);
+			if (left < right) {
+				return -view.sortDir;
+			}
+			if (left > right) {
+				return view.sortDir;
+			}
+			return a.id - b.id;
+		});
+
+		// 표를 통째로 다시 그리면 키보드 초점이 날아간다. 같은 줄로 돌려놓는다
+		const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.npc : undefined;
+
+		const filter = $("site-filter");
+		if (view.selectedSite >= 0) {
+			filter.innerHTML = `<span class="site-filter">${esc(siteName(view.selectedSite))} 안만<button type="button" aria-label="마을 거르기 풀기">×</button></span>`;
+			filter.querySelector("button").onclick = () => selectSite(view.selectedSite);
+		} else {
+			filter.innerHTML = "";
+		}
+
+		if (rows.length === 0) {
+			let text = "조건에 맞는 NPC 가 없다.";
+			if (view.selectedSite >= 0) {
+				text = "지금 " + siteName(view.selectedSite) + " 구역에 있는 사람이 없다. 다른 마을을 고르거나 거르기를 풀어 본다.";
+			}
+			$("npc-body").innerHTML = `<tr><td class="table-empty" colspan="${COLUMNS.length}">${esc(text)}</td></tr>`;
+			return;
+		}
+
+		$("npc-body").innerHTML = rows.map((npc) => {
+			const job = JOBS[npc.job];
+			const classes = [];
+			if (!npc.alive) {
+				classes.push("is-dead");
+			}
+			if (npc.id === view.selectedNpc) {
+				classes.push("is-selected");
+			}
+
+			let taskClass = "";
+			if (npc.task === TASK_FIGHT || npc.task === TASK_ENGAGE) {
+				taskClass = "fight";
+			} else if (npc.task === TASK_FLEE || npc.task === TASK_AVOID) {
+				taskClass = "flee";
+			}
+
+			const outlaw = npc.alive && npc.outlaw_sec > 0 ? `<span class="badge" title="무법자 ${Math.ceil(npc.outlaw_sec)}초 남음">무법자</span>` : "";
+			const hpRatio = npc.max_hp > 0 ? npc.hp / npc.max_hp : 0;
+
+			let task = esc(npc.task_name);
+			let brain = esc(npc.brain);
+			let region = esc(siteName(npc.region));
+			if (!npc.alive) {
+				task = "쓰러짐";
+				brain = "빈자리. 같은 직업이 곧 성문에서 나온다";
+				region = "-";
+			}
+
+			return `<tr data-npc="${npc.id}" tabindex="0" class="${classes.join(" ")}">
+				<td><span class="who"><span class="chip" style="--c:${job.color}"></span><span class="nm">${esc(npc.name)}</span>${outlaw}</span></td>
+				<td>${job.name}</td>
+				<td class="num">${npc.level}</td>
+				<td>${bar(hpRatio, "#c4483d")}${npc.hp}/${npc.max_hp}</td>
+				<td>${bar(npc.hunger, "#d9a441")}${Math.round(npc.hunger * 100)}%</td>
+				<td class="task ${taskClass}">${task}</td>
+				<td class="brain" title="${brain}">${brain}</td>
+				<td>${region}</td>
+				<td>${esc(siteName(npc.home))}</td>
+				<td class="num">${npc.gold}</td>
+				<td class="num">${npc.goods} / ${npc.goods_capacity}</td>
+				<td class="num">${npc.kills}</td>
+			</tr>`;
+		}).join("");
+
+		if (focused !== undefined) {
+			const row = $("npc-body").querySelector(`[data-npc="${focused}"]`);
+			if (row !== null) {
+				row.focus({ preventScroll: true });
+			}
+		}
+	}
+
+	$("npc-body").addEventListener("click", (event) => {
+		const row = event.target.closest("[data-npc]");
+		if (row !== null) {
+			selectNpc(Number(row.dataset.npc));
+		}
+	});
+
+	$("npc-body").addEventListener("keydown", (event) => {
+		if (event.key !== "Enter" && event.key !== " ") {
+			return;
+		}
+		const row = event.target.closest("[data-npc]");
+		if (row !== null) {
+			event.preventDefault();
+			selectNpc(Number(row.dataset.npc));
+		}
+	});
+
+	function renderDetail() {
+		const box = $("npc-detail");
+		if (view.snap === null || view.selectedNpc < 0 || view.selectedNpc >= view.snap.npcs.length) {
+			box.textContent = "명부나 지도에서 NPC 를 고르면 성향과 행동 트리가 여기 나온다.";
+			return;
+		}
+
+		const npc = view.snap.npcs[view.selectedNpc];
+		const t = npc.traits;
+		let state = `지금 ${esc(npc.task_name)}   적을 보면 ${esc(npc.stance_name)}   있는 곳 ${esc(siteName(npc.region))}   거처 ${esc(siteName(npc.home))}`;
+		if (!npc.alive) {
+			state = "쓰러졌다. 이 자리는 40 ~ 70 초 뒤 같은 직업으로 다시 채워진다";
+		}
+
+		box.innerHTML = `<b>${esc(JOBS[npc.job].name)} ${esc(npc.name)}</b>  Lv${npc.level}   장비 ${npc.gear}단계
+			<p>${state}</p>
+			<p>탐욕 ${t.greed}   용맹 ${t.bravery}   잔혹 ${t.cruelty}   근면 ${t.diligence}</p>
+			<p>${esc(npc.brain)}</p>`;
+	}
+
+	// ------------------------------------------------------------ 일지
+
+	function renderLog() {
+		const lines = view.log.map((line) => {
+			if (line.zone) {
+				return `<li class="zone-line"><time></time><span>${esc(line.text)}</span></li>`;
+			}
+			const [r, g, b] = line.color.map((c) => Math.round(clamp01(c) * 255));
+			return `<li><time>${formatClock(line.time)}</time><span style="color:rgb(${r},${g},${b})">${esc(line.text)}</span></li>`;
+		});
+
+		if (lines.length === 0) {
+			$("log").innerHTML = `<li><time></time><span class="muted">아직 일어난 일이 없다</span></li>`;
+		} else {
+			$("log").innerHTML = lines.join("");
+		}
+
+		$("log-note").textContent = "최근 " + view.log.length + "줄";
+	}
+
+	// ------------------------------------------------------------ 지도
+
+	function buildTerrain(zone) {
+		const size = zone.size;
+		const canvas = document.createElement("canvas");
+		canvas.width = size;
+		canvas.height = size;
+
+		const context = canvas.getContext("2d");
+		const image = context.createImageData(size, size);
+
+		for (let index = 0; index < size * size; ++index) {
+			const code = zone.tiles.charCodeAt(index) - 65;
+			let color = TILE_COLORS[code];
+			if (color === undefined) {
+				color = TILE_COLORS[0];
+			}
+			if (color === null) {
+				continue;
+			}
+			image.data[index * 4] = color[0];
+			image.data[index * 4 + 1] = color[1];
+			image.data[index * 4 + 2] = color[2];
+			image.data[index * 4 + 3] = 255;
+		}
+
+		context.putImageData(image, 0, 0);
+		return canvas;
+	}
+
+	// 게임 미니맵과 같은 투영. 오른쪽 = x - y, 아래 = x + y
+	function project(x, y) {
+		const m = view.mapView;
+		return [m.ox + (x - y) * m.s, m.oy + (x + y) * m.s * 0.5];
+	}
+
+	function drawMap() {
+		const canvas = $("map");
+		const context = canvas.getContext("2d");
+		const ratio = window.devicePixelRatio || 1;
+		const width = canvas.clientWidth;
+		const height = canvas.clientHeight;
+
+		if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
+			canvas.width = Math.round(width * ratio);
+			canvas.height = Math.round(height * ratio);
+		}
+
+		context.setTransform(1, 0, 0, 1, 0, 0);
+		context.clearRect(0, 0, canvas.width, canvas.height);
+
+		if (view.zone === null) {
+			return;
+		}
+
+		const size = view.zone.size;
+		const s = Math.min((width - 16) / (2 * size), (height - 16) / size);
+		view.mapView = { s, ox: width / 2, oy: (height - size * s) / 2 };
+		const m = view.mapView;
+
+		// 지형은 칸 그림 한 장을 아이소 행렬로 눕힌다
+		context.setTransform(s * ratio, s * 0.5 * ratio, -s * ratio, s * 0.5 * ratio, m.ox * ratio, m.oy * ratio);
+		context.imageSmoothingEnabled = false;
+		context.drawImage(view.terrain, 0, 0);
+		context.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+		const snap = view.snap;
+		const sitesByIndex = snap ? snap.sites : null;
+		const dimOther = view.selectedSite >= 0;
+
+		// 교전 중인 마을은 불씨처럼 번진다
+		if (snap !== null) {
+			for (const site of snap.sites) {
+				const zoneSite = view.zone.sites[site.id];
+				if (zoneSite === undefined || threatOf(site).level < 3) {
+					continue;
+				}
+				const [x, y] = project(zoneSite.x + 0.5, zoneSite.y + 0.5);
+				const radius = view.zone.threat_radius * s * 1.4;
+				const glow = context.createRadialGradient(x, y, 0, x, y, radius);
+				glow.addColorStop(0, "rgba(226, 118, 63, 0.45)");
+				glow.addColorStop(1, "rgba(226, 118, 63, 0)");
+				context.fillStyle = glow;
+				context.beginPath();
+				context.ellipse(x, y, radius, radius * 0.5, 0, 0, Math.PI * 2);
+				context.fill();
+			}
+		}
+
+		// 고른 마을의 위협 반경. 칸 공간 원을 같은 행렬로 눕혀 그린다
+		if (view.selectedSite >= 0) {
+			const zoneSite = view.zone.sites[view.selectedSite];
+			if (zoneSite !== undefined) {
+				context.save();
+				context.setTransform(s * ratio, s * 0.5 * ratio, -s * ratio, s * 0.5 * ratio, m.ox * ratio, m.oy * ratio);
+				context.beginPath();
+				context.arc(zoneSite.x + 0.5, zoneSite.y + 0.5, view.zone.threat_radius, 0, Math.PI * 2);
+				context.restore();
+				context.strokeStyle = "rgba(217, 164, 65, 0.85)";
+				context.setLineDash([4, 4]);
+				context.lineWidth = 1.5;
+				context.stroke();
+				context.setLineDash([]);
+			}
+		}
+
+		if (snap !== null) {
+			// 몬스터
+			for (const monster of snap.monsters) {
+				const [x, y] = project(monster.x, monster.y);
+				context.globalAlpha = dimOther && monster.region !== view.selectedSite ? 0.22 : 1;
+
+				let size = 3;
+				let color = "#b8463b";
+				if (monster.kind === 3) {
+					size = 8;
+					color = "#c24bc2";
+				} else if (monster.elite) {
+					size = 5;
+					color = "#e8a23c";
+				} else if (monster.kind === 2) {
+					size = 5;
+				}
+
+				context.fillStyle = color;
+				context.fillRect(x - size / 2, y - size / 2, size, size);
+
+				if (monster.fighting) {
+					context.strokeStyle = "#ffb070";
+					context.lineWidth = 1;
+					context.strokeRect(x - size / 2 - 1.5, y - size / 2 - 1.5, size + 3, size + 3);
+				}
+			}
+
+			// NPC
+			for (const npc of snap.npcs) {
+				if (!npc.alive) {
+					continue;
+				}
+				const [x, y] = project(npc.x, npc.y);
+				context.globalAlpha = dimOther && npc.region !== view.selectedSite ? 0.22 : 1;
+
+				context.fillStyle = JOBS[npc.job].color;
+				context.beginPath();
+				context.arc(x, y, 2.6, 0, Math.PI * 2);
+				context.fill();
+
+				if (npc.outlaw_sec > 0) {
+					context.strokeStyle = "#e0574a";
+					context.lineWidth = 1.2;
+					context.beginPath();
+					context.arc(x, y, 4.4, 0, Math.PI * 2);
+					context.stroke();
+				}
+			}
+
+			context.globalAlpha = 1;
+
+			// 고른 NPC 와 거처를 잇는다
+			if (view.selectedNpc >= 0 && view.selectedNpc < snap.npcs.length) {
+				const npc = snap.npcs[view.selectedNpc];
+				if (npc.alive) {
+					const [x, y] = project(npc.x, npc.y);
+					const home = view.zone.sites[npc.home];
+					if (home !== undefined) {
+						const [hx, hy] = project(home.x + 0.5, home.y + 0.5);
+						context.strokeStyle = "rgba(232, 223, 207, 0.35)";
+						context.setLineDash([2, 3]);
+						context.lineWidth = 1;
+						context.beginPath();
+						context.moveTo(x, y);
+						context.lineTo(hx, hy);
+						context.stroke();
+						context.setLineDash([]);
+					}
+					context.strokeStyle = "#ffffff";
+					context.lineWidth = 1.5;
+					context.beginPath();
+					context.arc(x, y, 7, 0, Math.PI * 2);
+					context.stroke();
+				}
+			}
+
+			// 플레이어
+			const player = snap.player;
+			const [px, py] = project(player.x, player.y);
+			context.fillStyle = player.dead ? "#6e6455" : "#ffffff";
+			context.strokeStyle = "#1b1814";
+			context.lineWidth = 1.5;
+			context.beginPath();
+			context.moveTo(px, py - 6);
+			context.lineTo(px + 5, py);
+			context.lineTo(px, py + 6);
+			context.lineTo(px - 5, py);
+			context.closePath();
+			context.fill();
+			context.stroke();
+		}
+
+		// 마을 표식
+		for (const site of view.zone.sites) {
+			const [x, y] = project(site.x + 0.5, site.y + 0.5);
+			const isSelected = view.selectedSite === site.id;
+			const markSize = isSelected ? 7 : 5;
+
+			context.save();
+			context.translate(x, y);
+			context.rotate(Math.PI / 4);
+			context.fillStyle = SITE_COLORS[site.kind];
+			context.strokeStyle = isSelected ? "#d9a441" : "#1b1814";
+			context.lineWidth = 2;
+			context.strokeRect(-markSize / 2, -markSize / 2, markSize, markSize);
+			context.fillRect(-markSize / 2, -markSize / 2, markSize, markSize);
+			context.restore();
+		}
+
+		drawSiteLabels(context);
+
+		if (sitesByIndex === null) {
+			context.fillStyle = "#a3967f";
+			context.font = "13px " + getComputedStyle(document.body).getPropertyValue("--sans");
+			context.fillText("상태를 기다리는 중", width / 2, height - 12);
+		}
+	}
+
+	// 이름표가 겹치면 위 -> 아래 -> 오른쪽 -> 왼쪽 순으로 비켜 본다. 다 막히면 빼고 마우스를 올렸을 때만 보인다
+	function drawSiteLabels(context) {
+		context.font = "700 13px " + getComputedStyle(document.body).getPropertyValue("--serif");
+		context.textBaseline = "middle";
+
+		// 고른 마을 먼저, 그다음 성채 둥지 소굴 초소 폐촌. 성문은 성채에 붙어 있어 고를 때만
+		const order = view.zone.sites.slice().sort((a, b) => {
+			const selectedA = a.id === view.selectedSite ? 0 : 1;
+			const selectedB = b.id === view.selectedSite ? 0 : 1;
+			return selectedA - selectedB || [0, 9, 3, 2, 4, 1][a.kind] - [0, 9, 3, 2, 4, 1][b.kind];
+		});
+
+		const placed = [];
+		const overlaps = (box) => placed.some((other) =>
+			box.x < other.x + other.w && other.x < box.x + box.w && box.y < other.y + other.h && other.y < box.y + box.h);
+
+		for (const site of order) {
+			const isSelected = site.id === view.selectedSite;
+			if (site.kind === 1 && !isSelected) {
+				continue;
+			}
+
+			const [x, y] = project(site.x + 0.5, site.y + 0.5);
+			const w = context.measureText(site.name).width + 4;
+			const h = 16;
+			const candidates = [
+				{ x: x - w / 2, y: y - 10 - h },
+				{ x: x - w / 2, y: y + 8 },
+				{ x: x + 8, y: y - h / 2 },
+				{ x: x - 8 - w, y: y - h / 2 },
+			];
+
+			let box = candidates.find((candidate) => !overlaps({ ...candidate, w, h }));
+			if (box === undefined) {
+				if (!isSelected) {
+					continue;
+				}
+				box = candidates[0];
+			}
+
+			placed.push({ x: box.x, y: box.y, w, h });
+
+			const textX = box.x + 2;
+			const textY = box.y + h / 2;
+			context.textAlign = "left";
+			context.lineWidth = 3.5;
+			context.strokeStyle = "rgba(27, 24, 20, 0.92)";
+			context.strokeText(site.name, textX, textY);
+			context.fillStyle = isSelected ? "#f0c873" : "#e8dfcf";
+			context.fillText(site.name, textX, textY);
+		}
+
+		context.textBaseline = "alphabetic";
+		context.textAlign = "center";
+	}
+
+	// 지도 위 가까운 것 찾기. 사람 -> 마을 -> 몬스터 순
+	function pickAt(mx, my) {
+		if (view.zone === null || view.mapView === null) {
+			return null;
+		}
+
+		const reach = 9;
+		let best = null;
+		let bestDistance = reach * reach;
+
+		function consider(kind, item, x, y, bias) {
+			const [sx, sy] = project(x, y);
+			const distance = (sx - mx) * (sx - mx) + (sy - my) * (sy - my) + bias;
+			if (distance < bestDistance) {
+				bestDistance = distance;
+				best = { kind, item, sx, sy };
+			}
+		}
+
+		if (view.snap !== null) {
+			for (const npc of view.snap.npcs) {
+				if (npc.alive) {
+					consider("npc", npc, npc.x, npc.y, 0);
+				}
+			}
+			for (const monster of view.snap.monsters) {
+				consider("monster", monster, monster.x, monster.y, 6);
+			}
+		}
+
+		for (const site of view.zone.sites) {
+			consider("site", site, site.x + 0.5, site.y + 0.5, 3);
+		}
+
+		return best;
+	}
+
+	function describe(hit) {
+		if (hit.kind === "npc") {
+			const npc = hit.item;
+			return `<b>${esc(JOBS[npc.job].name)} ${esc(npc.name)}</b>  Lv${npc.level}<br>${esc(npc.task_name)}   체력 ${npc.hp}/${npc.max_hp}`;
+		}
+		if (hit.kind === "monster") {
+			const monster = hit.item;
+			let text = `<b>${MONSTER_NAMES[monster.kind]}</b>`;
+			if (monster.elite) {
+				text += "  재불 정예";
+			}
+			if (monster.fighting) {
+				text += "<br>싸우는 중";
+			}
+			return text;
+		}
+
+		const site = hit.item;
+		let text = `<b>${esc(site.name)}</b>`;
+		if (view.snap !== null) {
+			const state = view.snap.sites[site.id];
+			text += `<br>사람 ${state.npc.here}   몬스터 ${state.monster.here}   ${threatOf(state).word}`;
+		}
+		return text;
+	}
+
+	$("map").addEventListener("mousemove", (event) => {
+		const rect = event.target.getBoundingClientRect();
+		const mx = event.clientX - rect.left;
+		const my = event.clientY - rect.top;
+		const hit = pickAt(mx, my);
+		const tip = $("tip");
+
+		if (hit === null) {
+			tip.hidden = true;
+			return;
+		}
+
+		tip.innerHTML = describe(hit);
+		tip.style.left = hit.sx + "px";
+		tip.style.top = hit.sy + "px";
+		tip.hidden = false;
+	});
+
+	$("map").addEventListener("mouseleave", () => {
+		$("tip").hidden = true;
+	});
+
+	$("map").addEventListener("click", (event) => {
+		const rect = event.target.getBoundingClientRect();
+		const hit = pickAt(event.clientX - rect.left, event.clientY - rect.top);
+
+		if (hit === null) {
+			view.selectedNpc = -1;
+			view.selectedSite = -1;
+			refreshSelection();
+			return;
+		}
+
+		if (hit.kind === "npc") {
+			selectNpc(hit.item.id);
+		} else if (hit.kind === "site") {
+			selectSite(hit.item.id);
+		}
+	});
+
+	new ResizeObserver(() => drawMap()).observe($("map-wrap"));
+
+	function renderLegend() {
+		const items = JOBS.map((job) => `<li><span class="swatch" style="--c:${job.color}"></span>${job.name}</li>`);
+		items.push(`<li><span class="swatch square" style="--c:#b8463b"></span>몬스터</li>`);
+		items.push(`<li><span class="swatch square" style="--c:#e8a23c"></span>재불 정예</li>`);
+		items.push(`<li><span class="swatch square" style="--c:#ffffff"></span>플레이어</li>`);
+		$("legend").innerHTML = items.join("");
+	}
+
+	renderLegend();
+	renderHead();
+	renderJobFilter();
+	renderLog();
+	connect();
+</script>
+</body>
+</html>

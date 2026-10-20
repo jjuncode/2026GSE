@@ -14,6 +14,14 @@ but WITHOUT ANY WARRANTY.
 #include "Dependencies\glew.h"
 #include "Dependencies\freeglut.h"
 
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+
 #include "Renderer.h"
 #include "WorldPos.h"
 #include "GameConfig.h"
@@ -26,15 +34,24 @@ but WITHOUT ANY WARRANTY.
 #include "PostProcess.h"
 #include "Player.h"
 #include "SpriteAtlas.h"
+#include "SpriteSheet.h"
 #include "Text.h"
 #include "Profiler.h"
 #include "Minimap.h"
 #include "Npc.h"
 #include "NpcHud.h"
+#include "Audio.h"
+#include "FloatingText.h"
+#include "GameData.h"
+#include "UiWindows.h"
+#include "Monitor.h"
 
 const uint8 KEY_ESCAPE = 27;
 const uint8 KEY_ENTER = 13;
 const uint8 KEY_TAB = 9;
+const uint8 KEY_SPACE = 32;
+
+const float QUIT_CONFIRM_SEC = 2.f;
 
 Renderer* g_renderer = nullptr;
 
@@ -42,6 +59,16 @@ Renderer* g_renderer = nullptr;
 float g_accumulated_seconds = 0.f;
 
 bool g_post_ready = false;
+
+// 쉬프트는 glut 가 따로 안 알려 준다. 매 프레임 직접 묻고 눌린 순간만 쓴다
+bool g_shift_was_down = false;
+bool g_left_held = false;
+float g_quit_confirm_timer = 0.f;
+
+static bool IsWindowFocused()
+{
+	return GetForegroundWindow() == FindWindowA(nullptr, "Ashen Walls - Game Software Engineering KPU");
+}
 
 static void ApplyInput(float delta_seconds)
 {
@@ -68,32 +95,26 @@ static void ApplyInput(float delta_seconds)
 		screen_right -= 1.f;
 	}
 
-	MovePlayerByScreenAxis(screen_right, screen_up, delta_seconds);
+	SetPlayerMoveInput(screen_right, screen_up);
 
-	float world_x = 0.f;
-	float world_y = 0.f;
-
-	if (IsSpecialKeyDown(GLUT_KEY_RIGHT))
+	// 좌클릭을 누르고 있으면 연타로 친다. 콤보를 손가락으로 두드리지 않아도 이어진다
+	if (g_left_held)
 	{
-		world_x += 1.f;
+		PressPlayerAttack();
 	}
 
-	if (IsSpecialKeyDown(GLUT_KEY_LEFT))
+	const bool shift_down = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0 && IsWindowFocused();
+	if (shift_down && g_shift_was_down == false)
 	{
-		world_x -= 1.f;
+		PressPlayerDodge(111);
 	}
 
-	if (IsSpecialKeyDown(GLUT_KEY_UP))
-	{
-		world_y += 1.f;
-	}
+	g_shift_was_down = shift_down;
 
-	if (IsSpecialKeyDown(GLUT_KEY_DOWN))
+	if (g_quit_confirm_timer > 0.f)
 	{
-		world_y -= 1.f;
+		g_quit_confirm_timer -= delta_seconds;
 	}
-
-	MovePlayerByWorldAxis(world_x, world_y, delta_seconds);
 }
 
 void Update()
@@ -109,6 +130,7 @@ void Update()
 		ApplyInput(FIXED_STEP_SECONDS);
 		UpdateScene(FIXED_STEP_SECONDS);
 		UpdateHud(FIXED_STEP_SECONDS);
+		UpdateMonitor(FIXED_STEP_SECONDS);
 
 		g_accumulated_seconds -= FIXED_STEP_SECONDS;
 	}
@@ -130,13 +152,12 @@ void RenderScene()
 	DrawScene(g_renderer);
 
 	EndScenePassAndComposite();
+	PresentUpscaled();
 
-	// 후처리 뒤 저해상도 버퍼에 그린다. 흐림과 비네팅은 안 타면서 도트 격자는 같이 탄다
+	// 확대한 뒤 백버퍼에 바로 그린다. 글자는 월드보다 고운 두 배 격자라 저해상도 버퍼에 못 얹는다
 	g_renderer->SetUndoToneMap(false);
 	DrawSceneOverlay(g_renderer);
 	DrawHud(g_renderer);
-
-	PresentUpscaled();
 
 	// 프레임 경계. 남은 것이 있으면 다음 프레임 첫 층 뒤로 밀린다
 	FlushRenderBatch();
@@ -159,42 +180,62 @@ void Idle()
 void MouseInput(int32 button, int32 state, int32 x, int32 y)
 {
 	SetMouseWindowPos(x, y);
+	const ScreenPos screen = GetMouseScreenPos();
 
-	// 오른쪽은 관찰. 공격 키와 겹치지 않게 떼어 둔다
-	if (button == GLUT_RIGHT_BUTTON)
+	if (state != GLUT_DOWN)
 	{
-		if (state == GLUT_DOWN)
+		UiMouseUp(button, screen.x, screen.y);
+
+		// 뗄 때는 창 위여도 풀어야 버튼이 눌린 채로 안 남는다
+		if (button == GLUT_LEFT_BUTTON)
 		{
-			SelectNpcAtCursor();
+			g_left_held = false;
+		}
+		else if (button == GLUT_RIGHT_BUTTON)
+		{
+			SetPlayerGuard(false);
 		}
 
 		return;
 	}
 
-	if (button != GLUT_LEFT_BUTTON)
+	if (UiMouseDown(button, screen.x, screen.y))
 	{
 		return;
 	}
 
-	if (state != GLUT_DOWN)
+	switch (button)
 	{
-		SetAttackHeld(false);
-		return;
+		case GLUT_LEFT_BUTTON:
+		{
+			PressPlayerAttack();
+			g_left_held = true;
+			break;
+		}
+		case GLUT_RIGHT_BUTTON:
+		{
+			SetPlayerGuard(true);
+			break;
+		}
+		case GLUT_MIDDLE_BUTTON:
+		{
+			// 관찰은 휠 버튼. 좌우 버튼은 전투가 쓴다
+			SelectNpcAtCursor();
+			break;
+		}
+		default:
+		{
+			break;
+		}
 	}
-
-	const ScreenPos screen = GetMouseScreenPos();
-	if (HandleHudClick(screen.x, screen.y))
-	{
-		return;
-	}
-
-	QueueAttack();
-	SetAttackHeld(true);
 }
 
 void MouseMotion(int32 x, int32 y)
 {
 	SetMouseWindowPos(x, y);
+
+	const ScreenPos screen = GetMouseScreenPos();
+	UiMouseMove(screen.x, screen.y);
 }
 
 void KeyInput(uint8 key, int32 x, int32 y)
@@ -221,16 +262,51 @@ void KeyInput(uint8 key, int32 x, int32 y)
 			ToggleStatWindow();
 			break;
 		}
+		case 'i':
+		case 'I':
+		{
+			ToggleInventoryWindow();
+			break;
+		}
+		case 'k':
+		case 'K':
+		{
+			ToggleSkillWindow();
+			break;
+		}
 		case 'u':
 		case 'U':
 		{
 			ToggleEnhanceWindow();
 			break;
 		}
+		case 'h':
+		case 'H':
+		{
+			ToggleKeyHelp();
+			break;
+		}
+		case 'q':
+		case 'Q':
+		{
+			PressPlayerSkill(106);
+			break;
+		}
 		case 'e':
 		case 'E':
 		{
-			PickupMaterials();
+			PressPlayerSkill(107);
+			break;
+		}
+		case 'r':
+		case 'R':
+		{
+			PressPlayerSkill(108);
+			break;
+		}
+		case KEY_SPACE:
+		{
+			PressPlayerDodge(110);
 			break;
 		}
 		case 'n':
@@ -245,8 +321,29 @@ void KeyInput(uint8 key, int32 x, int32 y)
 			ToggleProfileDetail();
 			break;
 		}
+		case 'b':
+		case 'B':
+		{
+			if (OpenMonitorPage())
+			{
+				AddDamageText(GetPlayer().m_pos, 80.f, L"모니터를 브라우저로 열었다", DAMAGE_STYLE_INFO);
+			}
+			else
+			{
+				AddDamageText(GetPlayer().m_pos, 80.f, L"모니터가 꺼져 있다", DAMAGE_STYLE_INFO);
+			}
+
+			break;
+		}
 		case 'f':
 		case 'F':
+		{
+			Interact();
+			SetInteractHeld(true);
+			break;
+		}
+		case 'o':
+		case 'O':
 		{
 			ToggleFollowNpc();
 			break;
@@ -276,27 +373,45 @@ void KeyInput(uint8 key, int32 x, int32 y)
 		}
 		case '1':
 		{
-			TryStatUp(STAT_MAX_HP);
+			UsePlayerPotion();
 			break;
 		}
-		case '2':
+		case '-':
+		case '_':
 		{
-			TryStatUp(STAT_ATTACK);
+			const float volume = ChangeMasterVolume(-GetConfig().audio_volume_step);
+			AddDamageText(GetPlayer().m_pos, 80.f, L"소리 " + std::to_wstring(static_cast<int32>(volume * 100.f + 0.5f)) + L"%", DAMAGE_STYLE_INFO);
 			break;
 		}
-		case '3':
+		case '=':
+		case '+':
 		{
-			TryStatUp(STAT_DEFENCE);
+			const float volume = ChangeMasterVolume(GetConfig().audio_volume_step);
+			PlaySfx(SFX_UI_CLICK, 0.8f);
+			AddDamageText(GetPlayer().m_pos, 80.f, L"소리 " + std::to_wstring(static_cast<int32>(volume * 100.f + 0.5f)) + L"%", DAMAGE_STYLE_INFO);
 			break;
 		}
 		case KEY_ENTER:
 		{
-			RequestEnhance();
+			UiKeyEnter();
 			break;
 		}
 		case KEY_ESCAPE:
 		{
-			glutLeaveMainLoop();
+			// 창이 열려 있으면 닫기만. 아무것도 없을 때 두 번 눌러야 끈다
+			if (CloseTopWindow())
+			{
+				break;
+			}
+
+			if (g_quit_confirm_timer > 0.f)
+			{
+				glutLeaveMainLoop();
+				break;
+			}
+
+			g_quit_confirm_timer = QUIT_CONFIRM_SEC;
+			AddDamageText(GetPlayer().m_pos, 80.f, L"한 번 더 누르면 종료", DAMAGE_STYLE_INFO);
 			break;
 		}
 		default:
@@ -309,6 +424,11 @@ void KeyInput(uint8 key, int32 x, int32 y)
 void KeyUpInput(uint8 key, int32 x, int32 y)
 {
 	SetKeyDown(key, false);
+
+	if (key == 'f' || key == 'F')
+	{
+		SetInteractHeld(false);
+	}
 }
 
 void SpecialKeyInput(int32 key, int32 x, int32 y)
@@ -327,6 +447,9 @@ void WindowEntry(int32 state)
 	{
 		// 창 밖에서 뗀 키는 뗌 통보가 안 와서 눌린 채로 남는다
 		ClearAllKeys();
+		g_left_held = false;
+		SetPlayerGuard(false);
+		SetInteractHeld(false);
 	}
 }
 
@@ -360,6 +483,18 @@ int main(int argc, char** argv)
 	InitProfiler();
 	LogGraphicsCaps();
 
+	if (LoadGameData() == false)
+	{
+		std::cout << "[ SimpleGame - main ] : game data missing - check ./Data\n";
+		return 1;
+	}
+
+	if (InitAudio() == false)
+	{
+		// 소리만 빠지고 게임은 돈다
+		std::cout << "[ SimpleGame - main ] : audio disabled\n";
+	}
+
 	g_renderer = new Renderer(WINDOW_SIZE_X, WINDOW_SIZE_Y);
 	if (g_renderer->IsInitialized() == false)
 	{
@@ -377,9 +512,20 @@ int main(int argc, char** argv)
 		std::cout << "[ SimpleGame - main ] : sprite atlas disabled\n";
 	}
 
+	if (InitSpriteSheets() == false)
+	{
+		std::cout << "[ SimpleGame - main ] : sprite sheets missing. run tools/art/bake.py and vfx.py\n";
+	}
+
 	if (InitText() == false)
 	{
 		std::cout << "[ SimpleGame - main ] : text disabled\n";
+	}
+
+	if (InitMonitor() == false)
+	{
+		// 브라우저 모니터만 빠진다
+		std::cout << "[ SimpleGame - main ] : monitor disabled\n";
 	}
 
 	const bool post_ready = InitPostProcess(RENDER_SIZE_X, RENDER_SIZE_Y, WINDOW_SIZE_X, WINDOW_SIZE_Y);
@@ -413,19 +559,19 @@ int main(int argc, char** argv)
 	InitScene();
 	ResetFrameClock();
 
-	std::cout << "\nWASD  : screen axis move\n";
-	std::cout << "Arrow : world axis move\n";
-	std::cout << "Mouse : aim / left click (hold) swing\n";
-	std::cout << "E     : pick up materials\n";
-	std::cout << "C     : stat window (1 2 3 : hp atk def)\n";
-	std::cout << "U     : enhance window (Enter : try)\n";
-	std::cout << "RMB   : inspect npc ( Tab next, F follow )\n";
-	std::cout << "V J M : npc labels / journal / map\n";
-	std::cout << "N     : new zone seed\n";
-	std::cout << "G     : chunk edge / blocked tile overlay\n";
-	std::cout << "L     : lighting on/off\n";
-	std::cout << "P     : profiler detail log\n";
-	std::cout << "ESC   : quit\n";
+	std::cout << "\nWASD        : move\n";
+	std::cout << "LMB         : attack combo ( hold to chain ), counter after parry\n";
+	std::cout << "RMB         : parry ( tap ) / guard ( hold )\n";
+	std::cout << "Q E R       : dash slash / spin slash / leap slam ( skill tree )\n";
+	std::cout << "Space Shift : dash / roll\n";
+	std::cout << "1           : hp potion\n";
+	std::cout << "F           : pick up / anvil\n";
+	std::cout << "I C K U H   : bag / stats / skill tree / enhance / help\n";
+	std::cout << "MMB Tab O   : inspect npc / next / follow\n";
+	std::cout << "V J M       : npc labels / journal / map\n";
+	std::cout << "N G L P     : new zone / blocked overlay / lighting / profiler\n";
+	std::cout << "B           : monitor page in browser\n";
+	std::cout << "ESC         : close window, twice to quit\n";
 
 	glutDisplayFunc(RenderScene);
 	glutIdleFunc(Idle);
@@ -440,11 +586,14 @@ int main(int argc, char** argv)
 
 	glutMainLoop();
 
+	ShutdownMonitor();
+	ShutdownAudio();
 	ShutdownMinimap();
 	ShutdownFog();
 	ShutdownGround();
 	ShutdownPostProcess();
 	ShutdownText();
+	ShutdownSpriteSheets();
 	ShutdownSpriteAtlas();
 	ShutdownProfiler();
 

@@ -3,6 +3,7 @@
 #include "Renderer.h"
 #include "ShaderUtil.h"
 #include "Profiler.h"
+#include "GameConfig.h"
 
 #include "Dependencies\glew.h"
 
@@ -73,11 +74,21 @@ namespace
 	GLint g_composite_blur_radius = -1;
 	GLint g_composite_vignette = -1;
 	GLint g_composite_position = -1;
+	GLint g_composite_zoom = -1;
+	GLint g_composite_flash = -1;
+
+	float g_zoom = 1.f;
+	float g_flash_r = 0.f;
+	float g_flash_g = 0.f;
+	float g_flash_b = 0.f;
+	float g_flash_strength = 0.f;
 
 	GLuint g_upscale_program = 0;
 	GLint g_upscale_source = -1;
 	GLint g_upscale_size = -1;
 	GLint g_upscale_position = -1;
+	GLint g_upscale_scale = -1;
+	GLint g_upscale_source_size = -1;
 
 	bool CreateRenderTarget(RenderTarget* target, int32 width, int32 height, GLint filter)
 	{
@@ -245,10 +256,14 @@ bool InitPostProcess(int32 render_width, int32 render_height, int32 window_width
 	g_composite_blur_radius = glGetUniformLocation(g_composite_program, "u_BlurRadius");
 	g_composite_vignette = glGetUniformLocation(g_composite_program, "u_VignetteEdge");
 	g_composite_position = glGetAttribLocation(g_composite_program, "a_Position");
+	g_composite_zoom = glGetUniformLocation(g_composite_program, "u_Zoom");
+	g_composite_flash = glGetUniformLocation(g_composite_program, "u_Flash");
 
 	g_upscale_source = glGetUniformLocation(g_upscale_program, "u_Source");
 	g_upscale_size = glGetUniformLocation(g_upscale_program, "u_ScreenSize");
 	g_upscale_position = glGetAttribLocation(g_upscale_program, "a_Position");
+	g_upscale_scale = glGetUniformLocation(g_upscale_program, "u_Scale");
+	g_upscale_source_size = glGetUniformLocation(g_upscale_program, "u_SourceSize");
 
 	g_ready = true;
 
@@ -312,6 +327,15 @@ void BeginScenePass()
 	glViewport(0, 0, g_scene.width, g_scene.height);
 }
 
+void SetPostEffects(float zoom, float flash_r, float flash_g, float flash_b, float flash_strength)
+{
+	g_zoom = zoom;
+	g_flash_r = flash_r;
+	g_flash_g = flash_g;
+	g_flash_b = flash_b;
+	g_flash_strength = flash_strength;
+}
+
 void EndScenePassAndComposite()
 {
 	// 씬에 그린 것이 전부 나간 뒤라야 밝은 부분을 뽑을 수 있다
@@ -369,6 +393,8 @@ void EndScenePassAndComposite()
 	const float render_ratio = static_cast<float>(g_render_width) / static_cast<float>(g_window_width);
 	glUniform1f(g_composite_blur_radius, BLUR_RADIUS * render_ratio);
 	glUniform1f(g_composite_vignette, VIGNETTE_EDGE);
+	glUniform1f(g_composite_zoom, g_zoom);
+	glUniform4f(g_composite_flash, g_flash_r, g_flash_g, g_flash_b, g_flash_strength);
 
 	DrawFullScreen(g_composite_position);
 
@@ -383,7 +409,7 @@ void EndScenePassAndComposite()
 
 void PresentUpscaled()
 {
-	// HUD 까지 전부 내보낸 뒤에 확대한다
+	// 씬을 전부 내보낸 뒤에 확대한다. HUD 는 이 뒤에 백버퍼로 바로 간다
 	FlushRenderBatch();
 
 	if (g_ready == false)
@@ -406,6 +432,8 @@ void PresentUpscaled()
 	glUniform1i(g_upscale_source, 0);
 
 	glUniform2f(g_upscale_size, static_cast<float>(g_window_width), static_cast<float>(g_window_height));
+	glUniform1f(g_upscale_scale, static_cast<float>(PIXEL_SCALE));
+	glUniform2f(g_upscale_source_size, static_cast<float>(g_post.width), static_cast<float>(g_post.height));
 
 	DrawFullScreen(g_upscale_position);
 

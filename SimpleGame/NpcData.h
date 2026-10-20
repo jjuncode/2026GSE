@@ -84,6 +84,7 @@ struct NpcArrow
 
 struct NpcEvent
 {
+	int32 serial = 0;	// 모니터가 이미 받은 줄을 거른다
 	std::wstring text;
 	float r = 1.f;
 	float g = 1.f;
@@ -161,6 +162,10 @@ struct Npc
 
 	float walk_distance = 0.f;
 	float idle_timer = 0.f;
+	float face_x = 1.f;	// 월드 방향. 그림 8 방향을 고른다
+	float face_y = 0.f;
+	float attack_anim = 0.f;	// 휘두르는 그림 남은 시간
+	float work_anim = 0.f;	// 채집 그림 남은 시간
 
 	BtMemory brain;
 };
@@ -189,6 +194,8 @@ std::wstring WithObject(const std::wstring& word);	// 받침 보고 을 / 를
 void NoteNpcRobbery();
 int32 GetNpcUpgradeCost(const Npc& npc);
 float GetNpcTickMicroseconds();
+int32 GetNpcDeathCount();	// 구역을 만든 뒤로
+int32 GetNpcRobberyCount();
 
 // 몸 ( Npc.cpp ) - 판단 쪽이 부른다
 void ResetNpcPath(Npc* npc);

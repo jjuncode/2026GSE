@@ -1,0 +1,735 @@
+{
+    "skills": [
+        {
+            "skill_id": 1,
+            "name": "M001_S01_Slash_Down",
+            "alias": "내려베기",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "LEFT_TO_RIGHT",
+            "angle_left": 50,
+            "angle_right": 30,
+            "range": 300,
+            "hit_windows": [
+                {
+                    "start_sec": 0.82,
+                    "end_sec": 0.94,
+                    "damage_rate": 2.5
+                }
+            ],
+            "hit_stop_sec": 0.02,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0,
+            "anim_id": "M001_A07_Raider_Slash_Down",
+            "hit_movement": [
+                {
+                    "start_sec": 0.0,
+                    "end_sec": 0.2,
+                    "forward": -70,
+                    "right": 0
+                }
+            ]
+        },
+        {
+            "skill_id": 2,
+            "name": "M001_S02_Side_Slash",
+            "alias": "횡베기",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "RIGHT_TO_LEFT",
+            "angle_left": 60,
+            "angle_right": 75,
+            "range": 300,
+            "hit_windows": [
+                {
+                    "start_sec": 0.62,
+                    "end_sec": 0.78,
+                    "damage_rate": 2.3
+                }
+            ],
+            "hit_stop_sec": 0.02,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0,
+            "anim_id": "M001_A08_Raider_Side_Slash",
+            "hit_movement": [
+                {
+                    "start_sec": 0.0,
+                    "end_sec": 0.2,
+                    "forward": -60,
+                    "right": 0
+                }
+            ]
+        },
+        {
+            "skill_id": 3,
+            "name": "M001_S03_Dash_Stab",
+            "alias": "돌진 찌르기",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "FRONT",
+            "angle_left": 25,
+            "angle_right": 25,
+            "range": 200,
+            "hit_windows": [
+                {
+                    "start_sec": 0.72,
+                    "end_sec": 0.98,
+                    "damage_rate": 3.0
+                }
+            ],
+            "hit_stop_sec": 0.04,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 7,
+            "anim_id": "M001_A09_Raider_Dash_Stab",
+            "knockback": {
+                "distance": 120,
+                "duration_sec": 0.25
+            }
+        },
+        {
+            "skill_id": 4,
+            "name": "M001_S04_Combo_Slash",
+            "alias": "연속 베기",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "NONE",
+            "angle_left": 80,
+            "angle_right": 80,
+            "range": 300,
+            "hit_windows": [
+                {
+                    "start_sec": 0.62,
+                    "end_sec": 0.7,
+                    "damage_rate": 1.0
+                },
+                {
+                    "start_sec": 0.92,
+                    "end_sec": 1.0,
+                    "damage_rate": 1.1
+                },
+                {
+                    "start_sec": 1.24,
+                    "end_sec": 1.32,
+                    "damage_rate": 1.3
+                },
+                {
+                    "start_sec": 1.66,
+                    "end_sec": 1.78,
+                    "damage_rate": 2.0
+                }
+            ],
+            "hit_stop_sec": 0.03,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 8,
+            "anim_id": "M001_A10_Raider_Combo_Slash",
+            "hit_movement": [
+                {
+                    "start_sec": 0.0,
+                    "end_sec": 0.15,
+                    "forward": -40,
+                    "right": 0
+                }
+            ]
+        },
+        {
+            "skill_id": 11,
+            "name": "W001_S01_Bite",
+            "alias": "물어뜯기",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "FRONT",
+            "angle_left": 35,
+            "angle_right": 35,
+            "range": 170,
+            "hit_windows": [
+                {
+                    "start_sec": 0.5,
+                    "end_sec": 0.6,
+                    "damage_rate": 2.0
+                }
+            ],
+            "hit_stop_sec": 0.02,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0,
+            "anim_id": "W001_A01_Bite",
+            "hit_movement": [
+                {
+                    "start_sec": 0.0,
+                    "end_sec": 0.15,
+                    "forward": -40,
+                    "right": 0
+                }
+            ]
+        },
+        {
+            "skill_id": 12,
+            "name": "W001_S02_Pounce",
+            "alias": "도약 물기",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "FRONT",
+            "angle_left": 30,
+            "angle_right": 30,
+            "range": 180,
+            "hit_windows": [
+                {
+                    "start_sec": 0.72,
+                    "end_sec": 0.88,
+                    "damage_rate": 2.6
+                }
+            ],
+            "hit_stop_sec": 0.03,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 5,
+            "anim_id": "W001_A02_Pounce",
+            "knockback": {
+                "distance": 100,
+                "duration_sec": 0.2
+            }
+        },
+        {
+            "skill_id": 21,
+            "name": "D001_S01_Slam",
+            "alias": "내려찍기",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "FRONT",
+            "angle_left": 40,
+            "angle_right": 40,
+            "range": 330,
+            "hit_windows": [
+                {
+                    "start_sec": 1.1,
+                    "end_sec": 1.25,
+                    "damage_rate": 3.0
+                }
+            ],
+            "hit_stop_sec": 0.05,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0,
+            "anim_id": "D001_A01_Slam",
+            "knockback": {
+                "distance": 150,
+                "duration_sec": 0.3
+            }
+        },
+        {
+            "skill_id": 22,
+            "name": "D001_S02_Sweep",
+            "alias": "휩쓸기",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "LEFT_TO_RIGHT",
+            "angle_left": 100,
+            "angle_right": 100,
+            "range": 360,
+            "hit_windows": [
+                {
+                    "start_sec": 0.95,
+                    "end_sec": 1.15,
+                    "damage_rate": 2.6
+                }
+            ],
+            "hit_stop_sec": 0.04,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 4,
+            "anim_id": "D001_A02_Sweep",
+            "hit_movement": [
+                {
+                    "start_sec": 0.0,
+                    "end_sec": 0.25,
+                    "forward": -110,
+                    "right": 0
+                }
+            ]
+        },
+        {
+            "skill_id": 23,
+            "name": "D001_S03_Grab",
+            "alias": "붙잡기",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "FRONT",
+            "angle_left": 30,
+            "angle_right": 30,
+            "range": 260,
+            "hit_windows": [
+                {
+                    "start_sec": 0.95,
+                    "end_sec": 1.1,
+                    "damage_rate": 3.8
+                }
+            ],
+            "hit_stop_sec": 0.06,
+            "stun_sec": 1.2,
+            "pierce_guard": true,
+            "cooldown_sec": 8,
+            "anim_id": "D001_A03_Grab"
+        },
+        {
+            "skill_id": 31,
+            "name": "G001_S01_Triple",
+            "alias": "세 번 내려치기",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "FRONT",
+            "angle_left": 70,
+            "angle_right": 70,
+            "range": 420,
+            "hit_windows": [
+                {
+                    "start_sec": 0.7,
+                    "end_sec": 0.82,
+                    "damage_rate": 2.0
+                },
+                {
+                    "start_sec": 1.1,
+                    "end_sec": 1.22,
+                    "damage_rate": 2.2
+                },
+                {
+                    "start_sec": 1.6,
+                    "end_sec": 1.78,
+                    "damage_rate": 3.0
+                }
+            ],
+            "hit_stop_sec": 0.05,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0,
+            "anim_id": "G001_A01_Triple",
+            "hit_movement": [
+                {
+                    "start_sec": 0.0,
+                    "end_sec": 0.2,
+                    "forward": -90,
+                    "right": 0
+                }
+            ]
+        },
+        {
+            "skill_id": 32,
+            "name": "G001_S02_Quake",
+            "alias": "지면 강타",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "NONE",
+            "angle_left": 180,
+            "angle_right": 180,
+            "range": 450,
+            "hit_windows": [
+                {
+                    "start_sec": 1.2,
+                    "end_sec": 1.35,
+                    "damage_rate": 4.0
+                }
+            ],
+            "hit_stop_sec": 0.07,
+            "stun_sec": 0,
+            "pierce_guard": true,
+            "cooldown_sec": 9,
+            "anim_id": "G001_A02_Quake",
+            "knockback": {
+                "distance": 250,
+                "duration_sec": 0.4
+            }
+        },
+        {
+            "skill_id": 33,
+            "name": "G001_S03_Charge",
+            "alias": "돌진",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "FRONT",
+            "angle_left": 40,
+            "angle_right": 40,
+            "range": 260,
+            "hit_windows": [
+                {
+                    "start_sec": 0.8,
+                    "end_sec": 1.4,
+                    "damage_rate": 3.0
+                }
+            ],
+            "hit_stop_sec": 0.05,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 7,
+            "anim_id": "G001_A03_Charge",
+            "knockback": {
+                "distance": 200,
+                "duration_sec": 0.35
+            }
+        },
+        {
+            "skill_id": 34,
+            "name": "G001_S04_Grab",
+            "alias": "움켜쥐기",
+            "input": "AI",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "FRONT",
+            "angle_left": 35,
+            "angle_right": 35,
+            "range": 320,
+            "hit_windows": [
+                {
+                    "start_sec": 1.0,
+                    "end_sec": 1.15,
+                    "damage_rate": 5.0
+                }
+            ],
+            "hit_stop_sec": 0.07,
+            "stun_sec": 1.5,
+            "pierce_guard": true,
+            "cooldown_sec": 10,
+            "anim_id": "G001_A04_Grab"
+        },
+        {
+            "skill_id": 101,
+            "name": "P001_S01_Basic_Slash_1",
+            "alias": "기본 베기 1",
+            "input": "LEFT_CLICK",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "LEFT_TO_RIGHT",
+            "angle_left": 55,
+            "angle_right": 35,
+            "range": 270,
+            "hit_windows": [
+                {
+                    "start_sec": 0.16,
+                    "end_sec": 0.26,
+                    "damage_rate": 2.8
+                }
+            ],
+            "hit_stop_sec": 0.02,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0,
+            "anim_id": "P001_A05_ATK_SLASH_01",
+            "hit_movement": [
+                {
+                    "start_sec": 0.0,
+                    "end_sec": 0.2,
+                    "forward": -60,
+                    "right": 0
+                }
+            ]
+        },
+        {
+            "skill_id": 102,
+            "name": "P001_S02_Basic_Slash_2",
+            "alias": "기본 베기 2",
+            "input": "LEFT_CLICK_COMBO_2",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "RIGHT_TO_LEFT",
+            "angle_left": 35,
+            "angle_right": 60,
+            "range": 270,
+            "hit_windows": [
+                {
+                    "start_sec": 0.14,
+                    "end_sec": 0.24,
+                    "damage_rate": 3.2
+                }
+            ],
+            "hit_stop_sec": 0.03,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0,
+            "anim_id": "P001_A06_ATK_SLASH_02",
+            "hit_movement": [
+                {
+                    "start_sec": 0.0,
+                    "end_sec": 0.2,
+                    "forward": -60,
+                    "right": 0
+                }
+            ]
+        },
+        {
+            "skill_id": 103,
+            "name": "P001_S03_Parry",
+            "alias": "패링",
+            "input": "RIGHT_CLICK",
+            "skill_type": "PARRY",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "FRONT",
+            "angle_left": 45,
+            "angle_right": 45,
+            "range": 220,
+            "parry_sec": 0.25,
+            "guard_gage_max": 100,
+            "hit_windows": [],
+            "hit_stop_sec": 0.05,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0.8,
+            "anim_id": "P001_A07_Player_Parry"
+        },
+        {
+            "skill_id": 104,
+            "name": "P001_S04_Combo_Slash",
+            "alias": "연속 참격",
+            "input": "LEFT_CLICK_COMBO_3",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "RIGHT_TO_LEFT",
+            "angle_left": 65,
+            "angle_right": 55,
+            "range": 320,
+            "hit_windows": [
+                {
+                    "start_sec": 0.24,
+                    "end_sec": 0.38,
+                    "damage_rate": 3.8
+                }
+            ],
+            "hit_stop_sec": 0.04,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0,
+            "anim_id": "P001_A08_ATK_COMBO_SLASH",
+            "knockback": {
+                "distance": 80,
+                "duration_sec": 0.15
+            }
+        },
+        {
+            "skill_id": 105,
+            "name": "P001_S05_Spin_Combo",
+            "alias": "회전 연계베기",
+            "input": "LEFT_CLICK_COMBO_4",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "NONE",
+            "angle_left": 120,
+            "angle_right": 120,
+            "range": 360,
+            "hit_windows": [
+                {
+                    "start_sec": 0.36,
+                    "end_sec": 0.56,
+                    "damage_rate": 4.8
+                }
+            ],
+            "hit_stop_sec": 0.05,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0,
+            "anim_id": "P001_A09_ATK_SPIN_COMBO",
+            "knockback": {
+                "distance": 120,
+                "duration_sec": 0.35
+            }
+        },
+        {
+            "skill_id": 106,
+            "name": "P001_S06_Dash_Slash",
+            "alias": "돌진 베기",
+            "input": "Q",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "FRONT",
+            "angle_left": 60,
+            "angle_right": 60,
+            "range": 220,
+            "hit_windows": [
+                {
+                    "start_sec": 0.18,
+                    "end_sec": 0.48,
+                    "damage_rate": 4.0
+                }
+            ],
+            "hit_stop_sec": 0.04,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 7,
+            "anim_id": "P001_A10_ATK_DASH_THRUST",
+            "knockback": {
+                "distance": 90,
+                "duration_sec": 0.2
+            }
+        },
+        {
+            "skill_id": 107,
+            "name": "P001_S07_Spin_Slash",
+            "alias": "회전 베기",
+            "input": "E",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "NONE",
+            "angle_left": 180,
+            "angle_right": 180,
+            "range": 380,
+            "hit_windows": [
+                {
+                    "start_sec": 0.1,
+                    "end_sec": 0.3,
+                    "damage_rate": 5.5
+                },
+                {
+                    "start_sec": 0.52,
+                    "end_sec": 0.65,
+                    "damage_rate": 5.5
+                },
+                {
+                    "start_sec": 0.72,
+                    "end_sec": 0.85,
+                    "damage_rate": 5.5
+                },
+                {
+                    "start_sec": 1.0,
+                    "end_sec": 1.4,
+                    "damage_rate": 5.5
+                },
+                {
+                    "start_sec": 1.86,
+                    "end_sec": 2.0,
+                    "damage_rate": 5.5
+                }
+            ],
+            "hit_stop_sec": 0.06,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 10,
+            "anim_id": "P001_A11_ATK_SPIN_SLASH",
+            "hit_movement": [
+                {
+                    "start_sec": 0.0,
+                    "end_sec": 0.14,
+                    "forward": -40,
+                    "right": 0
+                }
+            ]
+        },
+        {
+            "skill_id": 108,
+            "name": "P001_S08_Jump_Attack",
+            "alias": "도약 내려찍기",
+            "input": "R",
+            "skill_type": "ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "FRONT",
+            "angle_left": 55,
+            "angle_right": 55,
+            "range": 300,
+            "hit_windows": [
+                {
+                    "start_sec": 0.34,
+                    "end_sec": 0.5,
+                    "damage_rate": 5.5
+                }
+            ],
+            "hit_stop_sec": 0.06,
+            "stun_sec": 2.2,
+            "pierce_guard": false,
+            "cooldown_sec": 6,
+            "anim_id": "P001_A12_ATK_AIR_TO_FLOOR",
+            "hit_movement": [
+                {
+                    "start_sec": 0.0,
+                    "end_sec": 0.3,
+                    "forward": -70,
+                    "right": 0
+                }
+            ]
+        },
+        {
+            "skill_id": 109,
+            "name": "PARRY_ATTACK",
+            "alias": "패링 반격",
+            "input": "LEFT_CLICK_PARRY",
+            "skill_type": "PARRY_ATTACK",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "FRONT",
+            "angle_left": 55,
+            "angle_right": 55,
+            "range": 320,
+            "hit_windows": [
+                {
+                    "start_sec": 0.2,
+                    "end_sec": 0.36,
+                    "damage_rate": 7.0
+                }
+            ],
+            "hit_stop_sec": 0.08,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0,
+            "anim_id": "P001_A13_PARRY_ATTACK",
+            "knockback": {
+                "distance": 150,
+                "duration_sec": 0.3
+            }
+        },
+        {
+            "skill_id": 110,
+            "name": "P001_S10_Dodge",
+            "alias": "대쉬",
+            "input": "SPACE",
+            "skill_type": "DASH",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "NONE",
+            "angle_left": 0,
+            "angle_right": 0,
+            "range": 0,
+            "hit_windows": [],
+            "hit_stop_sec": 0,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0.75,
+            "anim_id": "P001_A14_DODGE",
+            "client_movement": {
+                "duration_sec": 0.3,
+                "recovery_sec": 0.12,
+                "distance": 500
+            }
+        },
+        {
+            "skill_id": 111,
+            "name": "P001_S11_Roll",
+            "alias": "구르기",
+            "input": "LEFT_SHIFT",
+            "skill_type": "DASH",
+            "damage_type": "PHYSICAL",
+            "attack_dir": "NONE",
+            "angle_left": 0,
+            "angle_right": 0,
+            "range": 0,
+            "hit_windows": [],
+            "hit_stop_sec": 0,
+            "stun_sec": 0,
+            "pierce_guard": false,
+            "cooldown_sec": 0.75,
+            "anim_id": "P001_A15_ROLL",
+            "client_movement": {
+                "duration_sec": 0.45,
+                "recovery_sec": 0.1,
+                "distance": 400
+            }
+        }
+    ]
+}

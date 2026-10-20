@@ -1,23 +1,28 @@
 ﻿#include "stdafx.h"
 #include "Scene.h"
 #include "Actor.h"
+#include "Audio.h"
 #include "Balance.h"
 #include "Drop.h"
+#include "Feel.h"
 #include "FloatingText.h"
 #include "Fog.h"
 #include "GameConfig.h"
 #include "Ground.h"
 #include "Input.h"
 #include "Minimap.h"
+#include "Monitor.h"
 #include "Monster.h"
 #include "Npc.h"
 #include "NpcHud.h"
 #include "Player.h"
+#include "PostProcess.h"
 #include "Profiler.h"
 #include "Renderer.h"
 #include "SceneGraph.h"
 #include "SpriteAtlas.h"
 #include "Text.h"
+#include "UiWindows.h"
 #include "World.h"
 #include "ZoneGen.h"
 
@@ -45,6 +50,9 @@ namespace
 
 	constexpr int32 DEBUG_VIEW_RADIUS = 24;
 
+	const float ANVIL_RANGE = 2.4f;	// 이 안에서 F 나 U 로 강화 창이 열린다
+	const float PICKUP_REPEAT_SEC = 0.14f;
+
 	ZoneLayout g_zone;
 	bool g_player_ready = false;
 
@@ -52,6 +60,11 @@ namespace
 	std::vector<size_t> g_light_indices;
 	std::vector<size_t> g_boss_light_indices;
 	std::vector<size_t> g_nearby_lights;
+
+	WorldPos g_anvil_pos;
+	bool g_has_anvil = false;
+	bool g_interact_held = false;
+	float g_interact_timer = 0.f;
 
 	bool g_show_chunk_grid = false;
 	bool g_use_lighting = true;
@@ -409,6 +422,12 @@ namespace
 		AddDecorAt(TileOffset(town.tile, 1.4f, -2.8f), SPRITE_STALL, 0, 0.95f, true);
 		AddDecorAt(TileOffset(town.tile, -1.2f, 2.6f), SPRITE_STALL, 0, 0.9f, true);
 
+		// 광장 모루. 강화는 여기서만 된다 - 사냥을 나갔다 돌아올 이유
+		g_anvil_pos = TileOffset(town.tile, 2.4f, 1.6f);
+		g_has_anvil = true;
+		AddDecorAt(g_anvil_pos, SPRITE_ANVIL, 0, 1.f, true);
+		AddLightAt(TileOffset(town.tile, 2.9f, 2.1f), 4.f, 1.00f, 0.55f, 0.25f, 0.55f, SPRITE_BRAZIER);
+
 		for (const ZoneTile& lamp : g_zone.lamps)
 		{
 			AddLightAt(ZoneTileToWorld(lamp.x, lamp.y, 0.5f, 0.5f), 5.f, 1.00f, 0.78f, 0.45f, 0.45f, SPRITE_LAMP);
@@ -650,6 +669,8 @@ namespace
 		ClearMonsters();
 		ClearDrops();
 		ClearFloatingTexts();
+		ClearFeel();
+		g_has_anvil = false;
 		g_decor.clear();
 		g_light_indices.clear();
 		g_boss_light_indices.clear();
@@ -690,6 +711,7 @@ namespace
 
 		BuildNpcs(g_zone);
 		BuildMinimap(g_zone);
+		BuildMonitorZone(g_zone);
 
 		std::cout << "[ Scene - BuildZone ] : seed " << seed << " packs " << g_zone.packs.size() << " decor " << g_decor.size() << "\n";
 	}
@@ -725,7 +747,7 @@ namespace
 		}
 
 		// 등불 하나 든 정도. 가장자리 어둠 속에서 발밑만 살짝 밝힌다
-		FillGroundLight(&frame.lights[0], camera, GetPlayer().body.m_pos, 6.f, 0.62f, 0.58f, 0.50f, 0.24f);
+		FillGroundLight(&frame.lights[0], camera, GetPlayer().m_pos, 6.f, 0.62f, 0.58f, 0.50f, 0.24f);
 		frame.light_count = 1;
 
 		g_nearby_lights = g_light_indices;
@@ -786,13 +808,13 @@ namespace
 			return;
 		}
 
-		const PlayerState& player = GetPlayer();
+		const Player& player = GetPlayer();
 
-		WorldPos marker = player.body.m_pos;
-		MoveWorldPos(&marker, player.facing_x * 0.9f, player.facing_y * 0.9f);
+		WorldPos marker = player.m_pos;
+		MoveWorldPos(&marker, player.m_aim_x * 0.9f, player.m_aim_y * 0.9f);
 
 		const ScreenPos screen = WorldToScreen(marker, camera);
-		renderer->DrawSolidDiamond(screen.x, screen.y, 0.22f, 0.90f, 0.80f, 0.50f, 0.45f);
+		renderer->DrawSolidDiamond(screen.x, screen.y, 0.18f, 0.90f, 0.80f, 0.50f, 0.35f);
 	}
 
 	struct ScreenBox
@@ -807,13 +829,13 @@ namespace
 	{
 		const ScreenPos foot = WorldToScreen(actor.m_pos, camera);
 		const float unit = static_cast<float>(PIXEL_SCALE);
-		const float half_width = static_cast<float>(GetSpriteWidth(actor.m_sprite)) * unit * 0.5f;
+		const float half_width = actor.GetArtWidth() * unit * 0.5f;
 
 		ScreenBox box;
 		box.left = foot.x - half_width;
 		box.right = foot.x + half_width;
 		box.bottom = foot.y + actor.m_foot_offset_y;
-		box.top = box.bottom + static_cast<float>(GetSpriteHeight(actor.m_sprite)) * unit;
+		box.top = box.bottom + actor.GetArtHeight() * unit;
 
 		return box;
 	}
@@ -830,7 +852,7 @@ namespace
 
 	void AddDecorActors(const WorldPos& camera)
 	{
-		const Actor& player = GetPlayer().body;
+		const Actor& player = GetPlayer();
 		const ScreenBox player_box = GetActorBox(player, camera);
 		const float player_depth = GetDepthKey(player.m_pos, camera);
 
@@ -869,10 +891,10 @@ namespace
 			return;
 		}
 
-		const Actor& body = GetPlayer().body;
+		const Actor& body = GetPlayer();
 		const ScreenPos screen = WorldToScreen(body.m_pos, camera);
 
-		DrawSprite(renderer, body.m_sprite, body.m_frame, screen.x, screen.y, 1.f, body.m_flip, 0.45f, 1.1f, 1.0f, 0.45f);
+		DrawSheetFrame(renderer, body.m_sheet, body.m_frame, screen.x, screen.y, 0.45f, 1.1f, 1.0f, 0.45f, 0.f);
 	}
 
 	// 깨어난 보스가 어디 있는지 모르면 넓은 구역에서 길을 잃는다
@@ -940,7 +962,7 @@ namespace
 			return;
 		}
 
-		if (GetPlayer().level < Balance::BOSS_UNLOCK_LEVEL)
+		if (GetPlayer().m_level < Balance::BOSS_UNLOCK_LEVEL)
 		{
 			return;
 		}
@@ -948,7 +970,9 @@ namespace
 		SummonBoss();
 		LightBossBraziers();
 
-		AddFloatingText(GetPlayer().body.m_pos, 60.f, std::wstring(GetBossName()) + L"가 깨어났다", 1.f, 0.40f, 0.28f);
+		AddDamageText(GetPlayer().m_pos, 150.f, std::wstring(GetBossName()) + L"가 깨어났다", DAMAGE_STYLE_BANNER_BAD);
+		AddShake(0.4f);
+		PlaySfx(SFX_DANGER, 1.f);
 	}
 
 	void DrawLightGlows(Renderer* renderer, const WorldPos& camera)
@@ -970,6 +994,60 @@ namespace
 			renderer->DrawSolidCircle(screen.x, flame_y, 5.f, light.m_light_r * core, light.m_light_g * core, light.m_light_b * core, 1.f);
 		}
 	}
+
+	float DistanceToAnvil()
+	{
+		if (g_has_anvil == false)
+		{
+			return 1.0e9f;
+		}
+
+		const float delta_x = GetTileDistanceX(GetPlayer().m_pos, g_anvil_pos);
+		const float delta_y = GetTileDistanceY(GetPlayer().m_pos, g_anvil_pos);
+
+		return std::sqrt(delta_x * delta_x + delta_y * delta_y);
+	}
+
+	// 모루 앞이면 머리 위에 안내를 띄운다
+	void DrawAnvilPrompt(Renderer* renderer, const WorldPos& camera)
+	{
+		if (g_has_anvil == false || IsPlayerDead())
+		{
+			return;
+		}
+
+		const ScreenPos screen = WorldToScreen(g_anvil_pos, camera);
+		const bool near = DistanceToAnvil() <= ANVIL_RANGE;
+
+		if (near)
+		{
+			DrawStringShadow(renderer, L"F  강화", screen.x, screen.y + 58.f, TEXT_ALIGN_CENTER, 1.f, 0.85f, 0.45f, 1.f);
+			return;
+		}
+
+		// 멀리서도 어디 있는지는 보이게
+		if (DistanceToAnvil() < 10.f)
+		{
+			DrawStringShadow(renderer, L"모루", screen.x, screen.y + 58.f, TEXT_ALIGN_CENTER, 0.75f, 0.65f, 0.5f, 0.8f);
+		}
+	}
+
+	void UpdateInteractHold(float real_seconds)
+	{
+		if (g_interact_held == false)
+		{
+			return;
+		}
+
+		g_interact_timer -= real_seconds;
+		if (g_interact_timer > 0.f)
+		{
+			return;
+		}
+
+		g_interact_timer = PICKUP_REPEAT_SEC;
+		PickupNearestDrop();
+	}
 }
 
 void InitScene()
@@ -982,36 +1060,32 @@ void RegenerateZone()
 	BuildZone(MakeRandomSeed());
 }
 
-void UpdateScene(float delta_seconds)
+void UpdateScene(float real_seconds)
 {
-	g_fog_scroll += delta_seconds * 60.f;
+	// 연출은 실제 시간, 판정은 히트스톱이 곱해진 시간. 그래야 세상이 멈춰도 불꽃은 튄다
+	UpdateFeel(real_seconds);
+	const float world_seconds = real_seconds * GetWorldTimeScale();
 
-	if (IsPlayerDead() == false)
-	{
-		const PlayerState& player = GetPlayer();
+	g_fog_scroll += world_seconds * 60.f;
 
-		// 커서 아래 바닥이 조준점. 카메라가 NPC 를 따라가도 커서 기준이 맞게 카메라로 되돌린다
-		const WorldPos aim = ScreenToWorld(GetMouseScreenPos(), GetCameraPos());
-		AimPlayer(GetTileDistanceX(player.body.m_pos, aim), GetTileDistanceY(player.body.m_pos, aim));
-
-		// 쿨이 돌았을 때만 꺼낸다. 쿨 중 클릭은 버리지 않고 대기시킨다
-		if (player.swing_cooldown <= 0.f && ConsumeAttackRequest())
-		{
-			if (TryStartSwing())
-			{
-				HitMonstersInFan(player.body.m_pos, player.facing_x, player.facing_y, Balance::SWING_RANGE, Balance::SWING_HALF_COS, GetPlayerAttack());
-				HitHostileNpcsInFan(player.body.m_pos, player.facing_x, player.facing_y, Balance::SWING_RANGE, Balance::SWING_HALF_COS, GetPlayerAttack());
-			}
-		}
-	}
+	// 커서 아래 바닥이 조준점. 카메라가 NPC 를 따라가도 커서 기준이 맞게 카메라로 되돌린다
+	SetPlayerAim(GetCursorWorldPos());
 
 	UpdateBossUnlock();
+	UpdateInteractHold(real_seconds);
 
-	UpdatePlayer(delta_seconds);
-	UpdateMonsters(delta_seconds);
-	UpdateNpcs(delta_seconds);
-	UpdateDrops(delta_seconds);
-	UpdateFloatingTexts(delta_seconds);
+	UpdatePlayer(world_seconds, real_seconds);
+	UpdateMonsters(world_seconds);
+	UpdateNpcs(world_seconds);
+	UpdateDrops(world_seconds);
+	UpdateFloatingTexts(real_seconds);
+
+	float flash_r = 0.f;
+	float flash_g = 0.f;
+	float flash_b = 0.f;
+	float flash_strength = 0.f;
+	GetScreenFlash(&flash_r, &flash_g, &flash_b, &flash_strength);
+	SetPostEffects(GetZoomPunch(), flash_r, flash_g, flash_b, flash_strength);
 }
 
 void DrawScene(Renderer* renderer)
@@ -1033,6 +1107,7 @@ void DrawScene(Renderer* renderer)
 
 	DrawNpcGroundMarks(renderer, camera);
 	DrawMonsterTelegraphs(renderer, camera);
+	DrawFeelGround(renderer, camera);
 	DrawAimMarker(renderer, camera);
 
 	BeginSceneGraph();
@@ -1040,14 +1115,11 @@ void DrawScene(Renderer* renderer)
 	CollectMonsterActors();
 	CollectDropActors();
 	CollectNpcActors();
-
-	if (IsPlayerDead() == false)
-	{
-		AddSceneActor(&GetPlayer().body);
-	}
+	AddSceneActor(&GetPlayer());
 
 	DrawSceneGraph(renderer, camera);
 
+	DrawFeelWorld(renderer, camera);
 	DrawPlayerSilhouette(renderer, camera);
 	DrawNpcArrows(renderer, camera);
 	DrawLightGlows(renderer, camera);
@@ -1066,6 +1138,7 @@ void DrawSceneOverlay(Renderer* renderer)
 	DrawMonsterBars(renderer, camera);
 	DrawNpcOverlay(renderer, camera);
 	DrawDropLabels(renderer, camera);
+	DrawAnvilPrompt(renderer, camera);
 	DrawBossMarker(renderer, camera);
 	DrawFloatingTexts(renderer, camera);
 
@@ -1074,51 +1147,56 @@ void DrawSceneOverlay(Renderer* renderer)
 
 WorldPos GetCameraPos()
 {
+	WorldPos camera = GetPlayer().m_pos;
+
 	WorldPos follow;
 	if (GetFollowPos(&follow))
 	{
-		return follow;
+		camera = follow;
 	}
 
-	return GetPlayer().body.m_pos;
+	// 흔들림은 카메라만 민다. 판정 좌표는 그대로다
+	const ScreenPos shake = GetShakeOffset();
+	if (std::fabs(shake.x) + std::fabs(shake.y) > 0.01f)
+	{
+		camera = ScreenToWorld(shake, camera);
+	}
+
+	return camera;
 }
 
-void MovePlayerByScreenAxis(float screen_right, float screen_up, float delta_seconds)
+WorldPos GetCursorWorldPos()
 {
-	const float length = std::sqrt(screen_right * screen_right + screen_up * screen_up);
-	if (length < 0.0001f)
+	return ScreenToWorld(GetMouseScreenPos(), GetCameraPos());
+}
+
+void Interact()
+{
+	if (PickupNearestDrop())
 	{
+		g_interact_timer = PICKUP_REPEAT_SEC;
 		return;
 	}
 
-	// 화면에서 먼저 길이를 1 로 맞춰야 대각선이 더 빠르지 않다
-	const float dir_right = screen_right / length;
-	const float dir_up = screen_up / length;
-
-	// 화면 오른쪽은 월드 (+1,-1), 화면 위는 월드 (-1,-1) 이라 되돌려서 넘긴다
-	const float velocity_x = (dir_right - dir_up) * Balance::PLAYER_MOVE_SPEED;
-	const float velocity_y = (-dir_right - dir_up) * Balance::PLAYER_MOVE_SPEED;
-
-	MovePlayer(velocity_x, velocity_y, delta_seconds);
-}
-
-void MovePlayerByWorldAxis(float world_x, float world_y, float delta_seconds)
-{
-	const float length = std::sqrt(world_x * world_x + world_y * world_y);
-	if (length < 0.0001f)
+	if (DistanceToAnvil() <= ANVIL_RANGE)
 	{
-		return;
+		ToggleEnhanceWindow();
 	}
-
-	const float velocity_x = world_x / length * Balance::PLAYER_MOVE_SPEED;
-	const float velocity_y = world_y / length * Balance::PLAYER_MOVE_SPEED;
-
-	MovePlayer(velocity_x, velocity_y, delta_seconds);
 }
 
-void PickupMaterials()
+void SetInteractHeld(bool held)
 {
-	PickupNearbyMaterials();
+	g_interact_held = held;
+
+	if (held)
+	{
+		g_interact_timer = PICKUP_REPEAT_SEC * 2.f;
+	}
+}
+
+bool IsPlayerNearAnvil()
+{
+	return DistanceToAnvil() <= ANVIL_RANGE;
 }
 
 void SelectNpcAtCursor()

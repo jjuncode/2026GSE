@@ -155,7 +155,7 @@ namespace
 	// 저해상도 픽셀 경계에 붙여야 글자 점이 두 픽셀로 쪼개지지 않는다
 	float SnapToPixel(float value)
 	{
-		const float unit = static_cast<float>(PIXEL_SCALE);
+		const float unit = static_cast<float>(UI_SCALE);
 		return std::floor(value / unit) * unit;
 	}
 
@@ -401,22 +401,33 @@ void ShutdownText()
 
 void DrawString(Renderer* renderer, const std::wstring& text, float x, float y, int32 align, float r, float g, float b, float a)
 {
+	DrawStringScaled(renderer, text, x, y, align, 1, r, g, b, a);
+}
+
+void DrawStringScaled(Renderer* renderer, const std::wstring& text, float x, float y, int32 align, int32 scale, float r, float g, float b, float a)
+{
 	if (g_texture == 0)
 	{
 		return;
 	}
 
-	const float unit = static_cast<float>(PIXEL_SCALE);
+	if (scale < 1)
+	{
+		scale = 1;
+	}
+
+	const float unit = static_cast<float>(UI_SCALE * scale);
 	const float cell_size = static_cast<float>(CELL) * unit;
+	const float width = MeasureString(text) * static_cast<float>(scale);
 
 	float pen_x = x;
 	if (align == TEXT_ALIGN_CENTER)
 	{
-		pen_x = x - MeasureString(text) * 0.5f;
+		pen_x = x - width * 0.5f;
 	}
 	else if (align == TEXT_ALIGN_RIGHT)
 	{
-		pen_x = x - MeasureString(text);
+		pen_x = x - width;
 	}
 
 	pen_x = SnapToPixel(pen_x);
@@ -445,9 +456,22 @@ void DrawString(Renderer* renderer, const std::wstring& text, float x, float y, 
 	}
 }
 
+void DrawStringOutline(Renderer* renderer, const std::wstring& text, float x, float y, int32 align, int32 scale, float r, float g, float b, float a)
+{
+	const float unit = static_cast<float>(UI_SCALE);
+	const float shadow_alpha = a * 0.9f;
+
+	DrawStringScaled(renderer, text, x + unit, y, align, scale, 0.f, 0.f, 0.f, shadow_alpha);
+	DrawStringScaled(renderer, text, x - unit, y, align, scale, 0.f, 0.f, 0.f, shadow_alpha);
+	DrawStringScaled(renderer, text, x, y + unit, align, scale, 0.f, 0.f, 0.f, shadow_alpha);
+	DrawStringScaled(renderer, text, x, y - unit, align, scale, 0.f, 0.f, 0.f, shadow_alpha);
+	DrawStringScaled(renderer, text, x + unit, y - unit, align, scale, 0.f, 0.f, 0.f, shadow_alpha);
+	DrawStringScaled(renderer, text, x, y, align, scale, r, g, b, a);
+}
+
 void DrawStringShadow(Renderer* renderer, const std::wstring& text, float x, float y, int32 align, float r, float g, float b, float a)
 {
-	const float unit = static_cast<float>(PIXEL_SCALE);
+	const float unit = static_cast<float>(UI_SCALE);
 
 	DrawString(renderer, text, x + unit, y - unit, align, 0.f, 0.f, 0.f, a * 0.85f);
 	DrawString(renderer, text, x, y, align, r, g, b, a);
@@ -466,10 +490,10 @@ float MeasureString(const std::wstring& text)
 		}
 	}
 
-	return width * static_cast<float>(PIXEL_SCALE);
+	return width * static_cast<float>(UI_SCALE);
 }
 
 float GetLineHeight()
 {
-	return static_cast<float>(g_line_height * PIXEL_SCALE);
+	return static_cast<float>(g_line_height * UI_SCALE);
 }

@@ -45,6 +45,10 @@ namespace
 	constexpr float ARRIVAL_MIN_SEC = 40.f;
 	constexpr float ARRIVAL_MAX_SEC = 70.f;
 	constexpr float CORPSE_LIFE_SEC = 240.f;
+	constexpr float FALLEN_LIFE_SEC = 40.f;	// 쓰러진 몸. 그 뒤엔 무덤만 남는다
+	constexpr size_t FALLEN_MAX_COUNT = 24;
+	constexpr float NPC_ATTACK_ANIM_SEC = 0.5f;
+	constexpr float NPC_DEATH_ANIM_SEC = 0.9f;
 	constexpr size_t GRAVE_MAX_COUNT = 48;
 	constexpr float ARROW_FLIGHT_SEC = 0.22f;
 	constexpr float EVENT_LIFE_SEC = 18.f;
@@ -87,6 +91,16 @@ namespace
 	std::vector<NpcResource> g_resources;
 	std::vector<NpcCorpse> g_corpses;
 	std::vector<Actor> g_graves;
+
+	// 죽은 자리에 쓰러진 몸. 주머니 ( 뒤질 것 ) 와 따로 둔다 - 빈손으로 죽어도 몸은 남아야 한다
+	struct FallenBody
+	{
+		Actor body;
+		int32 dir = 2;
+		float age = 0.f;
+	};
+
+	std::vector<FallenBody> g_fallen;
 	std::vector<NpcArrow> g_arrows;
 	std::vector<NpcEvent> g_events;
 	std::vector<Arrival> g_arrivals;
@@ -94,6 +108,7 @@ namespace
 
 	int32 g_treasury = 0;
 	int32 g_next_corpse_id = 1;
+	int32 g_event_serial = 0;	// 구역을 새로 만들어도 안 되돌린다. 모니터 페이지가 이어 붙인다
 	float g_treasury_carry = 0.f;
 	bool g_treasury_warned = false;
 
@@ -153,6 +168,33 @@ namespace
 		}
 
 		return g_npcs[static_cast<size_t>(index)].is_alive;
+	}
+
+	int32 GetSheetOfJob(int32 job)
+	{
+		switch (job)
+		{
+			case NPC_JOB_RAIDER:
+			{
+				return SHEET_NPC_RAIDER;
+			}
+			case NPC_JOB_MERCHANT:
+			{
+				return SHEET_NPC_MERCHANT;
+			}
+			case NPC_JOB_GATHERER:
+			{
+				return SHEET_NPC_GATHERER;
+			}
+			case NPC_JOB_WARDEN:
+			{
+				return SHEET_NPC_WARDEN;
+			}
+			default:
+			{
+				return SHEET_NPC_HUNTER;
+			}
+		}
 	}
 
 	int32 GetSpriteOfJob(int32 job)
@@ -397,7 +439,12 @@ namespace
 
 		npc->body.m_pos = pos;
 		npc->body.m_sprite = GetSpriteOfJob(job);
+		npc->body.m_sheet = GetSheetOfJob(job);
 		npc->body.m_flip = RollRange(0.f, 1.f) > 0.5f;
+
+		const float face_angle = RollRange(0.f, PI * 2.f);
+		npc->face_x = std::cos(face_angle);
+		npc->face_y = std::sin(face_angle);
 		npc->body.m_shade = RollRange(0.88f, 1.05f);
 		npc->spot = pos;
 		npc->progress_pos = pos;
@@ -494,6 +541,25 @@ namespace
 		g_graves.push_back(grave);
 	}
 
+	void AddFallenBody(const Npc& npc)
+	{
+		FallenBody fallen;
+		fallen.body.m_pos = npc.body.m_pos;
+		fallen.body.m_sprite = npc.body.m_sprite;
+		fallen.body.m_sheet = npc.body.m_sheet;
+		fallen.body.m_shade = npc.body.m_shade;
+		fallen.body.m_casts_shadow = false;
+		fallen.dir = GetDir8(npc.face_x, npc.face_y);
+		fallen.body.m_frame = PickSheetFrame(fallen.body.m_sheet, GetSheetAnim(fallen.body.m_sheet, ANIM_DEATH), fallen.dir, 0.f, 0.f, 0.f);
+
+		if (g_fallen.size() >= FALLEN_MAX_COUNT)
+		{
+			g_fallen.erase(g_fallen.begin());
+		}
+
+		g_fallen.push_back(fallen);
+	}
+
 	void KillNpc(int32 index, const std::wstring& cause, bool drop_gold_to_player)
 	{
 		Npc& npc = g_npcs[static_cast<size_t>(index)];
@@ -526,6 +592,7 @@ namespace
 		}
 
 		AddGrave(npc.body.m_pos);
+		AddFallenBody(npc);
 
 		PushNpcEvent(WithSubject(GetNpcTitle(npc)) + cause, 0.95f, 0.40f, 0.35f);
 
@@ -749,6 +816,22 @@ namespace
 			resource.regrow_timer = CountDown(resource.regrow_timer, delta_seconds);
 		}
 
+		for (size_t index = 0; index < g_fallen.size();)
+		{
+			FallenBody& fallen = g_fallen[index];
+			fallen.age += delta_seconds;
+
+			if (fallen.age > FALLEN_LIFE_SEC)
+			{
+				g_fallen.erase(g_fallen.begin() + static_cast<std::ptrdiff_t>(index));
+				continue;
+			}
+
+			const int32 death = GetSheetAnim(fallen.body.m_sheet, ANIM_DEATH);
+			fallen.body.m_frame = PickSheetFrame(fallen.body.m_sheet, death, fallen.dir, fallen.age / NPC_DEATH_ANIM_SEC, 0.f, 0.f);
+			++index;
+		}
+
 		for (size_t index = 0; index < g_corpses.size();)
 		{
 			g_corpses[index].age += delta_seconds;
@@ -838,14 +921,31 @@ namespace
 
 	void UpdateLook(Npc* npc)
 	{
-		if (npc->idle_timer < 0.12f)
+		const int32 sheet = npc->body.m_sheet;
+		const int32 dir = GetDir8(npc->face_x, npc->face_y);
+		int32 anim = GetSheetAnim(sheet, ANIM_IDLE);
+		float ratio = 0.f;
+
+		if (npc->hit_flash > 0.f)
 		{
-			npc->body.m_frame = static_cast<int32>(npc->walk_distance * 2.6f) % 2;
+			anim = GetSheetAnim(sheet, ANIM_HIT);
+			ratio = 1.f - npc->hit_flash / Balance::HIT_FLASH_SEC;
 		}
-		else
+		else if (npc->attack_anim > 0.f)
 		{
-			npc->body.m_frame = 0;
+			anim = GetSheetAnim(sheet, ANIM_ATTACK);
+			ratio = 1.f - npc->attack_anim / NPC_ATTACK_ANIM_SEC;
 		}
+		else if (npc->idle_timer < 0.12f)
+		{
+			anim = GetSheetAnim(sheet, ANIM_RUN);
+		}
+		else if (npc->work_anim > 0.f)
+		{
+			anim = GetSheetAnim(sheet, ANIM_WORK);
+		}
+
+		npc->body.m_frame = PickSheetFrame(sheet, anim, dir, ratio, npc->idle_timer, npc->walk_distance);
 
 		npc->body.m_emissive = 1.f + npc->hit_flash / Balance::HIT_FLASH_SEC * 2.5f;
 	}
@@ -853,6 +953,8 @@ namespace
 	void UpdateNpc(Npc* npc, int32 index, float delta_seconds)
 	{
 		npc->attack_cooldown = CountDown(npc->attack_cooldown, delta_seconds);
+		npc->attack_anim = CountDown(npc->attack_anim, delta_seconds);
+		npc->work_anim = CountDown(npc->work_anim, delta_seconds);
 		npc->hit_flash = CountDown(npc->hit_flash, delta_seconds);
 		npc->threat_timer = CountDown(npc->threat_timer, delta_seconds);
 		npc->outlaw_timer = CountDown(npc->outlaw_timer, delta_seconds);
@@ -1070,9 +1172,12 @@ namespace
 			return;
 		}
 
-		npc->walk_distance += std::sqrt(moved_x * moved_x + moved_y * moved_y);
+		const float moved = std::sqrt(moved_x * moved_x + moved_y * moved_y);
+		npc->walk_distance += moved;
 		npc->idle_timer = 0.f;
 		npc->body.m_flip = (moved_x - moved_y) < 0.f;
+		npc->face_x = moved_x / moved;
+		npc->face_y = moved_y / moved;
 	}
 
 	void FaceToward(Npc* npc, const WorldPos& target)
@@ -1083,6 +1188,13 @@ namespace
 		if (std::fabs(delta_x - delta_y) > 0.01f)
 		{
 			npc->body.m_flip = (delta_x - delta_y) < 0.f;
+		}
+
+		const float length = std::sqrt(delta_x * delta_x + delta_y * delta_y);
+		if (length > 0.01f)
+		{
+			npc->face_x = delta_x / length;
+			npc->face_y = delta_y / length;
 		}
 	}
 
@@ -1137,7 +1249,7 @@ namespace
 			{
 				robber->gold += taken;
 				robber->robbed_total += taken;
-				AddFloatingText(GetPlayer().body.m_pos, 60.f, L"-" + std::to_wstring(taken) + L" 골드", 1.f, 0.55f, 0.25f);
+				AddFloatingText(GetPlayer().m_pos, 60.f, L"-" + std::to_wstring(taken) + L" 골드", 1.f, 0.55f, 0.25f);
 			}
 
 			return;
@@ -1230,6 +1342,8 @@ namespace
 	{
 		const int32 self_index = GetNpcIndex(*npc);
 		const int32 damage = npc->attack + RollInt(-1, 1);
+
+		npc->attack_anim = NPC_ATTACK_ANIM_SEC;
 
 		if (npc->attack_range > 2.f)
 		{
@@ -1339,7 +1453,10 @@ int32 TakeTreasury(int32 amount)
 
 void PushNpcEvent(const std::wstring& text, float r, float g, float b)
 {
+	g_event_serial += 1;
+
 	NpcEvent event;
+	event.serial = g_event_serial;
 	event.text = text;
 	event.r = r;
 	event.g = g;
@@ -1431,7 +1548,7 @@ bool GetNpcTargetPos(int32 kind, int32 index, WorldPos* pos)
 				return false;
 			}
 
-			*pos = GetPlayer().body.m_pos;
+			*pos = GetPlayer().m_pos;
 			return true;
 		}
 		case NPC_TARGET_SITE:
@@ -1547,6 +1664,16 @@ int32 GetNpcUpgradeCost(const Npc& npc)
 float GetNpcTickMicroseconds()
 {
 	return g_tick_average_us;
+}
+
+int32 GetNpcDeathCount()
+{
+	return g_death_count;
+}
+
+int32 GetNpcRobberyCount()
+{
+	return g_robbery_count;
 }
 
 // ------------------------------------------------------------ 몸
@@ -1789,6 +1916,7 @@ void BuildNpcs(const ZoneLayout& layout)
 	g_resources.clear();
 	g_corpses.clear();
 	g_graves.clear();
+	g_fallen.clear();
 	g_arrows.clear();
 	g_events.clear();
 	g_arrivals.clear();
@@ -1891,6 +2019,11 @@ void CollectNpcActors()
 	for (const Actor& grave : g_graves)
 	{
 		AddSceneActor(&grave);
+	}
+
+	for (const FallenBody& fallen : g_fallen)
+	{
+		AddSceneActor(&fallen.body);
 	}
 }
 

@@ -21,12 +21,45 @@ void Actor::Draw(Renderer* renderer, const WorldPos& camera) const
 	const ScreenPos screen = WorldToScreen(m_pos, camera);
 	const float glow = m_shade * m_emissive;
 
+	if (m_sheet != SHEET_NONE)
+	{
+		DrawSheetFrame(renderer, m_sheet, m_frame, screen.x, screen.y + m_foot_offset_y, glow, glow, glow, 1.f, 0.f);
+		return;
+	}
+
 	DrawSprite(renderer, m_sprite, m_frame, screen.x, screen.y + m_foot_offset_y, 1.f, m_flip, glow, glow, glow, 1.f);
+}
+
+float Actor::GetArtWidth() const
+{
+	if (m_sheet != SHEET_NONE)
+	{
+		return GetSheetBodyWidth(m_sheet);
+	}
+
+	return static_cast<float>(GetSpriteWidth(m_sprite));
+}
+
+float Actor::GetArtHeight() const
+{
+	if (m_sheet != SHEET_NONE)
+	{
+		return GetSheetBodyHeight(m_sheet);
+	}
+
+	return static_cast<float>(GetSpriteHeight(m_sprite));
 }
 
 void Actor::DrawShadow(Renderer* renderer, const WorldPos& camera) const
 {
 	const ScreenPos screen = WorldToScreen(m_pos, camera);
+
+	if (m_sheet != SHEET_NONE)
+	{
+		DrawSheetShadow(renderer, m_sheet, m_frame, screen.x, screen.y, SHADOW_LEAN_X, SHADOW_LEAN_Y, SHADOW_ALPHA);
+		return;
+	}
+
 	const float unit = static_cast<float>(PIXEL_SCALE);
 	const float width = static_cast<float>(GetSpriteWidth(m_sprite)) * unit;
 	const float height = static_cast<float>(GetSpriteHeight(m_sprite)) * unit;

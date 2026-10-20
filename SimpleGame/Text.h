@@ -22,5 +22,11 @@ void DrawString(Renderer* renderer, const std::wstring& text, float x, float y, 
 // 검은 그림자를 한 점 밀어 깐다. 밝은 모래 위에서도 읽히게
 void DrawStringShadow(Renderer* renderer, const std::wstring& text, float x, float y, int32 align, float r, float g, float b, float a);
 
+// 정수 배율로 키운다. 글자 한 점이 배율 x 배율 칸이 돼서 도트 격자는 안 깨진다
+void DrawStringScaled(Renderer* renderer, const std::wstring& text, float x, float y, int32 align, int32 scale, float r, float g, float b, float a);
+
+// 네 방향 검은 테두리. 불꽃과 섬광 위에서도 숫자가 읽혀야 한다
+void DrawStringOutline(Renderer* renderer, const std::wstring& text, float x, float y, int32 align, int32 scale, float r, float g, float b, float a);
+
 float MeasureString(const std::wstring& text);
 float GetLineHeight();

@@ -1,10 +1,10 @@
 ﻿#pragma once
 
 // 그림 번호. GL 헤더 없이 게임 로직이 참조할 수 있게 따로 둔다.
-// 순서는 tools/sprite_art.py 의 build_sprites 와 같아야 한다
+// 그림은 tools/art/bake_props.py 가 이 번호 순서대로 Art/props.png 에 굽는다. 번호를 고치면 다시 굽는다
 constexpr int32 SPRITE_NONE = -1;
-constexpr int32 SPRITE_PLAYER = 0;
-constexpr int32 SPRITE_BLIGHTED = 1;	// 타락자
+constexpr int32 SPRITE_PLAYER = 0;	// 프레임은 PLAYER_POSE_
+constexpr int32 SPRITE_BLIGHTED = 1;	// 타락자. 프레임은 MONSTER_POSE_
 constexpr int32 SPRITE_HOUND = 2;	// 재늑대
 constexpr int32 SPRITE_DEVOURER = 3;	// 소거식귀
 constexpr int32 SPRITE_GATEBREAKER = 4;	// 성문파쇄자
@@ -41,4 +41,42 @@ constexpr int32 SPRITE_ARROW = 34;
 constexpr int32 SPRITE_STALL = 35;
 constexpr int32 SPRITE_CROPS = 36;	// 프레임 0 성 안 / 1 말라 죽은 밭
 constexpr int32 SPRITE_LAMP = 37;
-constexpr int32 SPRITE_COUNT = 38;
+constexpr int32 SPRITE_ICON_SWORD = 38;	// 가방 칸 16 x 16
+constexpr int32 SPRITE_ICON_TRACE = 39;
+constexpr int32 SPRITE_ICON_POTION = 40;
+constexpr int32 SPRITE_ICON_GOLD = 41;
+constexpr int32 SPRITE_DROP_TRACE = 42;	// 바닥에 떨어진 것
+constexpr int32 SPRITE_DROP_POTION = 43;
+constexpr int32 SPRITE_DROP_SWORD = 44;
+constexpr int32 SPRITE_CLEAVER = 45;	// 타락자 손칼
+constexpr int32 SPRITE_PIXEL = 46;	// 흰 점 하나. 돌린 막대와 조각
+constexpr int32 SPRITE_SKILL_ICON = 47;	// 프레임은 SKILL_ICON_
+constexpr int32 SPRITE_ANVIL = 48;
+constexpr int32 SPRITE_COUNT = 49;
+
+constexpr int32 PLAYER_POSE_STAND = 0;
+constexpr int32 PLAYER_POSE_WALK = 1;
+constexpr int32 PLAYER_POSE_ATTACK = 2;
+constexpr int32 PLAYER_POSE_GUARD = 3;
+constexpr int32 PLAYER_POSE_HIT = 4;
+constexpr int32 PLAYER_POSE_DODGE = 5;
+constexpr int32 PLAYER_POSE_DEAD = 6;
+
+constexpr int32 MONSTER_POSE_STAND = 0;
+constexpr int32 MONSTER_POSE_WALK = 1;
+constexpr int32 MONSTER_POSE_WINDUP = 2;
+constexpr int32 MONSTER_POSE_STRIKE = 3;
+constexpr int32 MONSTER_POSE_HIT = 4;
+constexpr int32 MONSTER_POSE_DEAD = 5;
+
+constexpr int32 SKILL_ICON_SLASH = 0;
+constexpr int32 SKILL_ICON_SLASH_2 = 1;
+constexpr int32 SKILL_ICON_COMBO = 2;
+constexpr int32 SKILL_ICON_SPIN_COMBO = 3;
+constexpr int32 SKILL_ICON_PARRY = 4;
+constexpr int32 SKILL_ICON_DASH_SLASH = 5;
+constexpr int32 SKILL_ICON_SPIN_SLASH = 6;
+constexpr int32 SKILL_ICON_LEAP = 7;
+constexpr int32 SKILL_ICON_COUNTER = 8;
+constexpr int32 SKILL_ICON_DODGE = 9;
+constexpr int32 SKILL_ICON_ROLL = 10;

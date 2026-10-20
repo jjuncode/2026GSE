@@ -1,75 +1,111 @@
 ﻿#pragma once
 
-#include "Actor.h"
+#include "Combat.h"
+#include "Inventory.h"
 
 #include <array>
 #include <string>
 
-constexpr int32 STAT_MAX_HP = 0;
-constexpr int32 STAT_ATTACK = 1;
-constexpr int32 STAT_DEFENCE = 2;
-constexpr int32 STAT_COUNT = 3;
+constexpr int32 UNLOCK_OK = 0;
+constexpr int32 UNLOCK_ALREADY_OWNED = 1;
+constexpr int32 UNLOCK_NO_LINK = 2;	// 이어진 스킬을 하나도 안 가졌다
+constexpr int32 UNLOCK_NO_POINT = 3;
+constexpr int32 UNLOCK_UNKNOWN = 4;
 
-constexpr int32 MATERIAL_DUST = 0;	// 재가루
-constexpr int32 MATERIAL_FRAGMENT = 1;	// 푸른 마석
-constexpr int32 MATERIAL_CORE = 2;	// 심장석
-constexpr int32 MATERIAL_COUNT = 3;
+constexpr int32 DASH_TRAIL_COUNT = 4;
 
-// 몸을 그린 뒤 손에 쥔 칼을 이어 그린다
-class PlayerActor : public Actor
+class Player : public Creature
 {
 public:
 	void Draw(Renderer* renderer, const WorldPos& camera) const override;
-};
 
-struct PlayerState
-{
-	PlayerActor body;
-	WorldPos spawn_pos;
+	bool IsParryable() const override;
+	void ApplyHitReact(const HitInfo& hit) override;
+	void OnDamaged(const HitInfo& hit, int32 taken) override;
+	void OnParry(const HitInfo& hit) override;
+	void OnDeath(Creature* killer) override;
+	void OnWindowCheck(const HitInfo& hit) override;
 
-	float facing_x = 1.f;	// 월드 방향 ( 길이 1 )
-	float facing_y = 0.f;
-	float walk_distance = 0.f;	// 걸은 거리로 걸음 프레임을 넘긴다
-	float idle_timer = 0.f;
+	void RecalcStat();	// 레벨 · 찍은 포인트 · 장비를 다시 더한다
+	bool AddExp(int32 exp);	// 레벨업 했으면 true
+	bool TryStatUp(int32 stat);
+	int32 CheckUnlockSkill(int32 skill_id) const;
+	bool TryUnlockSkill(int32 skill_id);
+	bool HasWeapon() const;
 
-	int32 hp = 0;
-	int32 level = 1;
-	int32 exp = 0;	// 현재 레벨에서 쌓은 경험치
-	int32 stat_point = 0;
-	std::array<int32, STAT_COUNT> stats = {};
+public:
+	WorldPos m_spawn_pos;
+	int32 m_exp = 0;	// 지금 레벨에서 쌓은 경험치
+	int32 m_stat_point = 0;
+	int32 m_skill_point = 0;
+	std::array<int32, STAT_COUNT> m_stat_invest = {};
+	int32 m_gold = 0;
+	Inventory m_inventory;
 
-	int32 gold = 0;
-	std::array<int32, MATERIAL_COUNT> materials = {};
-	int32 enhance_level = 0;
+	float m_potion_cooldown = 0.f;
+	float m_respawn_timer = 0.f;
 
-	float swing_cooldown = 0.f;
-	float swing_timer = 0.f;	// 휘두르는 연출 남은 시간
-	float hit_flash = 0.f;
-	float since_hit = 0.f;	// 마지막 피격 뒤 흐른 시간
-	float regen_carry = 0.f;	// 1 이 안 되는 회복 누적
-	float respawn_timer = 0.f;	// 0 보다 크면 죽어서 부활 대기
+	// 조작
+	float m_move_input_x = 0.f;	// 월드 방향. 길이 0 이면 안 움직인다
+	float m_move_input_y = 0.f;
+	float m_aim_x = 1.f;
+	float m_aim_y = 0.f;
+	bool m_guard_held = false;
+	float m_attack_buffer = 0.f;	// 좌클릭을 미리 눌러 둔 남은 시간
+	float m_guard_buffer = 0.f;
+	int32 m_skill_buffer_id = SKILL_ID_NONE;	// 콤보 도중 누른 Q · E · R. 창이 닫히면 나간다
+	float m_skill_buffer = 0.f;
+	int32 m_dodge_buffer_id = SKILL_ID_NONE;	// 경직이 풀리는 순간 나가는 회피
+	float m_dodge_buffer = 0.f;
+	int32 m_dash_skill_id = SKILL_ID_NONE;	// 대쉬와 구르기는 그림이 다르다
+	int32 m_combo_step = -1;	// 지금 휘두르는 좌클릭 단계
+	float m_combo_reset_timer = 0.f;	// 이 시간 안에 다시 누르면 다음 단계
+	int32 m_npc_hit_serial = -1;	// NPC 판정을 이미 본 시전 번호와 창
+	int32 m_npc_hit_window = -1;
+
+	// 연출
+	float m_walk_distance = 0.f;
+	float m_idle_timer = 0.f;
+	float m_level_up_glow = 0.f;
+	float m_no_weapon_notice = 0.f;
+	std::array<WorldPos, DASH_TRAIL_COUNT> m_dash_trail;
+	float m_dash_trail_timer = 0.f;
+	int32 m_kill_count = 0;
 };
 
 void InitPlayer(const WorldPos& spawn_pos);
 void PlacePlayer(const WorldPos& spawn_pos);	// 성장은 두고 자리만 옮긴다
-const PlayerState& GetPlayer();
-PlayerState& MutablePlayer();
-
+const Player& GetPlayer();
+Player& MutablePlayer();
 bool IsPlayerDead();
-void UpdatePlayer(float delta_seconds);
-void MovePlayer(float velocity_x, float velocity_y, float delta_seconds);	// 초당 칸
-void AimPlayer(float world_dir_x, float world_dir_y);
-bool TryStartSwing();	// 쿨이 돌았으면 휘두르기 시작
+
+// 히트스톱이 곱해진 시간으로 판정을, 실제 시간으로 부활 대기와 알림을 돌린다
+void UpdatePlayer(float world_seconds, float real_seconds);
+
+// 입력. 화면 축 이동은 갱신마다 새로 넣는다
+void SetPlayerMoveInput(float screen_right, float screen_up);
+void SetPlayerAim(const WorldPos& cursor_world);
+void PressPlayerAttack();
+void SetPlayerGuard(bool held);
+void PressPlayerSkill(int32 skill_id);	// Q · E · R
+void PressPlayerDodge(int32 skill_id);	// 대쉬 · 구르기
+bool UsePlayerPotion();	// 단축키 1
+bool UseBagItem(int32 slot_idx);	// 소비는 쓰고 장비는 낀다
+bool UnequipPlayerItem(int32 area, int32 slot_idx);
+
+// 보상
+bool GivePlayerItem(int32 item_id, int32 count);	// 가방이 차면 false
+void AddPlayerGold(int32 gold);
+void GrantKillReward(int32 exp, int32 monster_level);
+
+// NPC 쪽 창구
 void DamagePlayer(int32 damage);
-int32 TakePlayerGold(int32 amount);	// 실제로 빼앗긴 양
-
-int32 GetPlayerMaxHp();
+int32 TakePlayerGold(int32 amount);
 int32 GetPlayerAttack();
-int32 GetPlayerDefence();
+WorldPos GetPlayerPos();
+int32 GetPlayerHp();
+int32 GetPlayerGold();
+int32 GetPlayerLevel();
 
-int32 GetNeedExp(int32 level);
-void AddPlayerExp(int32 exp);
-bool TryStatUp(int32 stat);	// 잔여 포인트 없으면 false
-
-const wchar_t* GetMaterialName(int32 material);
 const wchar_t* GetStatName(int32 stat);
+int32 GetLevelDiffExpRate(int32 monster_level, int32 player_level);	// %

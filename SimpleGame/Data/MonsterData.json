@@ -1,0 +1,233 @@
+{
+  "monsters": [
+    {
+      "monster_type": 1,
+      "name": "타락자",
+      "grade": "NORMAL",
+      "level": 2,
+      "sprite": "BLIGHTED",
+      "weapon": "CLEAVER",
+      "body_radius": 40,
+      "hit_radius": 30,
+      "move_speed": 380,
+      "patrol_speed": 150,
+      "standoff_speed": 230,
+      "search_range": 1100,
+      "patrol_radius": 450,
+      "patrol_policy": "SPAWN",
+      "target_policy": "NEAREST",
+      "skill_policy": "RANDOM",
+      "stat": {
+        "max_hp": 250,
+        "attack": 12,
+        "defence": 3,
+        "crit_rate": 5,
+        "crit_damage": 150,
+        "penetration": 0,
+        "toughness": 0
+      },
+      "attack_cooldown_sec": 2.6,
+      "respawn_sec": 25.0,
+      "keep_distance": 330,
+      "skill_ids": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "weak_point_rate": 1.0,
+      "reward": {
+        "exp": 30,
+        "gold": [
+          6,
+          14
+        ],
+        "drops": [
+          {
+            "item_id": 2,
+            "rate": 70.0,
+            "min_count": 1,
+            "max_count": 2
+          },
+          {
+            "item_id": 3,
+            "rate": 10.0,
+            "min_count": 1,
+            "max_count": 1
+          }
+        ]
+      }
+    },
+    {
+      "monster_type": 2,
+      "name": "재늑대",
+      "grade": "NORMAL",
+      "level": 3,
+      "sprite": "HOUND",
+      "weapon": "NONE",
+      "body_radius": 40,
+      "hit_radius": 30,
+      "move_speed": 620,
+      "patrol_speed": 220,
+      "standoff_speed": 420,
+      "search_range": 1300,
+      "patrol_radius": 600,
+      "patrol_policy": "SPAWN",
+      "target_policy": "NEAREST",
+      "skill_policy": "RANDOM",
+      "stat": {
+        "max_hp": 130,
+        "attack": 9,
+        "defence": 0,
+        "crit_rate": 8,
+        "crit_damage": 150,
+        "penetration": 0,
+        "toughness": 0
+      },
+      "attack_cooldown_sec": 1.7,
+      "respawn_sec": 25.0,
+      "keep_distance": 360,
+      "skill_ids": [
+        11,
+        12
+      ],
+      "weak_point_rate": 1.0,
+      "reward": {
+        "exp": 22,
+        "gold": [
+          3,
+          8
+        ],
+        "drops": [
+          {
+            "item_id": 2,
+            "rate": 50.0,
+            "min_count": 1,
+            "max_count": 1
+          },
+          {
+            "item_id": 3,
+            "rate": 6.0,
+            "min_count": 1,
+            "max_count": 1
+          }
+        ]
+      }
+    },
+    {
+      "monster_type": 3,
+      "name": "소거식귀",
+      "grade": "ELITE",
+      "level": 6,
+      "sprite": "DEVOURER",
+      "weapon": "NONE",
+      "body_radius": 75,
+      "hit_radius": 70,
+      "move_speed": 300,
+      "patrol_speed": 110,
+      "standoff_speed": 180,
+      "search_range": 1200,
+      "patrol_radius": 450,
+      "patrol_policy": "SPAWN",
+      "target_policy": "NEAREST",
+      "skill_policy": "RANDOM",
+      "stat": {
+        "max_hp": 950,
+        "attack": 20,
+        "defence": 10,
+        "crit_rate": 5,
+        "crit_damage": 150,
+        "penetration": 0,
+        "toughness": 30
+      },
+      "attack_cooldown_sec": 3.0,
+      "respawn_sec": 45.0,
+      "keep_distance": 420,
+      "skill_ids": [
+        21,
+        22,
+        23
+      ],
+      "weak_point_rate": 2.5,
+      "reward": {
+        "exp": 140,
+        "gold": [
+          40,
+          70
+        ],
+        "drops": [
+          {
+            "item_id": 2,
+            "rate": 100.0,
+            "min_count": 3,
+            "max_count": 5
+          },
+          {
+            "item_id": 3,
+            "rate": 35.0,
+            "min_count": 1,
+            "max_count": 1
+          }
+        ]
+      }
+    },
+    {
+      "monster_type": 4,
+      "name": "성문파쇄자",
+      "grade": "BOSS",
+      "level": 10,
+      "sprite": "GATEBREAKER",
+      "weapon": "NONE",
+      "body_radius": 115,
+      "hit_radius": 105,
+      "move_speed": 340,
+      "patrol_speed": 0,
+      "standoff_speed": 200,
+      "search_range": 1600,
+      "patrol_radius": 300,
+      "patrol_policy": "NONE",
+      "target_policy": "NEAREST",
+      "skill_policy": "RANDOM",
+      "stat": {
+        "max_hp": 6000,
+        "attack": 40,
+        "defence": 25,
+        "crit_rate": 5,
+        "crit_damage": 150,
+        "penetration": 0,
+        "toughness": 50
+      },
+      "attack_cooldown_sec": 2.2,
+      "respawn_sec": 0,
+      "keep_distance": 500,
+      "skill_ids": [
+        31,
+        32,
+        33,
+        34
+      ],
+      "weak_point_rate": 2.0,
+      "reward": {
+        "exp": 1500,
+        "gold": [
+          300,
+          500
+        ],
+        "drops": [
+          {
+            "item_id": 2,
+            "rate": 100.0,
+            "min_count": 15,
+            "max_count": 25
+          },
+          {
+            "item_id": 3,
+            "rate": 100.0,
+            "min_count": 3,
+            "max_count": 3
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -304,7 +304,7 @@ namespace
 
 		if (kind == NPC_TARGET_PLAYER)
 		{
-			return GetPlayerAttack() * GetPlayer().hp;
+			return GetPlayerAttack() * GetPlayer().m_hp;
 		}
 
 		return 0;
@@ -850,15 +850,15 @@ namespace
 		}
 
 		// 개척대원 주머니도 노린다. 세니까 점수를 깎는다
-		const PlayerState& player = GetPlayer();
-		if (IsPlayerDead() == false && player.gold >= 15 && IsWorldPosInTown(player.body.m_pos) == false)
+		const Player& player = GetPlayer();
+		if (IsPlayerDead() == false && player.m_gold >= 15 && IsWorldPosInTown(player.m_pos) == false)
 		{
-			const float distance = GetNpcDistance(*npc, player.body.m_pos);
+			const float distance = GetNpcDistance(*npc, player.m_pos);
 
 			if (distance < PLAYER_RAID_RANGE)
 			{
 				const float crowd = static_cast<float>(CountRaidersOn(*npc, NPC_TARGET_PLAYER, -1));
-				const float score = static_cast<float>(player.gold) * 0.6f / (1.f + distance * 0.08f) * 0.4f / (1.f + crowd);
+				const float score = static_cast<float>(player.m_gold) * 0.6f / (1.f + distance * 0.08f) * 0.4f / (1.f + crowd);
 
 				if (score > best_score)
 				{
@@ -1247,6 +1247,7 @@ namespace
 
 		if (Linger(npc, is_enter, delta_seconds, work_sec, work_sec) == false)
 		{
+			npc->work_anim = 0.2f;
 			return BT_RUNNING;
 		}
 
