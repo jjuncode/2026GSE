@@ -20,3 +20,11 @@ void ResetNavBudget();
 bool TakeNavBudget();
 
 int32 PopNavSearchCount();	// 지난 호출 뒤 돌린 탐색 수
+
+// 마을 광장마다 거리 지도 한 장. 마을 사이 먼 길은 A* 대신 이걸 따라 내려간다
+void BuildNavFlowFields(const std::vector<ZoneTile>& goals);
+int32 GetNavFlowCount();
+int32 GetNavFlowDistance(int32 field, int32 x, int32 y);	// 곧은 칸 10, 대각 14. 못 가면 -1
+
+// 거리 지도를 몇 걸음 내려간 자리. 곧장 걸어갈 수 있는 데까지만 멀리 본다
+bool GetNavFlowWaypoint(int32 field, const WorldPos& from, float radius, WorldPos* waypoint);

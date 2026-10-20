@@ -12,7 +12,7 @@
 namespace
 {
 	constexpr int32 MAX_EXPAND = 16000;	// 구역 3 분의 1 쯤. 이걸 넘기면 거의 막힌 목표다
-	constexpr int32 BUDGET_PER_TICK = 4;
+	constexpr int32 BUDGET_PER_TICK = 6;	// 주민이 이백 명을 넘어 넷이면 틱마다 바닥났다 ( 15 초 3600 회 )
 	constexpr int32 GOAL_SEARCH_RADIUS = 3;
 	const float DIAGONAL_COST = 1.41421356f;
 	const float LINE_STEP = 0.25f;
@@ -31,6 +31,15 @@ namespace
 
 	int32 g_budget = BUDGET_PER_TICK;
 	int32 g_search_count = 0;
+
+	constexpr int32 FLOW_STRAIGHT = 10;
+	constexpr int32 FLOW_DIAGONAL = 14;
+	constexpr int32 FLOW_BUCKET_COUNT = FLOW_DIAGONAL + 1;	// 한 걸음 최대값보다 하나 많으면 지금 칸 통에 새 값이 안 섞인다
+	constexpr int32 FLOW_LOOK_AHEAD = 10;
+	constexpr uint16 FLOW_UNREACHED = 0xFFFF;	// 구역 대각선을 다 걸어도 14 x 500 칸이라 두 바이트에 담긴다
+
+	std::vector<std::vector<uint16>> g_flow_fields;	// 거리 지도가 스무 장 넘어 두 바이트로 든다
+	std::vector<int32> g_flow_scratch;
 
 	int32 ToIndex(int32 x, int32 y)
 	{
@@ -137,6 +146,152 @@ namespace
 		}
 
 		return false;
+	}
+
+	bool CanStep(int32 x, int32 y, int32 step_x, int32 step_y)
+	{
+		if (IsNavBlocked(x + step_x, y + step_y))
+		{
+			return false;
+		}
+
+		// 대각선은 옆 두 칸이 다 비어야 한다. 모서리를 스치면 사각형 몸이 걸린다
+		if (step_x != 0 && step_y != 0)
+		{
+			if (IsNavBlocked(x + step_x, y) || IsNavBlocked(x, y + step_y))
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	// 다익스트라를 통 여러 개로 돈다. 걸음값이 10 · 14 둘뿐이라 힙 없이 거리 순서가 지켜진다
+	void FillFlowField(const ZoneTile& goal, std::vector<uint16>* result)
+	{
+		const size_t count = static_cast<size_t>(ZONE_TILE_COUNT * ZONE_TILE_COUNT);
+		result->assign(count, FLOW_UNREACHED);
+
+		std::vector<int32>* field = &g_flow_scratch;
+		field->assign(count, -1);
+
+		if (IsNavBlocked(goal.x, goal.y))
+		{
+			return;
+		}
+
+		std::array<std::vector<int32>, FLOW_BUCKET_COUNT> buckets;
+		const int32 goal_index = ToIndex(goal.x, goal.y);
+		(*field)[static_cast<size_t>(goal_index)] = 0;
+		buckets[0].push_back(goal_index);
+
+		int32 pending = 1;
+		int32 current = 0;
+
+		while (pending > 0)
+		{
+			std::vector<int32>& bucket = buckets[static_cast<size_t>(current % FLOW_BUCKET_COUNT)];
+
+			for (size_t slot = 0; slot < bucket.size(); ++slot)
+			{
+				const int32 node = bucket[slot];
+				pending -= 1;
+
+				// 더 싼 값으로 다른 통에 다시 들어간 옛 항목
+				if ((*field)[static_cast<size_t>(node)] != current)
+				{
+					continue;
+				}
+
+				const int32 node_x = node % ZONE_TILE_COUNT;
+				const int32 node_y = node / ZONE_TILE_COUNT;
+
+				for (size_t dir = 0; dir < STEP_X.size(); ++dir)
+				{
+					if (CanStep(node_x, node_y, STEP_X[dir], STEP_Y[dir]) == false)
+					{
+						continue;
+					}
+
+					int32 step_cost = FLOW_STRAIGHT;
+					if (STEP_X[dir] != 0 && STEP_Y[dir] != 0)
+					{
+						step_cost = FLOW_DIAGONAL;
+					}
+
+					const int32 next = ToIndex(node_x + STEP_X[dir], node_y + STEP_Y[dir]);
+					const int32 next_cost = current + step_cost;
+					const int32 known = (*field)[static_cast<size_t>(next)];
+
+					if (known >= 0 && known <= next_cost)
+					{
+						continue;
+					}
+
+					(*field)[static_cast<size_t>(next)] = next_cost;
+					buckets[static_cast<size_t>(next_cost % FLOW_BUCKET_COUNT)].push_back(next);
+					pending += 1;
+				}
+			}
+
+			bucket.clear();
+			current += 1;
+		}
+
+		for (size_t index = 0; index < count; ++index)
+		{
+			const int32 value = (*field)[index];
+			if (value >= 0 && value < static_cast<int32>(FLOW_UNREACHED))
+			{
+				(*result)[index] = static_cast<uint16>(value);
+			}
+		}
+	}
+
+	int32 ReadFlow(const std::vector<uint16>& field, int32 x, int32 y)
+	{
+		const uint16 value = field[static_cast<size_t>(ToIndex(x, y))];
+		if (value == FLOW_UNREACHED)
+		{
+			return -1;
+		}
+
+		return static_cast<int32>(value);
+	}
+
+	// 거리가 가장 많이 줄어드는 이웃 칸. 광장에 닿았거나 못 내려가면 false
+	bool DescendFlow(const std::vector<uint16>& field, int32 x, int32 y, ZoneTile* next)
+	{
+		const int32 here = ReadFlow(field, x, y);
+		if (here <= 0)
+		{
+			return false;
+		}
+
+		int32 best = here;
+		bool found = false;
+
+		for (size_t dir = 0; dir < STEP_X.size(); ++dir)
+		{
+			if (CanStep(x, y, STEP_X[dir], STEP_Y[dir]) == false)
+			{
+				continue;
+			}
+
+			const int32 value = ReadFlow(field, x + STEP_X[dir], y + STEP_Y[dir]);
+			if (value < 0 || value >= best)
+			{
+				continue;
+			}
+
+			best = value;
+			next->x = x + STEP_X[dir];
+			next->y = y + STEP_Y[dir];
+			found = true;
+		}
+
+		return found;
 	}
 }
 
@@ -357,4 +512,93 @@ int32 PopNavSearchCount()
 	g_search_count = 0;
 
 	return count;
+}
+
+void BuildNavFlowFields(const std::vector<ZoneTile>& goals)
+{
+	g_flow_fields.assign(goals.size(), std::vector<uint16>());
+
+	for (size_t index = 0; index < goals.size(); ++index)
+	{
+		FillFlowField(goals[index], &g_flow_fields[index]);
+	}
+
+	g_flow_scratch.clear();
+	g_flow_scratch.shrink_to_fit();
+}
+
+int32 GetNavFlowCount()
+{
+	return static_cast<int32>(g_flow_fields.size());
+}
+
+int32 GetNavFlowDistance(int32 field, int32 x, int32 y)
+{
+	if (field < 0 || field >= static_cast<int32>(g_flow_fields.size()) || IsInside(x, y) == false)
+	{
+		return -1;
+	}
+
+	return ReadFlow(g_flow_fields[static_cast<size_t>(field)], x, y);
+}
+
+bool GetNavFlowWaypoint(int32 field, const WorldPos& from, float radius, WorldPos* waypoint)
+{
+	if (field < 0 || field >= static_cast<int32>(g_flow_fields.size()))
+	{
+		return false;
+	}
+
+	const std::vector<uint16>& flow = g_flow_fields[static_cast<size_t>(field)];
+
+	float from_x = 0.f;
+	float from_y = 0.f;
+	WorldToZoneFloat(from, &from_x, &from_y);
+
+	ZoneTile cursor;
+	cursor.x = static_cast<int32>(std::floor(from_x));
+	cursor.y = static_cast<int32>(std::floor(from_y));
+
+	if (IsInside(cursor.x, cursor.y) == false || ReadFlow(flow, cursor.x, cursor.y) < 0)
+	{
+		return false;
+	}
+
+	std::array<ZoneTile, FLOW_LOOK_AHEAD> steps;
+	int32 step_count = 0;
+
+	while (step_count < FLOW_LOOK_AHEAD)
+	{
+		ZoneTile next;
+		if (DescendFlow(flow, cursor.x, cursor.y, &next) == false)
+		{
+			break;
+		}
+
+		steps[static_cast<size_t>(step_count)] = next;
+		step_count += 1;
+		cursor = next;
+	}
+
+	if (step_count == 0)
+	{
+		return false;
+	}
+
+	// 멀리 본 칸부터 곧장 보이는지 따진다. 칸 중심만 밟으면 계단처럼 꺾여 걷는다
+	for (int32 index = step_count - 1; index > 0; --index)
+	{
+		const ZoneTile& tile = steps[static_cast<size_t>(index)];
+		const WorldPos candidate = ZoneTileToWorld(tile.x, tile.y, 0.5f, 0.5f);
+
+		if (HasNavLine(from, candidate, radius))
+		{
+			*waypoint = candidate;
+			return true;
+		}
+	}
+
+	*waypoint = ZoneTileToWorld(steps[0].x, steps[0].y, 0.5f, 0.5f);
+
+	return true;
 }

@@ -3,12 +3,14 @@
 #include "Actor.h"
 #include "Audio.h"
 #include "Balance.h"
+#include "Board.h"
 #include "Drop.h"
 #include "Feel.h"
 #include "FloatingText.h"
 #include "Fog.h"
 #include "GameConfig.h"
 #include "Ground.h"
+#include "HouseArt.h"
 #include "Input.h"
 #include "Minimap.h"
 #include "Monitor.h"
@@ -23,6 +25,7 @@
 #include "SpriteAtlas.h"
 #include "Text.h"
 #include "UiWindows.h"
+#include "Village.h"
 #include "World.h"
 #include "ZoneGen.h"
 
@@ -51,12 +54,45 @@ namespace
 	constexpr int32 DEBUG_VIEW_RADIUS = 24;
 
 	const float ANVIL_RANGE = 2.4f;	// 이 안에서 F 나 U 로 강화 창이 열린다
+	const float BOARD_RANGE = 2.4f;	// 이 안에서 F 로 게시판이 열린다
+	const float BOARD_LABEL_LIFT = 100.f;	// 게시판 그림 28 도트 x 3 위
 	const float PICKUP_REPEAT_SEC = 0.14f;
+	const float VILLAGE_BANNER_SEC = 3.2f;
 
 	ZoneLayout g_zone;
 	bool g_player_ready = false;
+	std::vector<uint8> g_door_tiles;	// 문이 난 집 칸. 집마다 하나
+
+	int32 g_player_village = -1;
+	float g_village_banner_timer = 0.f;
+	int32 g_village_banner = -1;
 
 	std::vector<Actor> g_decor;
+
+	// 한 채로 구운 집의 칸 조각과 게시판. 그림이 집 그림판에 있어 그리기만 다르다
+	class HousePieceActor : public Actor
+	{
+	public:
+		void Draw(Renderer* renderer, const WorldPos& camera) const override
+		{
+			const ScreenPos screen = WorldToScreen(m_pos, camera);
+			const float glow = m_shade * m_emissive;
+
+			if (m_prop >= 0)
+			{
+				DrawHouseProp(renderer, m_prop, screen.x, screen.y + m_foot_offset_y, glow, glow, glow);
+				return;
+			}
+
+			DrawHousePiece(renderer, m_piece, screen.x, screen.y + m_foot_offset_y, glow, glow, glow);
+		}
+
+		int32 m_piece = -1;
+		int32 m_prop = -1;
+	};
+
+	std::vector<HousePieceActor> g_house_pieces;
+	std::vector<uint8> g_house_piece_tiles;	// 조각으로 세운 집 칸. 여기는 칸 블록을 안 세운다
 	std::vector<size_t> g_light_indices;
 	std::vector<size_t> g_boss_light_indices;
 	std::vector<size_t> g_nearby_lights;
@@ -188,9 +224,111 @@ namespace
 		block.m_foot_offset_y = BLOCK_FOOT_OFFSET;
 	}
 
+	// 성채든 개척촌이든 마을 안이면 마당 흙과 푸른 밭
 	bool IsTownTile(int32 x, int32 y)
 	{
-		return IsInsideTown(g_zone, x, y);
+		return GetZoneVillageAt(g_zone, x, y) >= 0;
+	}
+
+	// 문 앞 칸 바로 뒤 집 칸이 문 난 칸이다. 그 칸만 문 그림, 나머지는 창 그림
+	void MarkDoorTiles()
+	{
+		g_door_tiles.assign(static_cast<size_t>(ZONE_TILE_COUNT * ZONE_TILE_COUNT), 0);
+
+		for (const ZoneHouse& house : g_zone.houses)
+		{
+			const int32 x = house.door.x;
+			const int32 y = house.door.y - 1;
+
+			if (x >= 0 && y >= 0 && x < ZONE_TILE_COUNT && y < ZONE_TILE_COUNT)
+			{
+				g_door_tiles[ToZoneIndex(x, y)] = 1;
+			}
+		}
+	}
+
+	// 집마다 지붕 색 하나, 밝기 하나. 칸마다 다르게 주면 한 채 안에 이음매가 보인다
+	void BuildHousePieces()
+	{
+		g_house_piece_tiles.assign(static_cast<size_t>(ZONE_TILE_COUNT * ZONE_TILE_COUNT), 0);
+
+		if (HasHouseArt() == false)
+		{
+			return;
+		}
+
+		const int32 roof_count = std::max(1, GetHouseRoofCount());
+
+		for (const ZoneHouse& house : g_zone.houses)
+		{
+			const uint32 hash = HashZoneTile(g_zone.seed + 919u, house.lot.x, house.lot.y);
+			const int32 roof = static_cast<int32>(hash % static_cast<uint32>(roof_count));
+			const int32 door_col = house.door.x - house.lot.x;
+			const float shade = 0.92f + HashToUnit(hash >> 8) * 0.1f;
+
+			std::vector<int32> pieces;
+			bool complete = true;
+
+			for (int32 tile_y = 0; tile_y < house.size_y; ++tile_y)
+			{
+				for (int32 tile_x = 0; tile_x < house.size_x; ++tile_x)
+				{
+					const int32 piece = FindHousePiece(house.size_x, house.size_y, door_col, roof, tile_x, tile_y);
+					if (piece < 0)
+					{
+						complete = false;
+					}
+
+					pieces.push_back(piece);
+				}
+			}
+
+			// 구운 적 없는 모양이면 그 집만 옛 칸 블록으로 남긴다
+			if (complete == false)
+			{
+				continue;
+			}
+
+			for (int32 tile_y = 0; tile_y < house.size_y; ++tile_y)
+			{
+				for (int32 tile_x = 0; tile_x < house.size_x; ++tile_x)
+				{
+					const int32 x = house.lot.x + tile_x;
+					const int32 y = house.lot.y + tile_y;
+
+					HousePieceActor actor;
+					actor.m_pos = ZoneTileToWorld(x, y, 0.5f, 0.5f);
+					actor.m_sprite = SPRITE_BLOCK_HOUSE;	// 그리기엔 안 쓴다. 벽 투시 판정이 블록 크기로 본다
+					actor.m_piece = pieces[static_cast<size_t>(tile_y * house.size_x + tile_x)];
+					actor.m_shade = shade;
+					actor.m_casts_shadow = false;
+					actor.m_foot_offset_y = BLOCK_FOOT_OFFSET;
+					g_house_pieces.push_back(actor);
+
+					g_house_piece_tiles[ToZoneIndex(x, y)] = 1;
+				}
+			}
+		}
+	}
+
+	bool IsHousePieceTile(int32 x, int32 y)
+	{
+		if (g_house_piece_tiles.empty())
+		{
+			return false;
+		}
+
+		return g_house_piece_tiles[ToZoneIndex(x, y)] == 1;
+	}
+
+	bool IsDoorTile(int32 x, int32 y)
+	{
+		if (x < 0 || y < 0 || x >= ZONE_TILE_COUNT || y >= ZONE_TILE_COUNT || g_door_tiles.empty())
+		{
+			return false;
+		}
+
+		return g_door_tiles[ToZoneIndex(x, y)] == 1;
 	}
 
 	uint8 GetGroundCode(int32 x, int32 y, uint8 tile)
@@ -352,7 +490,19 @@ namespace
 			}
 			case TILE_HOUSE:
 			{
-				AddBlock(x, y, SPRITE_BLOCK_HOUSE, variant, 0.92f + roll * 0.1f);
+				if (IsHousePieceTile(x, y))
+				{
+					return;
+				}
+
+				// 프레임 0 이 +y 면에 문, 1 이 창뿐
+				int32 frame = 1;
+				if (IsDoorTile(x, y))
+				{
+					frame = 0;
+				}
+
+				AddBlock(x, y, SPRITE_BLOCK_HOUSE, frame, 0.92f + roll * 0.1f);
 				return;
 			}
 			case TILE_RUIN:
@@ -427,10 +577,37 @@ namespace
 		g_has_anvil = true;
 		AddDecorAt(g_anvil_pos, SPRITE_ANVIL, 0, 1.f, true);
 		AddLightAt(TileOffset(town.tile, 2.9f, 2.1f), 4.f, 1.00f, 0.55f, 0.25f, 0.55f, SPRITE_BRAZIER);
+	}
 
-		for (const ZoneTile& lamp : g_zone.lamps)
+	// 개척촌 광장. 화로 하나에 노점 둘, 성채보다 수수하다
+	void BuildHamletDecor(const ZoneSite& town)
+	{
+		AddLightAt(TileOffset(town.tile, 0.f, 0.f), 8.f, 1.00f, 0.70f, 0.34f, 0.85f, SPRITE_BRAZIER);
+
+		AddDecorAt(TileOffset(town.tile, -2.6f, -1.2f), SPRITE_STALL, 0, 0.95f, true);
+		AddDecorAt(TileOffset(town.tile, -1.2f, 2.6f), SPRITE_STALL, 0, 0.9f, true);
+	}
+
+	// 게시판은 집 그림판에 함께 굽는다. 그림판이 없으면 깃대로 자리만 표시한다
+	void BuildBoardDecor()
+	{
+		const int32 board_prop = FindHouseProp("board");
+
+		for (const ZoneVillage& village : g_zone.villages)
 		{
-			AddLightAt(ZoneTileToWorld(lamp.x, lamp.y, 0.5f, 0.5f), 5.f, 1.00f, 0.78f, 0.45f, 0.45f, SPRITE_LAMP);
+			const WorldPos pos = ZoneTileToWorld(village.board.x, village.board.y, 0.5f, 0.5f);
+
+			if (board_prop < 0)
+			{
+				AddDecorAt(pos, SPRITE_BANNER, 0, 1.f, true);
+				continue;
+			}
+
+			HousePieceActor board;
+			board.m_pos = pos;
+			board.m_prop = board_prop;
+			board.m_casts_shadow = false;
+			g_house_pieces.push_back(board);
 		}
 	}
 
@@ -493,13 +670,28 @@ namespace
 
 	void BuildSites()
 	{
+		for (const ZoneTile& lamp : g_zone.lamps)
+		{
+			AddLightAt(ZoneTileToWorld(lamp.x, lamp.y, 0.5f, 0.5f), 5.f, 1.00f, 0.78f, 0.45f, 0.45f, SPRITE_LAMP);
+		}
+
+		BuildBoardDecor();
+
 		for (const ZoneSite& site : g_zone.sites)
 		{
 			switch (site.kind)
 			{
 				case SITE_TOWN:
 				{
-					BuildTownDecor(site);
+					if (site.village == ZONE_CITADEL)
+					{
+						BuildTownDecor(site);
+					}
+					else
+					{
+						BuildHamletDecor(site);
+					}
+
 					break;
 				}
 				case SITE_GATE:
@@ -672,8 +864,15 @@ namespace
 		ClearFeel();
 		g_has_anvil = false;
 		g_decor.clear();
+		g_house_pieces.clear();
 		g_light_indices.clear();
 		g_boss_light_indices.clear();
+		g_player_village = -1;
+		g_village_banner = -1;
+		g_village_banner_timer = 0.f;
+
+		MarkDoorTiles();
+		BuildHousePieces();
 
 		std::vector<uint8> codes(static_cast<size_t>(ZONE_TILE_COUNT * ZONE_TILE_COUNT), GROUND_CODE_OPEN);
 
@@ -709,6 +908,9 @@ namespace
 			g_player_ready = true;
 		}
 
+		// 마을 살림과 게시판이 먼저 서야 주민이 집을 받는다
+		BuildVillages(g_zone);
+		BuildBoards();
 		BuildNpcs(g_zone);
 		BuildMinimap(g_zone);
 		BuildMonitorZone(g_zone);
@@ -850,6 +1052,31 @@ namespace
 		return left.top >= right.bottom && right.top >= left.bottom;
 	}
 
+	void AddDecorActor(const Actor& actor, const WorldPos& camera, const ScreenBox& player_box, float player_depth)
+	{
+		if (actor.m_is_upright == false)
+		{
+			return;
+		}
+
+		// 망루와 죽은 나무는 발밑이 화면 밖이어도 윗부분이 걸치므로 여유를 크게 준다
+		if (IsOffScreen(WorldToScreen(actor.m_pos, camera), 140.f))
+		{
+			return;
+		}
+
+		AddSceneActor(&actor);
+
+		// 플레이어 앞에 서서 플레이어를 덮는 벽이 있으면 투시로 다시 그린다 ( 디아블로식 )
+		if (g_player_hidden == false && IsOccluder(actor) && GetDepthKey(actor.m_pos, camera) > player_depth)
+		{
+			if (IsOverlapping(player_box, GetActorBox(actor, camera)))
+			{
+				g_player_hidden = true;
+			}
+		}
+	}
+
 	void AddDecorActors(const WorldPos& camera)
 	{
 		const Actor& player = GetPlayer();
@@ -860,27 +1087,12 @@ namespace
 
 		for (const Actor& actor : g_decor)
 		{
-			if (actor.m_is_upright == false)
-			{
-				continue;
-			}
+			AddDecorActor(actor, camera, player_box, player_depth);
+		}
 
-			// 망루와 죽은 나무는 발밑이 화면 밖이어도 윗부분이 걸치므로 여유를 크게 준다
-			if (IsOffScreen(WorldToScreen(actor.m_pos, camera), 140.f))
-			{
-				continue;
-			}
-
-			AddSceneActor(&actor);
-
-			// 플레이어 앞에 서서 플레이어를 덮는 벽이 있으면 투시로 다시 그린다 ( 디아블로식 )
-			if (g_player_hidden == false && IsOccluder(actor) && GetDepthKey(actor.m_pos, camera) > player_depth)
-			{
-				if (IsOverlapping(player_box, GetActorBox(actor, camera)))
-				{
-					g_player_hidden = true;
-				}
-			}
+		for (const HousePieceActor& piece : g_house_pieces)
+		{
+			AddDecorActor(piece, camera, player_box, player_depth);
 		}
 	}
 
@@ -970,6 +1182,9 @@ namespace
 		SummonBoss();
 		LightBossBraziers();
 
+		const WorldPos lair = ZoneTileToWorld(g_zone.boss.x, g_zone.boss.y, 0.5f, 0.5f);
+		PostNewsAt(lair, NEWS_BOSS, std::wstring(GetVillageName(FindNearestVillage(lair))) + L" 너머 둥지에서 " + GetBossName() + L"가 깨어났다");
+
 		AddDamageText(GetPlayer().m_pos, 150.f, std::wstring(GetBossName()) + L"가 깨어났다", DAMAGE_STYLE_BANNER_BAD);
 		AddShake(0.4f);
 		PlaySfx(SFX_DANGER, 1.f);
@@ -1032,6 +1247,99 @@ namespace
 		}
 	}
 
+	int32 FindBoardInRange(float range)
+	{
+		const WorldPos& player = GetPlayer().m_pos;
+
+		for (int32 village = 0; village < GetVillageCount(); ++village)
+		{
+			const WorldPos board = GetBoardPos(village);
+			const float delta_x = GetTileDistanceX(player, board);
+			const float delta_y = GetTileDistanceY(player, board);
+
+			if (delta_x * delta_x + delta_y * delta_y <= range * range)
+			{
+				return village;
+			}
+		}
+
+		return -1;
+	}
+
+	void DrawBoardPrompt(Renderer* renderer, const WorldPos& camera)
+	{
+		if (IsPlayerDead())
+		{
+			return;
+		}
+
+		const int32 near_board = FindBoardInRange(BOARD_RANGE);
+		const int32 seen_board = FindBoardInRange(10.f);
+
+		if (seen_board < 0)
+		{
+			return;
+		}
+
+		const ScreenPos screen = WorldToScreen(GetBoardPos(seen_board), camera);
+
+		if (near_board >= 0)
+		{
+			DrawStringShadow(renderer, L"F  게시판", screen.x, screen.y + BOARD_LABEL_LIFT, TEXT_ALIGN_CENTER, 1.f, 0.85f, 0.45f, 1.f);
+			return;
+		}
+
+		DrawStringShadow(renderer, std::wstring(GetVillageName(seen_board)) + L" 게시판", screen.x, screen.y + BOARD_LABEL_LIFT, TEXT_ALIGN_CENTER, 0.75f, 0.65f, 0.5f, 0.8f);
+	}
+
+	// 마을 경계를 넘는 순간 이름을 크게 띄운다. 일곱 마을이 다 다른 곳이라는 걸 먼저 알린다
+	void UpdateVillageBanner(float real_seconds)
+	{
+		g_village_banner_timer -= real_seconds;
+
+		const int32 village = GetVillageAt(GetPlayer().m_pos);
+		if (village == g_player_village)
+		{
+			return;
+		}
+
+		g_player_village = village;
+
+		if (village >= 0)
+		{
+			g_village_banner = village;
+			g_village_banner_timer = VILLAGE_BANNER_SEC;
+		}
+	}
+
+	void DrawVillageBanner(Renderer* renderer)
+	{
+		if (g_village_banner < 0 || g_village_banner_timer <= 0.f)
+		{
+			return;
+		}
+
+		// 처음 0.4 초 차오르고 마지막 0.8 초 사위어 간다
+		float alpha = 1.f;
+		const float elapsed = VILLAGE_BANNER_SEC - g_village_banner_timer;
+		if (elapsed < 0.4f)
+		{
+			alpha = elapsed / 0.4f;
+		}
+		else if (g_village_banner_timer < 0.8f)
+		{
+			alpha = g_village_banner_timer / 0.8f;
+		}
+
+		const float top = static_cast<float>(WINDOW_SIZE_Y) * 0.5f - 96.f;
+		const std::wstring detail = L"주민 " + std::to_wstring(CountResidents(g_village_banner)) + L"   빈집 " + std::to_wstring(CountFreeHouses(g_village_banner)) + L"   금고 " + std::to_wstring(GetVillageTreasury(g_village_banner));
+
+		// 밝은 광장 돌바닥 위에서도 숫자 줄이 읽히게 어두운 띠를 깐다
+		renderer->DrawSolidBox(0.f, top - 36.f, 460.f, 92.f, 0.02f, 0.018f, 0.015f, 0.55f * alpha);
+		DrawStringOutline(renderer, GetVillageName(g_village_banner), 0.f, top, TEXT_ALIGN_CENTER, 2, 0.96f, 0.86f, 0.62f, alpha);
+		DrawStringShadow(renderer, detail, 0.f, top - 44.f, TEXT_ALIGN_CENTER, 0.78f, 0.74f, 0.66f, alpha);
+	}
+
 	void UpdateInteractHold(float real_seconds)
 	{
 		if (g_interact_held == false)
@@ -1073,6 +1381,7 @@ void UpdateScene(float real_seconds)
 
 	UpdateBossUnlock();
 	UpdateInteractHold(real_seconds);
+	UpdateVillageBanner(real_seconds);
 
 	UpdatePlayer(world_seconds, real_seconds);
 	UpdateMonsters(world_seconds);
@@ -1139,8 +1448,10 @@ void DrawSceneOverlay(Renderer* renderer)
 	DrawNpcOverlay(renderer, camera);
 	DrawDropLabels(renderer, camera);
 	DrawAnvilPrompt(renderer, camera);
+	DrawBoardPrompt(renderer, camera);
 	DrawBossMarker(renderer, camera);
 	DrawFloatingTexts(renderer, camera);
+	DrawVillageBanner(renderer);
 
 	EndProfileStage();
 }
@@ -1181,7 +1492,28 @@ void Interact()
 	if (DistanceToAnvil() <= ANVIL_RANGE)
 	{
 		ToggleEnhanceWindow();
+		return;
 	}
+
+	const int32 board = FindBoardInRange(BOARD_RANGE);
+	if (board >= 0)
+	{
+		ToggleBoardWindow(board);
+	}
+}
+
+bool IsPlayerNearBoard(int32 village, float range)
+{
+	if (village < 0 || village >= GetVillageCount())
+	{
+		return false;
+	}
+
+	const WorldPos board = GetBoardPos(village);
+	const float delta_x = GetTileDistanceX(GetPlayer().m_pos, board);
+	const float delta_y = GetTileDistanceY(GetPlayer().m_pos, board);
+
+	return delta_x * delta_x + delta_y * delta_y <= range * range;
 }
 
 void SetInteractHeld(bool held)

@@ -723,14 +723,15 @@
 		{ name: "행상", color: "#cf98e3" },
 		{ name: "채집꾼", color: "#e2cf8c" },
 		{ name: "순찰병", color: "#62cdbf" },
+		{ name: "전령", color: "#f0b14a" },
 	];
 	const MONSTER_NAMES = ["타락자", "재늑대", "소거식귀", "성문파쇄자"];
 	const SITE_COLORS = ["#d6cdbd", "#9f9686", "#4fb3a6", "#cf4a3c", "#a8a190", "#c24bc2"];
-	const SITE_RANK = [0, 1, 2, 4, 3, 5];	// 성채 성문 초소 폐촌 소굴 둥지
-	const TASK_FIGHT = 11;
-	const TASK_FLEE = 12;
-	const TASK_ENGAGE = 13;
-	const TASK_AVOID = 14;
+	const SITE_RANK = [0, 1, 2, 4, 3, 5];	// 마을 성문 초소 폐촌 소굴 둥지
+	const TASK_FIGHT = 14;
+	const TASK_FLEE = 15;
+	const TASK_ENGAGE = 16;
+	const TASK_AVOID = 17;
 	const LOG_MAX = 150;
 	const STALE_MS = 3000;
 
@@ -929,7 +930,7 @@
 			["몬스터", s.monster_alive, "/ " + s.monster_slots, false],
 			["교전 중", s.monster_fighting, "", s.monster_fighting > 0],
 			["정예", s.elite_alive, "", false],
-			["성채 금고", s.treasury, "", s.treasury <= 0],
+			["마을 금고 합계", s.treasury, "", s.treasury <= 0],
 			["사망", s.deaths, "", false],
 			["약탈", s.robberies, "", false],
 			["성문파쇄자", bossWord, "", boss.summoned && !boss.dead],

@@ -3,10 +3,13 @@
 #include "Monster.h"
 #include "NavGrid.h"
 #include "Player.h"
+#include "Village.h"
 #include "ZoneGen.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <iostream>
 #include <string>
 
 namespace
@@ -38,20 +41,32 @@ namespace
 	constexpr int32 HIDEOUT_FOOD_PRICE = 3;
 	constexpr int32 OUTPOST_FOOD_PRICE = 6;	// 벽 밖으로 실어 나른 값
 	constexpr int32 WARDEN_WAGE = 8;
+	constexpr float POST_RANGE = 100.f;	// 순찰병이 도는 초소 · 성문 · 광장은 집 마을에서 이 안
+	constexpr float ROUTE_RANGE = 150.f;	// 행상이 다니는 마을 · 초소
+	constexpr float OUTPOST_REST_MARGIN = 40.f;	// 집이 초소보다 이만큼 더 멀면 초소에서 쉰다
+	constexpr float BOARD_STAND_DISTANCE = 1.2f;
+	constexpr float READ_FULL_SEC = 150.f;	// 게시판 본 지 이만큼 지나면 궁금함이 다 찬다
+	constexpr float MOVE_WEIGHT = 20.f;	// 이사를 결심했으면 거의 그것만 한다
+	constexpr float MOVE_SETTLE_SEC = 300.f;	// 이사 온 뒤 이만큼은 또 안 옮긴다
+	constexpr float MOVE_CHANCE_MAX = 0.45f;	// 게시판 한 번 읽고 결심할 확률 상한
+	constexpr int32 MOVE_MAX_LEAVING = 2;	// 한 마을에서 동시에 짐 싸는 사람 상한. 소문 하나에 마을이 비면 안 된다
+	constexpr int32 COURIER_LETTERS = 8;
+	constexpr float PACK_SENSE_RANGE = 4.5f;	// 무리 배회 반경 3 ~ 4 칸
 
 	BehaviorTree<Npc> g_tree;
 	int32 g_daily_node = -1;
 	bool g_built = false;
 
 	// 직업 x 일과 기본 가중치. 직업은 할 수 있는 일의 윤곽만 정한다.
-	// 순서: 사냥 약탈 거래 채집 행상 순찰 식사 휴식 정비 뒤지기 배회
+	// 순서: 사냥 약탈 거래 채집 행상 순찰 식사 휴식 정비 뒤지기 배회 게시판 배달 이사
 	const std::array<std::array<float, NPC_DAILY_TASK_COUNT>, NPC_JOB_COUNT> JOB_BASE =
 	{ {
-		{ { 1.2f, 0.f, 1.f, 0.25f, 0.f, 0.f, 1.f, 1.f, 0.6f, 0.15f, 0.3f } },
-		{ { 0.25f, 1.3f, 1.f, 0.f, 0.f, 0.f, 1.f, 1.f, 0.6f, 0.9f, 0.35f } },
-		{ { 0.f, 0.f, 0.f, 0.f, 1.5f, 0.f, 1.f, 1.f, 0.3f, 0.f, 0.2f } },
-		{ { 0.f, 0.f, 1.f, 1.3f, 0.f, 0.f, 1.f, 1.f, 0.4f, 0.35f, 0.3f } },
-		{ { 0.5f, 0.f, 0.5f, 0.f, 0.f, 1.3f, 1.f, 1.f, 0.6f, 0.f, 0.25f } },
+		{ { 1.2f, 0.f, 1.f, 0.25f, 0.f, 0.f, 1.f, 1.f, 0.6f, 0.15f, 0.3f, 0.35f, 0.f, 1.f } },
+		{ { 0.25f, 1.3f, 1.f, 0.f, 0.f, 0.f, 1.f, 1.f, 0.6f, 0.9f, 0.35f, 0.f, 0.f, 0.f } },
+		{ { 0.f, 0.f, 0.f, 0.f, 1.5f, 0.f, 1.f, 1.f, 0.3f, 0.f, 0.2f, 0.35f, 0.f, 1.f } },
+		{ { 0.f, 0.f, 1.f, 1.3f, 0.f, 0.f, 1.f, 1.f, 0.4f, 0.35f, 0.3f, 0.35f, 0.f, 1.f } },
+		{ { 0.5f, 0.f, 0.5f, 0.f, 0.f, 1.3f, 1.f, 1.f, 0.6f, 0.f, 0.25f, 0.35f, 0.f, 1.f } },
+		{ { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 1.f, 1.f, 0.3f, 0.f, 0.15f, 0.f, 2.2f, 1.f } },
 	} };
 
 	float Clamp01(float value)
@@ -144,19 +159,71 @@ namespace
 		return best;
 	}
 
-	// 무법자는 벽 안이나 초소로 못 간다. 소굴이 곧 집이다
-	int32 FindShelter(const Npc& npc)
+	// 쉴 곳. 마을 사람은 제 집, 멀리 나와 있으면 길가 초소, 무법자는 소굴이 집이다
+	bool FindShelterPos(const Npc& npc, WorldPos* pos)
 	{
 		if (IsNpcOutlaw(npc))
 		{
 			const int32 hideout = FindNearestSite(npc, SITE_HIDEOUT, -1);
 			if (hideout >= 0)
 			{
-				return hideout;
+				*pos = GetSitePos(hideout);
+				return true;
 			}
 		}
 
-		return FindNearestSite(npc, SITE_TOWN, SITE_OUTPOST);
+		bool has_home = false;
+		WorldPos home_pos;
+
+		if (npc.house >= 0 && IsNpcOutlaw(npc) == false)
+		{
+			home_pos = GetHouseDoorPos(npc.house);
+			has_home = true;
+		}
+		else if (npc.home_village >= 0)
+		{
+			home_pos = GetVillageCenterPos(npc.home_village);
+			has_home = true;
+		}
+
+		float home_distance = 1.0e9f;
+		if (has_home)
+		{
+			home_distance = GetNpcDistance(npc, home_pos);
+		}
+
+		const int32 outpost = FindNearestSite(npc, SITE_OUTPOST, -1);
+		if (outpost >= 0 && GetNpcDistance(npc, GetSitePos(outpost)) + OUTPOST_REST_MARGIN < home_distance)
+		{
+			*pos = GetSitePos(outpost);
+			return true;
+		}
+
+		if (has_home)
+		{
+			*pos = home_pos;
+			return true;
+		}
+
+		const int32 town = FindNearestSite(npc, SITE_TOWN, SITE_OUTPOST);
+		if (town < 0)
+		{
+			return false;
+		}
+
+		*pos = GetSitePos(town);
+
+		return true;
+	}
+
+	bool IsAtOwnDoor(const Npc& npc)
+	{
+		if (npc.house < 0)
+		{
+			return false;
+		}
+
+		return GetNpcDistance(npc, GetHouseDoorPos(npc.house)) <= SPOT_ARRIVE + 0.4f;
 	}
 
 	bool IsStallOpen(const Npc& merchant)
@@ -290,11 +357,42 @@ namespace
 		return npc.attack * npc.hp;
 	}
 
+	// 무리째 센다. 한 마리만 보고 덤비면 재늑대 다섯 마리에 순찰병이 죽는다 ( 90 초 사망 42 중 재늑대에게 덤비다 11 )
+	int32 GetPackThreat(int32 monster)
+	{
+		const WorldPos center = GetMonsterPos(monster);
+		int32 total = 0;
+
+		for (int32 index = 0; index < GetMonsterCount(); ++index)
+		{
+			if (IsMonsterAlive(index) == false)
+			{
+				continue;
+			}
+
+			const WorldPos pos = GetMonsterPos(index);
+			const float delta_x = GetTileDistanceX(center, pos);
+			const float delta_y = GetTileDistanceY(center, pos);
+
+			if (delta_x * delta_x + delta_y * delta_y <= PACK_SENSE_RANGE * PACK_SENSE_RANGE)
+			{
+				total += GetMonsterThreat(index);
+			}
+		}
+
+		return total;
+	}
+
 	int32 GetTargetPower(int32 kind, int32 index)
 	{
 		if (kind == NPC_TARGET_MONSTER)
 		{
-			return GetMonsterThreat(index);
+			if (IsMonsterAlive(index) == false)
+			{
+				return 0;
+			}
+
+			return GetPackThreat(index);
 		}
 
 		if (kind == NPC_TARGET_NPC && IsLiveNpc(index))
@@ -415,7 +513,14 @@ namespace
 	{
 		const float missing = 1.f - HealthRatio(npc);
 
-		return Base(npc, NPC_TASK_REST) * (std::pow(missing, 1.5f) * 3.f + 0.02f);
+		// 제 집이 있으면 다치지 않아도 가끔 들어가 쉰다
+		float homing = 0.02f;
+		if (npc.house >= 0)
+		{
+			homing = 0.12f;
+		}
+
+		return Base(npc, NPC_TASK_REST) * (std::pow(missing, 1.5f) * 3.f + homing);
 	}
 
 	float WeightUpgrade(const Npc& npc)
@@ -451,6 +556,39 @@ namespace
 		return Base(npc, NPC_TASK_WANDER) * (2.f - npc.diligence);
 	}
 
+	// 게시판 본 지 오래될수록 궁금하다. 겁 많은 사람과 욕심 많은 사람이 소식에 더 귀를 기울인다
+	float WeightRead(const Npc& npc)
+	{
+		if (npc.home_village < 0 || IsNpcOutlaw(npc))
+		{
+			return 0.f;
+		}
+
+		const float curiosity = std::min(1.5f, npc.read_timer / READ_FULL_SEC);
+
+		return Base(npc, NPC_TASK_READ) * curiosity * (0.6f + (2.f - npc.bravery) * 0.2f + npc.greed * 0.2f);
+	}
+
+	float WeightDeliver(const Npc& npc)
+	{
+		if (npc.home_village < 0)
+		{
+			return 0.f;
+		}
+
+		return Base(npc, NPC_TASK_DELIVER) * (0.7f + npc.diligence * 0.3f);
+	}
+
+	float WeightMove(const Npc& npc)
+	{
+		if (npc.move_target < 0 || npc.move_house < 0)
+		{
+			return 0.f;
+		}
+
+		return Base(npc, NPC_TASK_MOVE) * MOVE_WEIGHT;
+	}
+
 	// ------------------------------------------------------------ 반응 가중치
 
 	float GetJobFight(int32 job)
@@ -482,7 +620,7 @@ namespace
 
 	float GetJobFlee(int32 job)
 	{
-		if (job == NPC_JOB_MERCHANT || job == NPC_JOB_GATHERER)
+		if (job == NPC_JOB_MERCHANT || job == NPC_JOB_GATHERER || job == NPC_JOB_COURIER)
 		{
 			return 1.5f;
 		}
@@ -596,10 +734,9 @@ namespace
 		}
 
 		// 쉴 곳이 위협 반대편이면 그리로, 아니면 그냥 등을 돌려 뛴다. 거점으로 가는 길이 적을 지나면 안 된다
-		const int32 shelter = FindShelter(*npc);
-		if (shelter >= 0)
+		WorldPos shelter_pos;
+		if (FindShelterPos(*npc, &shelter_pos))
 		{
-			const WorldPos shelter_pos = GetSitePos(shelter);
 			const float to_shelter_x = GetTileDistanceX(npc->body.m_pos, shelter_pos);
 			const float to_shelter_y = GetTileDistanceY(npc->body.m_pos, shelter_pos);
 			const float to_threat_x = GetTileDistanceX(npc->body.m_pos, threat_pos);
@@ -700,8 +837,14 @@ namespace
 		return npc->task_timer >= npc->task_limit;
 	}
 
+	// 마을에 집이 있는 사람은 기대는 거점이 그 마을 광장으로 고정이다. 들개단만 머문 소굴로 옮긴다
 	void SetHomeIfSite(Npc* npc)
 	{
+		if (npc->home_village >= 0)
+		{
+			return;
+		}
+
 		if (npc->target_kind == NPC_TARGET_SITE && GetSiteKind(npc->target_index) != SITE_GATE)
 		{
 			npc->home_site = npc->target_index;
@@ -901,7 +1044,11 @@ namespace
 		}
 
 		NoteNpcRobbery();
-		PushNpcEvent(WithSubject(GetNpcTitle(npc)) + L" " + DescribeVictim(npc) + L" 덮쳐 " + std::to_wstring(npc.robbed_total) + L"골드어치를 빼앗았다", 1.f, 0.62f, 0.30f);
+		NoteVillageRobbery(npc.body.m_pos);
+
+		const std::wstring text = WithSubject(GetNpcTitle(npc)) + L" " + DescribeVictim(npc) + L" 덮쳐 " + std::to_wstring(npc.robbed_total) + L"골드어치를 빼앗았다";
+		PushNpcEvent(text, 1.f, 0.62f, 0.30f);
+		PostNewsAt(npc.body.m_pos, NEWS_ROBBERY, std::wstring(GetVillageName(FindNearestVillage(npc.body.m_pos))) + L" 길목에서 " + text);
 	}
 
 	int32 ActAmbush(Npc* npc, bool is_enter, float delta_seconds)
@@ -1062,7 +1209,7 @@ namespace
 		const int32 market = FindNearestSite(*npc, SITE_TOWN, -1);
 
 		float market_distance = 1.0e9f;
-		if (market >= 0 && GetTreasury() > 0)
+		if (market >= 0 && GetVillageTreasury(GetSiteMarketVillage(market)) > 0)
 		{
 			market_distance = GetNpcDistance(*npc, GetSitePos(market));
 		}
@@ -1144,8 +1291,9 @@ namespace
 		}
 		else
 		{
+			const int32 village = GetSiteMarketVillage(npc->target_index);
 			const int32 want = static_cast<int32>(static_cast<float>(npc->goods) * MARKET_RATE);
-			pay = TakeTreasury(want);
+			pay = TakeVillageTreasury(village, want);
 
 			// 금고가 모자라면 받은 만큼만 넘긴다
 			int32 sold = npc->goods;
@@ -1156,7 +1304,8 @@ namespace
 
 			npc->goods -= sold;
 			npc->gold += pay;
-			where = L"성채 시장에";
+			where = std::wstring(GetVillageName(village)) + L" 시장에";
+			NoteVillageTrade(village, pay);
 		}
 
 		if (pay <= 0)
@@ -1168,7 +1317,13 @@ namespace
 
 		if (pay >= 25)
 		{
-			PushNpcEvent(WithSubject(GetNpcTitle(*npc)) + L" 짐을 " + where + L" " + std::to_wstring(pay) + L"골드에 넘겼다", 0.95f, 0.82f, 0.40f);
+			const std::wstring text = WithSubject(GetNpcTitle(*npc)) + L" 짐을 " + where + L" " + std::to_wstring(pay) + L"골드에 넘겼다";
+			PushNpcEvent(text, 0.95f, 0.82f, 0.40f);
+
+			if (pay >= 30)
+			{
+				PostNewsAt(npc->body.m_pos, NEWS_TRADE, text);
+			}
 		}
 
 		return BT_SUCCESS;
@@ -1278,16 +1433,44 @@ namespace
 	{
 		npc->task = NPC_TASK_PEDDLE;
 
-		const int32 town = FindNearestSite(*npc, SITE_TOWN, -1);
+		const std::vector<ZoneSite>& sites = GetNpcSites();
 
-		// 짐이 쌓이면 성채 시장에 풀러 간다. 그게 행상의 차익이다
-		if (town >= 0 && npc->goods >= npc->goods_capacity * 2 / 5)
+		// 짐이 쌓이면 금고가 두둑한 마을 시장에 풀러 간다. 멀면 깎아서 본다. 그게 행상의 차익이다
+		if (npc->goods >= npc->goods_capacity * 2 / 5)
 		{
-			SetTarget(npc, NPC_TARGET_SITE, town);
-			return BT_SUCCESS;
+			int32 best = -1;
+			float best_score = 0.f;
+
+			for (size_t index = 0; index < sites.size(); ++index)
+			{
+				if (sites[index].kind != SITE_TOWN)
+				{
+					continue;
+				}
+
+				const float distance = GetNpcDistance(*npc, GetSitePos(static_cast<int32>(index)));
+				if (distance > ROUTE_RANGE)
+				{
+					continue;
+				}
+
+				const float treasury = static_cast<float>(GetVillageTreasury(sites[index].village));
+				const float score = treasury / (1.f + distance / 80.f);
+
+				if (score > best_score)
+				{
+					best_score = score;
+					best = static_cast<int32>(index);
+				}
+			}
+
+			if (best >= 0)
+			{
+				SetTarget(npc, NPC_TARGET_SITE, best);
+				return BT_SUCCESS;
+			}
 		}
 
-		const std::vector<ZoneSite>& sites = GetNpcSites();
 		std::vector<int32> candidates;
 
 		for (size_t index = 0; index < sites.size(); ++index)
@@ -1299,7 +1482,8 @@ namespace
 			}
 
 			// 지금 서 있는 거점은 빼고
-			if (GetNpcDistance(*npc, GetSitePos(static_cast<int32>(index))) < 6.f)
+			const float distance = GetNpcDistance(*npc, GetSitePos(static_cast<int32>(index)));
+			if (distance < 6.f || distance > ROUTE_RANGE)
 			{
 				continue;
 			}
@@ -1326,13 +1510,17 @@ namespace
 
 			if (GetSiteKind(npc->target_index) == SITE_TOWN && npc->goods > 0)
 			{
-				const int32 pay = TakeTreasury(npc->goods);
+				const int32 village = GetSiteMarketVillage(npc->target_index);
+				const int32 pay = TakeVillageTreasury(village, npc->goods);
 				npc->gold += pay;
 				npc->goods -= pay;
+				NoteVillageTrade(village, pay);
 
 				if (pay >= 40)
 				{
-					PushNpcEvent(WithSubject(GetNpcTitle(*npc)) + L" 성채 시장에 물건을 풀어 " + std::to_wstring(pay) + L"골드를 벌었다", 0.95f, 0.82f, 0.40f);
+					const std::wstring text = WithSubject(GetNpcTitle(*npc)) + L" " + GetVillageName(village) + L" 시장에 물건을 풀어 " + std::to_wstring(pay) + L"골드를 벌었다";
+					PushNpcEvent(text, 0.95f, 0.82f, 0.40f);
+					PostNews(village, NEWS_TRADE, text);
 				}
 			}
 		}
@@ -1357,6 +1545,13 @@ namespace
 		const std::vector<ZoneSite>& sites = GetNpcSites();
 		std::vector<int32> candidates;
 
+		// 제 마을에서 닿는 거리의 초소 · 성문 · 광장. 이웃 마을 광장까지 들르기도 한다
+		WorldPos home = npc->body.m_pos;
+		if (npc->home_village >= 0)
+		{
+			home = GetVillageCenterPos(npc->home_village);
+		}
+
 		for (size_t index = 0; index < sites.size(); ++index)
 		{
 			const int32 kind = sites[index].kind;
@@ -1365,7 +1560,15 @@ namespace
 				continue;
 			}
 
-			if (GetNpcDistance(*npc, GetSitePos(static_cast<int32>(index))) < 6.f)
+			const WorldPos site_pos = GetSitePos(static_cast<int32>(index));
+			if (GetNpcDistance(*npc, site_pos) < 6.f)
+			{
+				continue;
+			}
+
+			const float delta_x = GetTileDistanceX(home, site_pos);
+			const float delta_y = GetTileDistanceY(home, site_pos);
+			if (delta_x * delta_x + delta_y * delta_y > POST_RANGE * POST_RANGE)
 			{
 				continue;
 			}
@@ -1390,10 +1593,10 @@ namespace
 		{
 			SetHomeIfSite(npc);
 
-			// 성채에 들르면 급료. 금고가 마르면 끊긴다
-			if (GetSiteKind(npc->target_index) == SITE_TOWN)
+			// 제 마을 광장에 들르면 그 마을 금고에서 급료. 금고가 마르면 끊긴다
+			if (GetSiteKind(npc->target_index) == SITE_TOWN && GetVillageOfSite(npc->target_index) == npc->home_village)
 			{
-				const int32 wage = TakeTreasury(WARDEN_WAGE);
+				const int32 wage = TakeVillageTreasury(npc->home_village, WARDEN_WAGE);
 				npc->gold += wage;
 			}
 		}
@@ -1509,8 +1712,8 @@ namespace
 		}
 		else if (site_kind != SITE_HIDEOUT)
 		{
-			// 소굴 밥값은 벽 안으로 안 돌아온다
-			AddTreasury(price);
+			// 소굴 밥값은 마을로 안 돌아온다
+			AddVillageTreasury(GetSiteMarketVillage(npc->target_index), price);
 		}
 		npc->hunger = 0.f;
 		npc->hp += 15;
@@ -1528,30 +1731,74 @@ namespace
 	{
 		npc->task = NPC_TASK_REST;
 
-		const int32 shelter = FindShelter(*npc);
-		if (shelter < 0)
+		WorldPos shelter;
+		if (FindShelterPos(*npc, &shelter) == false)
 		{
 			return BT_FAILURE;
 		}
 
-		SetTarget(npc, NPC_TARGET_SITE, shelter);
+		bool is_door = false;
+		if (npc->house >= 0)
+		{
+			const WorldPos door = GetHouseDoorPos(npc->house);
+			is_door = std::fabs(GetTileDistanceX(door, shelter)) + std::fabs(GetTileDistanceY(door, shelter)) < 0.01f;
+		}
+
+		// 문 앞이 아니면 화로 둘레 빈자리. 한 점에 몰리면 서로 밀어내느라 영영 못 닿는다
+		for (int32 attempt = 0; attempt < 6 && is_door == false; ++attempt)
+		{
+			const float angle = Roll(npc) * 6.2832f;
+			const float radius = RollRange(npc, 1.f, 2.5f);
+
+			WorldPos spot = shelter;
+			MoveWorldPos(&spot, std::cos(angle) * radius, std::sin(angle) * radius);
+
+			int32 tile_x = 0;
+			int32 tile_y = 0;
+			WorldToZoneTile(spot, &tile_x, &tile_y);
+
+			if (IsNavBlocked(tile_x, tile_y) == false)
+			{
+				shelter = spot;
+				break;
+			}
+		}
+
+		npc->spot = shelter;
+		SetTarget(npc, NPC_TARGET_SPOT, -1);
 
 		return BT_SUCCESS;
 	}
 
+	// 제 집 문 앞이면 들어가 문을 닫는다. 집 안은 몬스터도 약탈자도 못 닿고 더 빨리 낫는다
 	int32 ActRest(Npc* npc, bool is_enter, float delta_seconds)
 	{
 		if (is_enter)
 		{
 			SetHomeIfSite(npc);
+
+			if (IsAtOwnDoor(*npc))
+			{
+				NpcEnterHouse(npc);
+			}
 		}
 
-		NpcHeal(npc, 4.f, delta_seconds);
+		float heal_per_sec = 4.f;
+		float min_sec = 0.f;
+		if (npc->is_inside)
+		{
+			heal_per_sec = 6.f;
+			min_sec = 8.f;
+		}
+
+		NpcHeal(npc, heal_per_sec, delta_seconds);
 
 		const bool timed_out = Linger(npc, is_enter, delta_seconds, 30.f, 30.f);
+		const bool rested = npc->hp >= npc->max_hp && npc->task_timer >= min_sec;
 
-		if (npc->hp >= npc->max_hp || timed_out)
+		if (rested || timed_out)
 		{
+			NpcLeaveHouse(npc);
 			return BT_SUCCESS;
 		}
 
@@ -1600,9 +1847,9 @@ namespace
 
 		npc->gold -= cost;
 
-		if (IsNpcOutlaw(*npc) == false)
+		if (IsNpcOutlaw(*npc) == false && GetSiteKind(npc->target_index) != SITE_HIDEOUT)
 		{
-			AddTreasury(cost);
+			AddVillageTreasury(GetSiteMarketVillage(npc->target_index), cost);
 		}
 
 		npc->gear += 1;
@@ -1610,8 +1857,15 @@ namespace
 		npc->attack += 2;
 		npc->hp = npc->max_hp;
 
+		const std::wstring text = WithSubject(GetNpcTitle(*npc)) + L" 장비를 맞췄다 (" + std::to_wstring(npc->gear) + L"단계)";
 		NpcShowText(*npc, L"장비 +" + std::to_wstring(npc->gear), 0.55f, 0.75f, 1.f);
-		PushNpcEvent(WithSubject(GetNpcTitle(*npc)) + L" 장비를 맞췄다 (" + std::to_wstring(npc->gear) + L"단계)", 0.55f, 0.72f, 1.f);
+		PushNpcEvent(text, 0.55f, 0.72f, 1.f);
+
+		// 두 번째 장비부터는 그 마을 대장간 솜씨가 소문이 난다
+		if (npc->gear >= 2 && GetSiteKind(npc->target_index) == SITE_TOWN)
+		{
+			PostNews(GetSiteMarketVillage(npc->target_index), NEWS_GEAR, text);
+		}
 
 		return BT_SUCCESS;
 	}
@@ -1736,6 +1990,432 @@ namespace
 		return BT_SUCCESS;
 	}
 
+	// ------------------------------------------------------------ 게시판 · 이사
+
+	// 게시판 앞 ( 카메라 쪽 ) 반원에 선다. 여럿이 한 점에 몰리면 서로 밀어내느라 못 닿는다
+	WorldPos GetBoardStandPos(Npc* npc, int32 village)
+	{
+		const WorldPos board = GetBoardPos(village);
+
+		for (int32 attempt = 0; attempt < 4; ++attempt)
+		{
+			const float angle = RollRange(npc, -0.3f, 1.87f);
+			const float radius = RollRange(npc, BOARD_STAND_DISTANCE, BOARD_STAND_DISTANCE + 0.8f);
+
+			WorldPos spot = board;
+			MoveWorldPos(&spot, std::cos(angle) * radius, std::sin(angle) * radius);
+
+			int32 tile_x = 0;
+			int32 tile_y = 0;
+			WorldToZoneTile(spot, &tile_x, &tile_y);
+
+			if (IsNavBlocked(tile_x, tile_y) == false)
+			{
+				return spot;
+			}
+		}
+
+		return board;
+	}
+
+	// 용감할수록 위험한 소문에 덜 흔들린다. 용감한 순찰병은 오히려 도둑이 들끓는 곳으로 간다
+	float GetSafetyWeight(const Npc& npc)
+	{
+		switch (npc.job)
+		{
+			case NPC_JOB_WARDEN:
+			{
+				return 0.8f - npc.bravery;
+			}
+			case NPC_JOB_HUNTER:
+			{
+				return (1.5f - npc.bravery) * 0.5f;
+			}
+			case NPC_JOB_GATHERER:
+			{
+				return (1.5f - npc.bravery) * 1.4f;
+			}
+			default:
+			{
+				return 1.5f - npc.bravery;
+			}
+		}
+	}
+
+	float GetProsperityWeight(const Npc& npc)
+	{
+		float weight = npc.greed * 0.7f;
+
+		if (npc.job == NPC_JOB_MERCHANT)
+		{
+			weight *= 1.5f;
+		}
+
+		return weight;
+	}
+
+	float ScoreVillage(const Npc& npc, int32 village)
+	{
+		const VillageView& view = npc.opinion[static_cast<size_t>(village)];
+
+		return GetSafetyWeight(npc) * view.safety + GetProsperityWeight(npc) * view.prosperity;
+	}
+
+	int32 CountLeaving(int32 village)
+	{
+		int32 count = 0;
+
+		for (const Npc& other : Npcs())
+		{
+			if (other.is_alive && other.home_village == village && other.move_target >= 0 && other.move_target != village)
+			{
+				count += 1;
+			}
+		}
+
+		return count;
+	}
+
+	std::wstring DescribeMoveReason(const Npc& npc, int32 home, int32 target)
+	{
+		const VillageView& from = npc.opinion[static_cast<size_t>(home)];
+		const VillageView& to = npc.opinion[static_cast<size_t>(target)];
+		const float safety_gain = GetSafetyWeight(npc) * (to.safety - from.safety);
+		const float prosperity_gain = GetProsperityWeight(npc) * (to.prosperity - from.prosperity);
+
+		if (safety_gain >= prosperity_gain)
+		{
+			if (GetSafetyWeight(npc) < 0.f)
+			{
+				return L"도적과 짐승이 들끓어 창이 모자라다는 소식";
+			}
+
+			return L"거기가 더 안전하다는 소문";
+		}
+
+		if (from.prosperity < -0.5f)
+		{
+			return L"이 마을 금고가 말랐다는 소식";
+		}
+
+		return L"거기 살림이 넉넉하다는 소문";
+	}
+
+	// 게시판이 말한 평판으로 마을끼리 견준다. 득이 정 붙인 값을 넘으면 그 차이만큼 확률로 결심한다
+	void ConsiderMove(Npc* npc)
+	{
+		if (npc->job == NPC_JOB_COURIER || npc->job == NPC_JOB_RAIDER || IsNpcOutlaw(*npc))
+		{
+			return;
+		}
+
+		if (npc->home_village < 0 || npc->move_target >= 0 || npc->settle_timer > 0.f)
+		{
+			return;
+		}
+
+		const int32 home = npc->home_village;
+		const float home_score = ScoreVillage(*npc, home);
+		const float attachment = 0.5f + npc->diligence * 0.4f;
+		const WorldPos home_pos = GetVillageCenterPos(home);
+
+		int32 best = -1;
+		float best_gain = 0.f;
+
+		for (int32 village = 0; village < GetVillageCount() && village < ZONE_VILLAGE_COUNT; ++village)
+		{
+			if (village == home || npc->opinion[static_cast<size_t>(village)].known == false || CountFreeHouses(village) <= 0)
+			{
+				continue;
+			}
+
+			// 멀수록 짐 지고 가기 번거롭다
+			const float hop = GetVillageDistance(village, home_pos) / 120.f * 0.25f;
+			const float gain = ScoreVillage(*npc, village) - home_score - attachment - hop;
+
+			if (gain > best_gain)
+			{
+				best_gain = gain;
+				best = village;
+			}
+		}
+
+		if (best < 0 || CountLeaving(home) >= MOVE_MAX_LEAVING)
+		{
+			return;
+		}
+
+		if (Roll(npc) >= std::min(MOVE_CHANCE_MAX, best_gain * 0.3f))
+		{
+			return;
+		}
+
+		const int32 house = ReserveFreeHouse(best, GetNpcIndex(*npc));
+		if (house < 0)
+		{
+			return;
+		}
+
+		npc->move_target = best;
+		npc->move_house = house;
+		npc->move_from = home;
+		npc->move_reason = DescribeMoveReason(*npc, home, best);
+
+		// 누가 어디서 어디로 얼마의 득을 보고 떠났나. 이사가 몰리거나 끊기면 이 줄부터 본다
+		std::cout << "[ NpcBrain - ConsiderMove ] : job " << npc->job << " " << home << " -> " << best << " gain " << best_gain
+			<< " safety_w " << GetSafetyWeight(*npc) << " prosperity_w " << GetProsperityWeight(*npc) << "\n";
+
+		NpcShowText(*npc, L"이사를 가야겠어", 0.95f, 0.88f, 0.62f);
+		PushNpcEvent(WithSubject(GetNpcTitle(*npc)) + L" " + WithToward(GetVillageName(best)) + L" 이사를 결심했다 (" + npc->move_reason + L")", 0.85f, 0.82f, 0.95f);
+	}
+
+	void ReadBoard(Npc* npc, int32 village)
+	{
+		for (int32 about = 0; about < GetVillageCount() && about < ZONE_VILLAGE_COUNT; ++about)
+		{
+			npc->opinion[static_cast<size_t>(about)] = EvaluateBoardView(village, about);
+		}
+
+		npc->opinion_board = village;
+		npc->read_timer = 0.f;
+
+		ConsiderMove(npc);
+	}
+
+	int32 ActPickBoard(Npc* npc, bool is_enter, float delta_seconds)
+	{
+		npc->task = NPC_TASK_READ;
+
+		int32 village = npc->current_village;
+		if (village < 0)
+		{
+			village = npc->home_village;
+		}
+
+		if (village < 0)
+		{
+			return BT_FAILURE;
+		}
+
+		npc->spot = GetBoardStandPos(npc, village);
+		SetTarget(npc, NPC_TARGET_SPOT, village);
+
+		return BT_SUCCESS;
+	}
+
+	int32 ActReadBoard(Npc* npc, bool is_enter, float delta_seconds)
+	{
+		if (Linger(npc, is_enter, delta_seconds, 2.5f, 4.5f) == false)
+		{
+			return BT_RUNNING;
+		}
+
+		ReadBoard(npc, npc->target_index);
+
+		return BT_SUCCESS;
+	}
+
+	// 짐을 아직 안 쌌으면 제 집 문 앞, 쌌으면 새 집 문 앞
+	bool HasPacked(const Npc& npc)
+	{
+		return npc.house < 0 || GetHouse(npc.house).village == npc.move_target;
+	}
+
+	int32 ActPickMoveStep(Npc* npc, bool is_enter, float delta_seconds)
+	{
+		npc->task = NPC_TASK_MOVE;
+
+		if (npc->move_target < 0 || npc->move_house < 0)
+		{
+			return BT_FAILURE;
+		}
+
+		if (HasPacked(*npc))
+		{
+			npc->spot = GetHouseDoorPos(npc->move_house);
+		}
+		else
+		{
+			npc->spot = GetHouseDoorPos(npc->house);
+		}
+
+		SetTarget(npc, NPC_TARGET_SPOT, -1);
+
+		return BT_SUCCESS;
+	}
+
+	void PackUp(Npc* npc)
+	{
+		const int32 from = npc->home_village;
+
+		ReleaseHouse(npc->house, GetNpcIndex(*npc));
+		npc->house = -1;
+
+		const std::wstring text = std::wstring(GetVillageName(from)) + L"의 " + WithSubject(GetNpcTitle(*npc)) + L" 짐을 싸 " + WithToward(GetVillageName(npc->move_target)) + L" 떠났다. " + npc->move_reason + L"을 들었다고";
+		PostNews(from, NEWS_MOVE_OUT, text);
+		PushNpcEvent(WithSubject(GetNpcTitle(*npc)) + L" 짐을 싸 " + WithToward(GetVillageName(npc->move_target)) + L" 떠났다", 0.85f, 0.82f, 0.95f);
+	}
+
+	bool Settle(Npc* npc)
+	{
+		const int32 index = GetNpcIndex(*npc);
+		const int32 from = npc->move_from;
+		const int32 to = npc->move_target;
+
+		int32 house = npc->move_house;
+		if (MoveIntoHouse(house, index) == false)
+		{
+			house = ClaimFreeHouse(to, index);
+		}
+
+		npc->move_target = -1;
+		npc->move_house = -1;
+
+		// 오는 사이 빈집이 다 찼다. 집 없이 떠돈다
+		if (house < 0)
+		{
+			return false;
+		}
+
+		npc->house = house;
+		npc->home_village = to;
+		npc->home_site = GetVillage(to).site;
+		npc->settle_timer = MOVE_SETTLE_SEC;
+
+		NoteVillageMove(from, to);
+
+		if (from >= 0)
+		{
+			NoteNpcMove();
+
+			const std::wstring text = std::wstring(GetVillageName(from)) + L"에서 온 " + WithSubject(GetNpcTitle(*npc)) + L" " + GetVillageName(to) + L"에 짐을 풀었다";
+			PostNews(to, NEWS_MOVE_IN, text);
+			PushNpcEvent(text, 0.70f, 0.90f, 0.75f);
+		}
+		else
+		{
+			const std::wstring text = L"새 주민 " + WithSubject(GetNpcTitle(*npc)) + L" " + GetVillageName(to) + L"에 짐을 풀었다";
+			PostNews(to, NEWS_ARRIVAL, text);
+			PushNpcEvent(text, 0.45f, 0.85f, 0.80f);
+		}
+
+		return true;
+	}
+
+	int32 ActMoveArrive(Npc* npc, bool is_enter, float delta_seconds)
+	{
+		if (HasPacked(*npc) == false)
+		{
+			if (Linger(npc, is_enter, delta_seconds, 2.f, 3.f) == false)
+			{
+				npc->work_anim = 0.2f;
+				return BT_RUNNING;
+			}
+
+			// 다음 추첨에서 이사 가중치가 그대로라 곧장 새 집으로 떠난다
+			PackUp(npc);
+			return BT_SUCCESS;
+		}
+
+		if (Linger(npc, is_enter, delta_seconds, 1.5f, 1.5f) == false)
+		{
+			npc->work_anim = 0.2f;
+			return BT_RUNNING;
+		}
+
+		if (Settle(npc) == false)
+		{
+			return BT_FAILURE;
+		}
+
+		return BT_SUCCESS;
+	}
+
+	// ------------------------------------------------------------ 편지 배달 ( 전령 )
+
+	// 집 마을에 있으면 이웃 마을 하나로, 밖이면 집으로. 모르는 소식이 쌓인 이웃일수록 먼저
+	int32 ActPickDelivery(Npc* npc, bool is_enter, float delta_seconds)
+	{
+		npc->task = NPC_TASK_DELIVER;
+
+		const int32 home = npc->home_village;
+		if (home < 0)
+		{
+			return BT_FAILURE;
+		}
+
+		const int32 here = npc->current_village;
+		int32 target = home;
+
+		if (here == home)
+		{
+			const std::vector<int32>& neighbors = GetVillage(home).neighbors;
+			if (neighbors.empty())
+			{
+				return BT_FAILURE;
+			}
+
+			float total = 0.f;
+			for (int32 neighbor : neighbors)
+			{
+				total += 1.f + static_cast<float>(CountUnknownNews(home, neighbor));
+			}
+
+			float roll = Roll(npc) * total;
+			target = neighbors.back();
+
+			for (int32 neighbor : neighbors)
+			{
+				roll -= 1.f + static_cast<float>(CountUnknownNews(home, neighbor));
+				if (roll <= 0.f)
+				{
+					target = neighbor;
+					break;
+				}
+			}
+		}
+
+		// 처음 나설 때 들고 갈 편지가 없으면 지금 게시판에서 챙긴다
+		if (npc->letters.empty() && here >= 0)
+		{
+			CollectLetters(here, COURIER_LETTERS, &npc->letters);
+			npc->carry_via = VIA_LETTER;
+			npc->carry_from = here;
+		}
+
+		npc->deliver_target = target;
+		npc->spot = GetBoardStandPos(npc, target);
+		SetTarget(npc, NPC_TARGET_SPOT, target);
+
+		return BT_SUCCESS;
+	}
+
+	int32 ActPostLetters(Npc* npc, bool is_enter, float delta_seconds)
+	{
+		if (Linger(npc, is_enter, delta_seconds, 2.5f, 3.5f) == false)
+		{
+			npc->work_anim = 0.2f;
+			return BT_RUNNING;
+		}
+
+		const int32 village = npc->target_index;
+		const int32 posted = NpcPostLetters(npc, village);
+
+		if (posted > 0)
+		{
+			PushNpcEvent(WithSubject(GetNpcTitle(*npc)) + L" " + GetVillageName(village) + L" 게시판에 편지 " + std::to_wstring(posted) + L"통을 붙였다", 0.95f, 0.88f, 0.62f);
+		}
+
+		// 읽고 다음 길에 들고 갈 소식을 챙긴다
+		ReadBoard(npc, village);
+		CollectLetters(village, COURIER_LETTERS, &npc->letters);
+		npc->carry_via = VIA_LETTER;
+		npc->carry_from = village;
+		npc->deliver_target = -1;
+
+		return BT_SUCCESS;
+	}
+
 	// ------------------------------------------------------------ 감지
 
 	float GetJobEngage(const Npc& npc, int32 enemy_kind, int32 enemy_index)
@@ -1823,6 +2503,7 @@ namespace
 		{
 			case NPC_JOB_MERCHANT:
 			case NPC_JOB_GATHERER:
+			case NPC_JOB_COURIER:
 			{
 				job = 1.6f;
 				break;
@@ -1890,7 +2571,7 @@ namespace
 		{
 			const Npc& other = Npcs()[other_index];
 
-			if (&other == &npc || other.is_alive == false || IsEnemyNpc(npc, other) == false)
+			if (&other == &npc || IsNpcVisible(other) == false || IsEnemyNpc(npc, other) == false)
 			{
 				continue;
 			}
@@ -2070,9 +2751,32 @@ void BuildNpcBrain()
 			tree.AddAction(L"서성이기", ActLinger),
 		});
 
+	// 게시판을 읽다가 이사를 결심한다. 소문이 곧 이사의 원인이다
+	const int32 read = tree.AddSequence(L"게시판",
+		{
+			tree.AddAction(L"게시판 찾기", ActPickBoard),
+			tree.AddAction(L"찾아가기", ActGoToTarget),
+			tree.AddAction(L"읽기", ActReadBoard),
+		});
+
+	const int32 deliver = tree.AddSequence(L"편지 배달",
+		{
+			tree.AddAction(L"갈 마을 고르기", ActPickDelivery),
+			tree.AddAction(L"길 떠나기", ActGoToTarget),
+			tree.AddAction(L"게시판에 붙이기", ActPostLetters),
+		});
+
+	// 한 번은 제 집에서 짐을 싸고, 다음 번에 새 집에서 짐을 푼다
+	const int32 move = tree.AddSequence(L"이사",
+		{
+			tree.AddAction(L"갈 집 정하기", ActPickMoveStep),
+			tree.AddAction(L"걸어가기", ActGoToTarget),
+			tree.AddAction(L"짐 싸고 풀기", ActMoveArrive),
+		});
+
 	g_daily_node = tree.AddWeighted(L"일과",
-		{ hunt, raid, sell, gather, peddle, patrol, eat, rest, upgrade, scavenge, wander },
-		{ WeightHunt, WeightRaid, WeightSell, WeightGather, WeightPeddle, WeightPatrol, WeightEat, WeightRest, WeightUpgrade, WeightScavenge, WeightWander });
+		{ hunt, raid, sell, gather, peddle, patrol, eat, rest, upgrade, scavenge, wander, read, deliver, move },
+		{ WeightHunt, WeightRaid, WeightSell, WeightGather, WeightPeddle, WeightPatrol, WeightEat, WeightRest, WeightUpgrade, WeightScavenge, WeightWander, WeightRead, WeightDeliver, WeightMove });
 
 	const int32 root = tree.AddSelector(L"뿌리", { threat, engage, avoid, g_daily_node });
 	tree.SetRoot(root);
@@ -2191,6 +2895,18 @@ const wchar_t* GetNpcTaskName(int32 task)
 		case NPC_TASK_WANDER:
 		{
 			return L"배회";
+		}
+		case NPC_TASK_READ:
+		{
+			return L"게시판";
+		}
+		case NPC_TASK_DELIVER:
+		{
+			return L"배달";
+		}
+		case NPC_TASK_MOVE:
+		{
+			return L"이사";
 		}
 		case NPC_TASK_FIGHT:
 		{

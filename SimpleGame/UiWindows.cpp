@@ -1,6 +1,7 @@
 ﻿#include "stdafx.h"
 #include "UiWindows.h"
 #include "Audio.h"
+#include "Board.h"
 #include "Enhance.h"
 #include "Feel.h"
 #include "FloatingText.h"
@@ -12,6 +13,7 @@
 #include "SpriteAtlas.h"
 #include "Text.h"
 #include "UiDraw.h"
+#include "Village.h"
 
 #include <algorithm>
 #include <array>
@@ -65,6 +67,16 @@ namespace
 	const float CONFIRM_WIDTH = 320.f;
 	const float CONFIRM_HEIGHT = 150.f;
 
+	// 게시판. 소식 글이 길어 넓게 연다
+	const float BOARD_X = 0.f;
+	const float BOARD_Y = 0.f;
+	const float BOARD_WIDTH = 920.f;
+	const float BOARD_HEIGHT = 600.f;
+	const float BOARD_LINE = 25.f;	// 24 면 굴림 두 줄이 붙는다
+	const float BOARD_CLOSE_RANGE = 4.f;	// 이보다 멀어지면 창을 닫는다
+	constexpr int32 BOARD_TAB_NEWS = 0;
+	constexpr int32 BOARD_TAB_VIEW = 1;
+
 	constexpr int32 DRAG_NONE = 0;
 	constexpr int32 DRAG_BAG = 1;
 	constexpr int32 DRAG_EQUIP = 2;
@@ -73,7 +85,8 @@ namespace
 	constexpr int32 WINDOW_STAT = 1;
 	constexpr int32 WINDOW_SKILL = 2;
 	constexpr int32 WINDOW_ENHANCE = 3;
-	constexpr int32 WINDOW_COUNT = 4;
+	constexpr int32 WINDOW_BOARD = 4;
+	constexpr int32 WINDOW_COUNT = 5;
 
 	struct SkillNode
 	{
@@ -124,6 +137,12 @@ namespace
 
 	int32 g_enhance_result = ENHANCE_RESULT_NONE;
 	float g_enhance_result_timer = 0.f;
+
+	int32 g_board_village = -1;
+	int32 g_board_tab = BOARD_TAB_NEWS;
+	int32 g_board_first = 0;	// 이 쪽 맨 위 소식 순번 ( 새 것부터 )
+	int32 g_board_next = 0;	// 다음 쪽 맨 위. 그릴 때 정해진다
+	std::vector<int32> g_board_page_starts;	// 지나온 쪽의 맨 위. 이전 쪽으로 돌아갈 때
 
 	// ------------------------------------------------------------ 공통
 
@@ -197,6 +216,10 @@ namespace
 			case WINDOW_ENHANCE:
 			{
 				return IsInsideBox(x, y, ENHANCE_X, ENHANCE_Y, ENHANCE_WIDTH + 8.f, ENHANCE_HEIGHT + 8.f);
+			}
+			case WINDOW_BOARD:
+			{
+				return IsInsideBox(x, y, BOARD_X, BOARD_Y, BOARD_WIDTH + 8.f, BOARD_HEIGHT + 8.f);
 			}
 			default:
 			{
@@ -1283,6 +1306,344 @@ namespace
 		}
 	}
 
+	// ------------------------------------------------------------ 게시판
+
+	const float BOARD_TOP = BOARD_Y + BOARD_HEIGHT * 0.5f;
+	const float BOARD_BOTTOM = BOARD_Y - BOARD_HEIGHT * 0.5f;
+	const float BOARD_LEFT = BOARD_X - BOARD_WIDTH * 0.5f;
+	const float BOARD_TAB_Y = BOARD_TOP - 62.f;
+	const float BOARD_TAB_WIDTH = 200.f;
+	const float BOARD_BUTTON_HEIGHT = 32.f;
+	const float BOARD_LIST_TOP = BOARD_TOP - 104.f;
+	const float BOARD_LIST_BOTTOM = BOARD_BOTTOM + 66.f;
+	const float BOARD_PAGE_Y = BOARD_BOTTOM + 34.f;
+	const float BOARD_PAGE_BUTTON_X = 170.f;
+	const float BOARD_PAGE_BUTTON_WIDTH = 150.f;
+	const float BOARD_TEXT_LEFT = BOARD_LEFT + 34.f;
+	const float BOARD_TEXT_WIDTH = BOARD_WIDTH - 64.f;
+
+	float GetBoardTabX(int32 tab)
+	{
+		return BOARD_X - 110.f + static_cast<float>(tab) * 220.f;
+	}
+
+	// 띄어쓰기에서 끊어 너비 안에 담는다
+	std::vector<std::wstring> WrapText(const std::wstring& text, float width)
+	{
+		std::vector<std::wstring> lines;
+		std::wstring line;
+		size_t start = 0;
+
+		while (start <= text.size())
+		{
+			size_t space = text.find(L' ', start);
+			if (space == std::wstring::npos)
+			{
+				space = text.size();
+			}
+
+			const std::wstring word = text.substr(start, space - start);
+
+			std::wstring candidate = word;
+			if (line.empty() == false)
+			{
+				candidate = line + L" " + word;
+			}
+
+			if (line.empty() || MeasureString(candidate) <= width)
+			{
+				line = candidate;
+			}
+			else
+			{
+				lines.push_back(line);
+				line = word;
+			}
+
+			start = space + 1;
+		}
+
+		if (line.empty() == false)
+		{
+			lines.push_back(line);
+		}
+
+		return lines;
+	}
+
+	// 목격은 흰빛, 편지는 금빛, 소문은 잿빛 푸른색. 어떻게 왔는지가 글보다 먼저 읽힌다
+	std::array<float, 3> GetViaColor(int32 via)
+	{
+		switch (via)
+		{
+			case VIA_LETTER:
+			{
+				return { 1.f, 0.80f, 0.40f };
+			}
+			case VIA_RUMOR:
+			{
+				return { 0.62f, 0.70f, 0.88f };
+			}
+			default:
+			{
+				return { 0.86f, 0.82f, 0.74f };
+			}
+		}
+	}
+
+	std::wstring DescribePostSource(const BoardPost& post, const News& news)
+	{
+		const float now = GetWorldClock();
+		std::wstring origin = std::wstring(GetVillageName(news.origin)) + L" 소식";
+		if (news.origin == g_board_village)
+		{
+			origin = L"이 마을 소식";
+		}
+
+		if (post.via == VIA_WITNESS)
+		{
+			return L"[목격]  " + origin + L"  ·  " + FormatAgo(now - news.time);
+		}
+
+		std::wstring carrier = post.carrier + L" 편";
+		if (post.via == VIA_RUMOR)
+		{
+			carrier = post.carrier + L"에게 들음";
+		}
+
+		// 일어난 때와 닿은 때를 같이 보여야 소식이 길을 걸어왔다는 게 보인다
+		return L"[" + std::wstring(GetViaName(post.via)) + L"]  " + carrier + L"  ·  " + origin + L"  ·  " + FormatAgo(now - news.time) + L" 일, " + FormatAgo(now - post.posted) + L" 도착";
+	}
+
+	void GetSortedPosts(std::vector<const BoardPost*>* sorted)
+	{
+		sorted->clear();
+
+		for (const BoardPost& post : GetBoardPosts(g_board_village))
+		{
+			sorted->push_back(&post);
+		}
+
+		std::sort(sorted->begin(), sorted->end(),
+			[](const BoardPost* left, const BoardPost* right)
+			{
+				return left->posted > right->posted;
+			});
+	}
+
+	void DrawBoardNews(Renderer* renderer)
+	{
+		std::vector<const BoardPost*> sorted;
+		GetSortedPosts(&sorted);
+
+		const int32 total = static_cast<int32>(sorted.size());
+		if (g_board_first >= total)
+		{
+			g_board_first = 0;
+			g_board_page_starts.clear();
+		}
+
+		if (total == 0)
+		{
+			DrawStringShadow(renderer, L"아직 붙은 소식이 없다", BOARD_X, BOARD_LIST_TOP - 40.f, TEXT_ALIGN_CENTER, 0.6f, 0.56f, 0.5f, 1.f);
+			g_board_next = 0;
+			return;
+		}
+
+		float y = BOARD_LIST_TOP;
+		g_board_next = total;
+
+		for (int32 index = g_board_first; index < total; ++index)
+		{
+			const BoardPost& post = *sorted[static_cast<size_t>(index)];
+			const News* news = FindNews(post.news);
+			if (news == nullptr)
+			{
+				continue;
+			}
+
+			std::vector<std::wstring> lines = WrapText(news->text, BOARD_TEXT_WIDTH);
+			if (lines.size() > 2)
+			{
+				lines.resize(2);
+				lines[1] += L" …";
+			}
+
+			const float height = BOARD_LINE * static_cast<float>(lines.size() + 1) + 12.f;
+			if (y - height < BOARD_LIST_BOTTOM && index > g_board_first)
+			{
+				g_board_next = index;
+				break;
+			}
+
+			const std::array<float, 3> color = GetViaColor(post.via);
+			renderer->DrawSolidBox(BOARD_TEXT_LEFT - 14.f, y - (height - 12.f) * 0.5f, 4.f, height - 16.f, color[0], color[1], color[2], 0.9f);
+
+			float line_y = y;
+			for (const std::wstring& line : lines)
+			{
+				DrawStringShadow(renderer, line, BOARD_TEXT_LEFT, line_y, TEXT_ALIGN_LEFT, 0.93f, 0.89f, 0.80f, 1.f);
+				line_y -= BOARD_LINE;
+			}
+
+			DrawStringShadow(renderer, DescribePostSource(post, *news), BOARD_TEXT_LEFT, line_y, TEXT_ALIGN_LEFT, color[0] * 0.8f, color[1] * 0.8f, color[2] * 0.8f, 0.9f);
+
+			y -= height;
+			renderer->DrawSolidBox(BOARD_X, y + 6.f, BOARD_WIDTH - 48.f, 1.f, 0.24f, 0.19f, 0.13f, 1.f);
+		}
+
+		const int32 page = static_cast<int32>(g_board_page_starts.size()) + 1;
+		DrawStringShadow(renderer, std::to_wstring(page) + L" 쪽  ·  소식 " + std::to_wstring(total) + L"건", BOARD_X, BOARD_PAGE_Y + UI_LINE * 0.5f, TEXT_ALIGN_CENTER, 0.7f, 0.64f, 0.54f, 1.f);
+
+		const bool has_prev = g_board_page_starts.empty() == false;
+		const bool has_next = g_board_next < total;
+		DrawButton(renderer, BOARD_X - BOARD_PAGE_BUTTON_X, BOARD_PAGE_Y, BOARD_PAGE_BUTTON_WIDTH, BOARD_BUTTON_HEIGHT, L"새 소식 쪽", has_prev,
+			IsInsideBox(g_mouse_x, g_mouse_y, BOARD_X - BOARD_PAGE_BUTTON_X, BOARD_PAGE_Y, BOARD_PAGE_BUTTON_WIDTH, BOARD_BUTTON_HEIGHT));
+		DrawButton(renderer, BOARD_X + BOARD_PAGE_BUTTON_X, BOARD_PAGE_Y, BOARD_PAGE_BUTTON_WIDTH, BOARD_BUTTON_HEIGHT, L"묵은 소식 쪽", has_next,
+			IsInsideBox(g_mouse_x, g_mouse_y, BOARD_X + BOARD_PAGE_BUTTON_X, BOARD_PAGE_Y, BOARD_PAGE_BUTTON_WIDTH, BOARD_BUTTON_HEIGHT));
+	}
+
+	// 평판 -3 ~ +1.5 를 막대 0 ~ 1 로
+	float SafetyToRatio(float safety)
+	{
+		return (safety + 3.f) / 4.5f;
+	}
+
+	float ProsperityToRatio(float prosperity)
+	{
+		return (prosperity + 2.f) / 4.f;
+	}
+
+	void DrawBoardViews(Renderer* renderer)
+	{
+		// 막대 170 + 숫자 넷 자리. "마지막 소식" 이 오른쪽 끝에서 여섯 글자를 먹어 금고를 그 앞에서 끊는다
+		const float name_x = BOARD_TEXT_LEFT;
+		const float safety_x = BOARD_LEFT + 210.f;
+		const float prosperity_x = BOARD_LEFT + 410.f;
+		const float people_x = BOARD_LEFT + 610.f;
+		const float treasury_x = BOARD_LEFT + 680.f;
+		const float latest_x = BOARD_LEFT + 890.f;
+		const float bar_width = 170.f;
+		const float row_height = 48.f;
+
+		float y = BOARD_LIST_TOP;
+		DrawStringShadow(renderer, L"마을", name_x, y, TEXT_ALIGN_LEFT, 0.7f, 0.64f, 0.54f, 1.f);
+		DrawStringShadow(renderer, L"치안", safety_x, y, TEXT_ALIGN_LEFT, 0.7f, 0.64f, 0.54f, 1.f);
+		DrawStringShadow(renderer, L"살림", prosperity_x, y, TEXT_ALIGN_LEFT, 0.7f, 0.64f, 0.54f, 1.f);
+		DrawStringShadow(renderer, L"주민", people_x, y, TEXT_ALIGN_LEFT, 0.7f, 0.64f, 0.54f, 1.f);
+		DrawStringShadow(renderer, L"금고", treasury_x, y, TEXT_ALIGN_LEFT, 0.7f, 0.64f, 0.54f, 1.f);
+		DrawStringShadow(renderer, L"마지막 소식", latest_x, y, TEXT_ALIGN_RIGHT, 0.7f, 0.64f, 0.54f, 1.f);
+
+		y -= BOARD_LINE + 10.f;
+
+		for (int32 village = 0; village < GetVillageCount(); ++village)
+		{
+			const VillageView view = EvaluateBoardView(g_board_village, village);
+
+			std::array<float, 3> name_color = { 0.9f, 0.86f, 0.76f };
+			std::wstring name = GetVillageName(village);
+			if (village == g_board_village)
+			{
+				name_color = { 1.f, 0.84f, 0.45f };
+				name += L" ( 여기 )";
+			}
+
+			DrawStringShadow(renderer, name, name_x, y, TEXT_ALIGN_LEFT, name_color[0], name_color[1], name_color[2], 1.f);
+
+			if (view.known == false)
+			{
+				DrawStringShadow(renderer, L"아직 소식이 닿지 않았다", safety_x, y, TEXT_ALIGN_LEFT, 0.5f, 0.47f, 0.42f, 1.f);
+				y -= row_height;
+				continue;
+			}
+
+			const float bar_y = y - UI_LINE * 0.5f;
+			DrawBarLeft(renderer, safety_x, bar_y, bar_width, 10.f, SafetyToRatio(view.safety), 0.35f, 0.78f, 0.62f);
+			DrawBarLeft(renderer, prosperity_x, bar_y, bar_width, 10.f, ProsperityToRatio(view.prosperity), 0.95f, 0.74f, 0.32f);
+
+			std::wstring people = L"-";
+			std::wstring treasury = L"-";
+			if (view.population > 0)
+			{
+				people = std::to_wstring(view.population);
+				treasury = std::to_wstring(view.treasury);
+			}
+
+			DrawStringShadow(renderer, people, people_x, y, TEXT_ALIGN_LEFT, 0.86f, 0.82f, 0.74f, 1.f);
+			DrawStringShadow(renderer, treasury, treasury_x, y, TEXT_ALIGN_LEFT, 1.f, 0.84f, 0.4f, 1.f);
+			DrawStringShadow(renderer, FormatAgo(GetWorldClock() - view.newest), latest_x, y, TEXT_ALIGN_RIGHT, 0.7f, 0.66f, 0.6f, 1.f);
+
+			y -= row_height;
+		}
+
+		DrawStringShadow(renderer, L"이 게시판에 붙은 소식만으로 매긴 평판이다. 주민은 이걸 읽고 이사를 정한다", BOARD_X, BOARD_PAGE_Y + UI_LINE * 0.5f, TEXT_ALIGN_CENTER, 0.6f, 0.56f, 0.5f, 1.f);
+	}
+
+	void DrawBoardWindow(Renderer* renderer)
+	{
+		if (g_board_village < 0)
+		{
+			return;
+		}
+
+		DrawPanel(renderer, BOARD_X, BOARD_Y, BOARD_WIDTH, BOARD_HEIGHT, std::wstring(GetVillageName(g_board_village)) + L" 게시판  ( F )");
+
+		const std::array<const wchar_t*, 2> tab_names = { L"소식", L"마을 평판" };
+		for (int32 tab = 0; tab < static_cast<int32>(tab_names.size()); ++tab)
+		{
+			const float tab_x = GetBoardTabX(tab);
+			const bool hovered = IsInsideBox(g_mouse_x, g_mouse_y, tab_x, BOARD_TAB_Y, BOARD_TAB_WIDTH, BOARD_BUTTON_HEIGHT);
+			DrawButton(renderer, tab_x, BOARD_TAB_Y, BOARD_TAB_WIDTH, BOARD_BUTTON_HEIGHT, tab_names[static_cast<size_t>(tab)], tab == g_board_tab, hovered);
+		}
+
+		if (g_board_tab == BOARD_TAB_NEWS)
+		{
+			DrawBoardNews(renderer);
+			return;
+		}
+
+		DrawBoardViews(renderer);
+	}
+
+	bool HandleBoardDown(float x, float y)
+	{
+		for (int32 tab = BOARD_TAB_NEWS; tab <= BOARD_TAB_VIEW; ++tab)
+		{
+			if (IsInsideBox(x, y, GetBoardTabX(tab), BOARD_TAB_Y, BOARD_TAB_WIDTH, BOARD_BUTTON_HEIGHT) && tab != g_board_tab)
+			{
+				g_board_tab = tab;
+				PlaySfx(SFX_UI_CLICK, 0.5f);
+				return true;
+			}
+		}
+
+		if (g_board_tab != BOARD_TAB_NEWS)
+		{
+			return true;
+		}
+
+		if (IsInsideBox(x, y, BOARD_X - BOARD_PAGE_BUTTON_X, BOARD_PAGE_Y, BOARD_PAGE_BUTTON_WIDTH, BOARD_BUTTON_HEIGHT) && g_board_page_starts.empty() == false)
+		{
+			g_board_first = g_board_page_starts.back();
+			g_board_page_starts.pop_back();
+			PlaySfx(SFX_UI_CLICK, 0.5f);
+			return true;
+		}
+
+		std::vector<const BoardPost*> sorted;
+		GetSortedPosts(&sorted);
+
+		if (IsInsideBox(x, y, BOARD_X + BOARD_PAGE_BUTTON_X, BOARD_PAGE_Y, BOARD_PAGE_BUTTON_WIDTH, BOARD_BUTTON_HEIGHT) && g_board_next < static_cast<int32>(sorted.size()))
+		{
+			g_board_page_starts.push_back(g_board_first);
+			g_board_first = g_board_next;
+			PlaySfx(SFX_UI_CLICK, 0.5f);
+			return true;
+		}
+
+		return true;
+	}
+
 	bool HandleWindowDown(int32 window, int32 button, float x, float y)
 	{
 		switch (window)
@@ -1302,6 +1663,10 @@ namespace
 			case WINDOW_ENHANCE:
 			{
 				return HandleEnhanceDown(x, y);
+			}
+			case WINDOW_BOARD:
+			{
+				return HandleBoardDown(x, y);
 			}
 			default:
 			{
@@ -1349,6 +1714,22 @@ void OpenEnhanceWindow()
 
 	g_enhance_result_timer = 0.f;
 	OpenWindow(WINDOW_ENHANCE);
+}
+
+void ToggleBoardWindow(int32 village)
+{
+	if (g_open[static_cast<size_t>(WINDOW_BOARD)] && g_board_village == village)
+	{
+		CloseWindow(WINDOW_BOARD);
+		return;
+	}
+
+	g_board_village = village;
+	g_board_tab = BOARD_TAB_NEWS;
+	g_board_first = 0;
+	g_board_next = 0;
+	g_board_page_starts.clear();
+	OpenWindow(WINDOW_BOARD);
 }
 
 bool CloseTopWindow()
@@ -1496,6 +1877,11 @@ void UpdateUiWindows(float real_seconds)
 		CloseWindow(WINDOW_ENHANCE);
 	}
 
+	if (g_open[static_cast<size_t>(WINDOW_BOARD)] && IsPlayerNearBoard(g_board_village, BOARD_CLOSE_RANGE) == false)
+	{
+		CloseWindow(WINDOW_BOARD);
+	}
+
 	// 죽으면 끌던 것을 놓는다
 	if (IsPlayerDead())
 	{
@@ -1509,7 +1895,7 @@ void DrawUiWindows(Renderer* renderer)
 	std::vector<TooltipLine> tooltip;
 
 	// 늦게 연 창이 위
-	std::array<int32, WINDOW_COUNT> order = { WINDOW_INVENTORY, WINDOW_STAT, WINDOW_SKILL, WINDOW_ENHANCE };
+	std::array<int32, WINDOW_COUNT> order = { WINDOW_INVENTORY, WINDOW_STAT, WINDOW_SKILL, WINDOW_ENHANCE, WINDOW_BOARD };
 	std::sort(order.begin(), order.end(),
 		[](int32 left, int32 right)
 		{
@@ -1548,6 +1934,11 @@ void DrawUiWindows(Renderer* renderer)
 			case WINDOW_ENHANCE:
 			{
 				DrawEnhanceWindow(renderer, &window_tooltip);
+				break;
+			}
+			case WINDOW_BOARD:
+			{
+				DrawBoardWindow(renderer);
 				break;
 			}
 			default:

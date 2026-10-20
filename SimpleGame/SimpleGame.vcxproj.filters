@@ -48,6 +48,15 @@
     <ClInclude Include="Monitor.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="Village.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="HouseArt.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Board.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
     <ClInclude Include="UiWindows.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -192,6 +201,15 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="Monitor.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Village.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="HouseArt.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Board.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="UiWindows.cpp">

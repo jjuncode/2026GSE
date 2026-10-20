@@ -7,6 +7,7 @@
 #include "Renderer.h"
 #include "SpriteAtlas.h"
 #include "Text.h"
+#include "Village.h"
 
 #include <array>
 #include <cmath>
@@ -23,7 +24,7 @@ namespace
 	const float INSPECTOR_X = 440.f;
 	const float INSPECTOR_TOP = 316.f;
 	const float INSPECTOR_WIDTH = 380.f;
-	const float INSPECTOR_HEIGHT = 460.f;
+	const float INSPECTOR_HEIGHT = 540.f;
 	const float ROW_HEIGHT = 26.f;	// 굴림 12 픽셀 x 배율 2 = 24. 이보다 좁으면 줄이 겹친다
 	const float BAR_ROW_HEIGHT = 25.f;
 	const float WEIGHT_ROW_HEIGHT = 24.f;
@@ -56,11 +57,64 @@ namespace
 			{
 				return { 0.90f, 0.84f, 0.62f };
 			}
+			case NPC_JOB_COURIER:
+			{
+				return { 0.95f, 0.72f, 0.32f };
+			}
 			default:
 			{
 				return { 0.42f, 0.88f, 0.82f };
 			}
 		}
+	}
+
+	std::wstring DescribeHome(const Npc& npc)
+	{
+		if (npc.home_village < 0)
+		{
+			return L"집  소굴 천막";
+		}
+
+		std::wstring text = L"집  " + std::wstring(GetVillageName(npc.home_village));
+		if (npc.house < 0)
+		{
+			return text + L" ( 집 없음 )";
+		}
+
+		text += L" " + std::to_wstring(npc.house) + L"번 집";
+		if (npc.is_inside)
+		{
+			text += L"  ·  안에서 쉰다";
+		}
+
+		return text;
+	}
+
+	// 머릿속. 이사 결심, 들고 가는 소식, 마지막으로 본 게시판
+	std::wstring DescribeMind(const Npc& npc)
+	{
+		if (npc.move_target >= 0)
+		{
+			return WithToward(GetVillageName(npc.move_target)) + L" 이사 - " + npc.move_reason;
+		}
+
+		if (npc.letters.empty() == false)
+		{
+			std::wstring what = L"편지 " + std::to_wstring(npc.letters.size()) + L"통";
+			if (npc.carry_via == VIA_RUMOR)
+			{
+				what = L"소문 " + std::to_wstring(npc.letters.size()) + L"가지";
+			}
+
+			return std::wstring(GetVillageName(npc.carry_from)) + L" 소식 " + WithObject(what) + L" 들고 간다";
+		}
+
+		if (npc.opinion_board >= 0)
+		{
+			return L"마지막으로 본 게시판  " + std::wstring(GetVillageName(npc.opinion_board));
+		}
+
+		return L"아직 게시판을 안 봤다";
 	}
 
 	bool IsOffScreen(const ScreenPos& screen, float margin)
@@ -253,6 +307,11 @@ namespace
 		DrawStringShadow(renderer, L"골드 " + std::to_wstring(npc.gold) + L"   처치 " + std::to_wstring(npc.kills) + L"   장비 " + std::to_wstring(npc.gear), left_x, y, TEXT_ALIGN_LEFT, 1.f, 0.82f, 0.35f, 1.f);
 
 		y -= ROW_HEIGHT;
+		DrawStringShadow(renderer, DescribeHome(npc), left_x, y, TEXT_ALIGN_LEFT, 0.80f, 0.86f, 0.74f, 1.f);
+		y -= ROW_HEIGHT;
+		DrawStringShadow(renderer, DescribeMind(npc), left_x, y, TEXT_ALIGN_LEFT, 0.86f, 0.80f, 0.95f, 1.f);
+
+		y -= ROW_HEIGHT;
 		std::array<float, 3> task_color = { 0.90f, 0.88f, 0.82f };
 		if (IsReactiveTask(npc.task))
 		{
@@ -314,7 +373,7 @@ namespace
 		const float left_x = -static_cast<float>(WINDOW_SIZE_X) * 0.5f + 16.f;
 		const float top_y = static_cast<float>(WINDOW_SIZE_Y) * 0.5f - 38.f;
 
-		const std::wstring header = L"변경 일지   주민 " + std::to_wstring(alive) + L"   성채 금고 " + std::to_wstring(GetTreasury()) + L"   NPC 갱신 " + FormatMilliseconds(GetNpcTickMicroseconds());
+		const std::wstring header = L"변경 일지   주민 " + std::to_wstring(alive) + L"   마을 금고 합계 " + std::to_wstring(GetTreasury()) + L"   NPC 갱신 " + FormatMilliseconds(GetNpcTickMicroseconds());
 
 		const std::vector<NpcEvent>& events = GetNpcEvents();
 

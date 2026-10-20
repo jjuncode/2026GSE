@@ -2,12 +2,15 @@
 #include "AutoTest.h"
 #include "Combat.h"
 #include "GameConfig.h"
+#include "GameTime.h"
 #include "Input.h"
+#include "Minimap.h"
 #include "Monster.h"
 #include "NpcData.h"
 #include "Player.h"
 #include "Scene.h"
 #include "UiWindows.h"
+#include "Village.h"
 #include "World.h"
 #include "ZoneGen.h"
 
@@ -706,6 +709,86 @@ void UpdateAutoTest(float real_seconds)
 		if (stop >= 1 && stop <= static_cast<int32>(sites.size()) && within >= 1.2f && within < 1.22f)
 		{
 			Capture("tour_" + std::to_string(stop) + "_kind" + std::to_string(sites[static_cast<size_t>(stop - 1)].kind));
+		}
+
+		return;
+	}
+
+	if (g_mode == "village")
+	{
+		// 지도 한 장, 그다음 마을마다 광장 전경 · 게시판 소식 · 게시판 평판. 소식이 쌓이게 90 초 뒤부터 돈다
+		const auto crossed = [](float mark)
+		{
+			return g_time - FIXED_STEP_SECONDS < mark && g_time >= mark;
+		};
+
+		if (crossed(4.f))
+		{
+			ToggleMinimap();
+		}
+
+		if (crossed(4.6f))
+		{
+			Capture("village_map");
+		}
+
+		if (crossed(5.2f))
+		{
+			ToggleMinimap();
+		}
+
+		const float start = 90.f;
+		const float stop_sec = 4.f;
+
+		for (int32 village = 0; village < GetVillageCount(); ++village)
+		{
+			const float base = start + static_cast<float>(village) * stop_sec;
+			const std::string tag = "village_" + std::to_string(village);
+
+			if (crossed(base))
+			{
+				WorldPos plaza = GetVillageCenterPos(village);
+				MoveWorldPos(&plaza, 3.f, 3.f);
+				PlacePlayer(plaza);
+			}
+
+			if (crossed(base + 0.8f))
+			{
+				Capture(tag + "_plaza");
+			}
+
+			if (crossed(base + 1.0f))
+			{
+				WorldPos board = GetBoardPos(village);
+				MoveWorldPos(&board, 1.f, 1.f);
+				PlacePlayer(board);
+			}
+
+			if (crossed(base + 1.4f))
+			{
+				Interact();
+			}
+
+			if (crossed(base + 2.2f))
+			{
+				Capture(tag + "_news");
+			}
+
+			// 평판 탭 ( 창 가운데 원점, 위가 양수 )
+			if (crossed(base + 2.4f))
+			{
+				UiMouseDown(UI_MOUSE_LEFT, 110.f, 238.f);
+			}
+
+			if (crossed(base + 3.2f))
+			{
+				Capture(tag + "_view");
+			}
+
+			if (crossed(base + 3.6f))
+			{
+				CloseTopWindow();
+			}
 		}
 
 		return;

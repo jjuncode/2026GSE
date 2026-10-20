@@ -12,6 +12,7 @@ void ToggleStatWindow();
 void ToggleSkillWindow();
 void ToggleEnhanceWindow();	// 모루 근처에서만 열린다
 void OpenEnhanceWindow();
+void ToggleBoardWindow(int32 village);	// 그 마을 게시판 앞에서
 bool CloseTopWindow();	// 닫은 게 있으면 true
 bool IsAnyWindowOpen();
 

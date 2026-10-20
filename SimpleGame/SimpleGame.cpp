@@ -35,6 +35,7 @@ but WITHOUT ANY WARRANTY.
 #include "Player.h"
 #include "SpriteAtlas.h"
 #include "SpriteSheet.h"
+#include "HouseArt.h"
 #include "Text.h"
 #include "Profiler.h"
 #include "Minimap.h"
@@ -517,6 +518,9 @@ int main(int argc, char** argv)
 		std::cout << "[ SimpleGame - main ] : sprite sheets missing. run tools/art/bake.py and vfx.py\n";
 	}
 
+	// 없으면 집을 옛 칸 블록으로 세운다
+	InitHouseArt();
+
 	if (InitText() == false)
 	{
 		std::cout << "[ SimpleGame - main ] : text disabled\n";
@@ -594,6 +598,7 @@ int main(int argc, char** argv)
 	ShutdownPostProcess();
 	ShutdownText();
 	ShutdownSpriteSheets();
+	ShutdownHouseArt();
 	ShutdownSpriteAtlas();
 	ShutdownProfiler();
 

@@ -2,6 +2,7 @@
 
 #include "Actor.h"
 #include "BehaviorTree.h"
+#include "Board.h"
 #include "ZoneGen.h"
 
 #include <array>
@@ -13,9 +14,10 @@ constexpr int32 NPC_JOB_RAIDER = 1;	// 약탈자 ( 들개단 )
 constexpr int32 NPC_JOB_MERCHANT = 2;	// 행상
 constexpr int32 NPC_JOB_GATHERER = 3;	// 채집꾼
 constexpr int32 NPC_JOB_WARDEN = 4;	// 개척대 순찰병
-constexpr int32 NPC_JOB_COUNT = 5;
+constexpr int32 NPC_JOB_COURIER = 5;	// 전령. 이웃 마을 게시판에 편지를 나른다
+constexpr int32 NPC_JOB_COUNT = 6;
 
-// 일과. 0 ~ 10 이 가중 선택 대상이다
+// 일과. 0 ~ 13 이 가중 선택 대상이다
 constexpr int32 NPC_TASK_HUNT = 0;
 constexpr int32 NPC_TASK_RAID = 1;
 constexpr int32 NPC_TASK_SELL = 2;
@@ -27,14 +29,17 @@ constexpr int32 NPC_TASK_REST = 7;
 constexpr int32 NPC_TASK_UPGRADE = 8;
 constexpr int32 NPC_TASK_SCAVENGE = 9;
 constexpr int32 NPC_TASK_WANDER = 10;
-constexpr int32 NPC_DAILY_TASK_COUNT = 11;
+constexpr int32 NPC_TASK_READ = 11;	// 게시판 보기. 이사 결심이 여기서 난다
+constexpr int32 NPC_TASK_DELIVER = 12;	// 편지 배달
+constexpr int32 NPC_TASK_MOVE = 13;	// 이사
+constexpr int32 NPC_DAILY_TASK_COUNT = 14;
 
 // 반응층 행동. 라벨로만 쓴다
-constexpr int32 NPC_TASK_FIGHT = 11;	// 맞은 자에게 반격
-constexpr int32 NPC_TASK_FLEE = 12;
-constexpr int32 NPC_TASK_ENGAGE = 13;	// 보이는 적에게 먼저 덤빈다
-constexpr int32 NPC_TASK_AVOID = 14;
-constexpr int32 NPC_TASK_COUNT = 15;
+constexpr int32 NPC_TASK_FIGHT = 14;	// 맞은 자에게 반격
+constexpr int32 NPC_TASK_FLEE = 15;
+constexpr int32 NPC_TASK_ENGAGE = 16;	// 보이는 적에게 먼저 덤빈다
+constexpr int32 NPC_TASK_AVOID = 17;
+constexpr int32 NPC_TASK_COUNT = 18;
 
 constexpr int32 NPC_TARGET_NONE = 0;
 constexpr int32 NPC_TARGET_MONSTER = 1;
@@ -98,7 +103,28 @@ struct Npc
 	std::wstring name;
 	int32 job = NPC_JOB_HUNTER;
 	int32 home_site = 0;	// 쉬고 배회할 때 기대는 거점
+	int32 home_village = -1;	// 약탈자는 -1
+	int32 house = -1;
 	bool is_alive = false;
+	bool is_inside = false;	// 집 안에서 쉰다. 안 보이고 안 맞는다
+
+	// 소식 나르기. 마을을 나설 때 그 게시판 소식을 챙기고, 다른 마을에 들어서면 푼다
+	int32 current_village = -1;
+	int32 carry_from = -1;
+	int32 carry_via = VIA_RUMOR;
+	std::vector<int32> letters;
+	int32 deliver_target = -1;	// 전령이 가는 마을
+	float village_check_timer = 0.f;
+
+	// 이사. 게시판을 읽고 결심하면 빈집을 잡아 두고 짐을 싼다
+	std::array<VillageView, ZONE_VILLAGE_COUNT> opinion;	// 마지막으로 읽은 게시판이 말한 마을 평판
+	int32 opinion_board = -1;
+	float read_timer = 0.f;	// 게시판을 읽은 뒤 흐른 시간
+	float settle_timer = 0.f;	// 0 보다 크면 아직 이사를 안 생각한다
+	int32 move_target = -1;
+	int32 move_house = -1;
+	int32 move_from = -1;	// 처음 오는 사람은 -1
+	std::wstring move_reason;
 
 	int32 hp = 0;
 	int32 max_hp = 0;
@@ -143,6 +169,9 @@ struct Npc
 	int32 path_fail_count = 0;
 	float progress_timer = 0.f;
 	WorldPos progress_pos;
+	WorldPos flow_waypoint;	// 마을 사이 먼 길은 거리 지도를 따라간다
+	int32 flow_field = -1;
+	float flow_timer = 0.f;
 
 	// 싸움
 	float attack_cooldown = 0.f;
@@ -176,12 +205,11 @@ const std::vector<ZoneSite>& GetNpcSites();
 std::vector<NpcResource>& GetNpcResources();
 std::vector<NpcCorpse>& GetNpcCorpses();
 const std::vector<NpcEvent>& GetNpcEvents();
-int32 GetTreasury();
-void AddTreasury(int32 amount);
-int32 TakeTreasury(int32 amount);	// 실제로 내준 양. 금고가 마르면 모자라게 준다
+int32 GetTreasury();	// 마을 금고 전부 합친 것
 void PushNpcEvent(const std::wstring& text, float r, float g, float b);
 bool IsNpcOutlaw(const Npc& npc);
-bool IsWorldPosInTown(const WorldPos& pos);
+bool IsNpcVisible(const Npc& npc);	// 살아 있고 집 밖
+bool IsWorldPosInTown(const WorldPos& pos);	// 어느 마을이든 그 안
 WorldPos GetSitePos(int32 site);
 bool IsSiteInTown(int32 site);
 int32 GetNpcIndex(const Npc& npc);
@@ -191,7 +219,10 @@ std::wstring GetNpcTitle(const Npc& npc);	// "사냥꾼 로안"
 const wchar_t* GetNpcJobName(int32 job);
 std::wstring WithSubject(const std::wstring& word);	// 받침 보고 이 / 가
 std::wstring WithObject(const std::wstring& word);	// 받침 보고 을 / 를
+std::wstring WithToward(const std::wstring& word);	// 받침 보고 로 / 으로
 void NoteNpcRobbery();
+void NoteNpcMove();
+int32 GetNpcMoveCount();	// 구역을 만든 뒤로 이사한 수
 int32 GetNpcUpgradeCost(const Npc& npc);
 float GetNpcTickMicroseconds();
 int32 GetNpcDeathCount();	// 구역을 만든 뒤로
@@ -205,3 +236,7 @@ void NpcMoveAway(Npc* npc, const WorldPos& from, float delta_seconds);
 void NpcHeal(Npc* npc, float per_second, float delta_seconds);
 void NpcGainExp(Npc* npc, int32 exp);
 void NpcShowText(const Npc& npc, const std::wstring& text, float r, float g, float b);
+void NpcEnterHouse(Npc* npc);
+void NpcLeaveHouse(Npc* npc);
+int32 NpcPostLetters(Npc* npc, int32 village);	// 들고 온 소식을 그 마을 게시판에. 새로 붙은 수
+int32 GetSiteMarketVillage(int32 site);	// 그 거점 장사 몫이 가는 마을

@@ -1,6 +1,7 @@
 ﻿#include "stdafx.h"
 #include "Npc.h"
 #include "Balance.h"
+#include "Board.h"
 #include "Drop.h"
 #include "FloatingText.h"
 #include "GameConfig.h"
@@ -13,6 +14,7 @@
 #include "Scene.h"
 #include "SceneGraph.h"
 #include "SpriteAtlas.h"
+#include "Village.h"
 #include "World.h"
 #include "ZoneGen.h"
 
@@ -30,11 +32,11 @@ namespace
 {
 	const float PI = 3.14159265f;
 
-	constexpr int32 WARDEN_COUNT = 10;
-	constexpr int32 HUNTER_COUNT = 9;
-	constexpr int32 GATHERER_COUNT = 11;
-	constexpr int32 MERCHANT_COUNT = 6;
-	constexpr int32 RAIDER_COUNT = 9;
+	// 마을마다 서른 명. 성채는 장사꾼과 순찰병이, 개척촌은 채집꾼과 사냥꾼이 많다
+	// 순서: 사냥꾼 약탈자 행상 채집꾼 순찰병 전령
+	const std::array<int32, NPC_JOB_COUNT> CITADEL_JOBS = { 6, 0, 8, 6, 8, 2 };
+	const std::array<int32, NPC_JOB_COUNT> HAMLET_JOBS = { 8, 0, 5, 9, 6, 2 };
+	constexpr int32 RAIDERS_PER_HIDEOUT = 6;
 
 	constexpr float HUNGER_FULL_SEC = 170.f;
 	constexpr float STARVE_DAMAGE_SEC = 3.f;
@@ -58,9 +60,17 @@ namespace
 	constexpr float ENGAGE_GIVE_UP = 22.f;
 	constexpr float SEPARATION_DISTANCE = 0.5f;
 	constexpr float SEPARATION_SPEED = 0.9f;
-	constexpr int32 TREASURY_START = 600;
-	constexpr float TREASURY_INCOME_PER_SEC = 2.f;	// 왕관벽 안 세금. 없으면 벽 밖 짐값에 금고가 몇 분 만에 마른다
 	constexpr float TEXT_NEAR_RANGE = 22.f;	// 이보다 먼 NPC 의 떠오르는 글자는 안 띄운다
+	constexpr float DRAW_RANGE = 24.f;	// 화면 밖 NPC 는 정렬 · 그리기에 안 넣는다
+	constexpr float FLOW_RANGE = 26.f;	// 목표가 이보다 먼 마을이면 거리 지도를 따라간다
+	constexpr float FLOW_REFRESH_SEC = 0.6f;
+	constexpr float FLOW_SITE_RADIUS = 10.f;	// 거점에서 이 안의 목표는 그 거점 지도를 탄다 ( 매복 자리 9 ~ 15 칸 중 가까운 쪽 )
+	constexpr float VILLAGE_CHECK_SEC = 0.25f;
+	constexpr int32 MERCHANT_LETTER_COUNT = 4;	// 행상 · 이사하는 사람이 챙기는 편지
+	constexpr int32 RUMOR_COUNT = 2;	// 그 밖의 사람이 옮기는 말
+	constexpr float SETTLE_MIN_SEC = 90.f;	// 처음 · 막 이사 온 뒤 한동안은 이사를 안 생각한다
+	constexpr float SETTLE_MAX_SEC = 260.f;
+	constexpr float ARRIVAL_RETRY_SEC = 30.f;
 	constexpr int32 OUTLAW_BOUNTY = 20;
 	constexpr float WAYPOINT_REACH = 0.35f;
 	constexpr float PROGRESS_CHECK_SEC = 1.2f;
@@ -73,7 +83,8 @@ namespace
 		float timer = 0.f;
 	};
 
-	const std::array<const wchar_t*, 56> NAMES =
+	// 이백 명이 넘게 살아서 겹치지 않을 만큼
+	const std::vector<const wchar_t*> NAMES =
 	{
 		L"로안", L"카심", L"도르", L"에바", L"미렐", L"하겐", L"브란", L"시그",
 		L"올라프", L"레아", L"토린", L"가렛", L"유리엔", L"세라", L"마르코", L"이델",
@@ -82,6 +93,34 @@ namespace
 		L"요르크", L"일사", L"마야", L"프리다", L"오스카", L"벨", L"리안", L"그레타",
 		L"아스트", L"빌름", L"코라", L"데인", L"니브", L"사울", L"타리크", L"엘로",
 		L"무라", L"키란", L"페드로", L"야나", L"로크", L"수엔", L"이반", L"헬가",
+		L"아델", L"아론", L"알바", L"앙겔", L"바렌", L"베아", L"비요른", L"브리타",
+		L"카야", L"세드릭", L"달리아", L"도린", L"에드릭", L"엘사", L"에밋", L"파렌",
+		L"피오나", L"가브", L"길다", L"고트", L"하랄", L"헤다", L"이드리스", L"잉가",
+		L"이솔", L"야콥", L"요한", L"카이", L"카트린", L"케일", L"라스", L"레나",
+		L"리브", L"로렌", L"마그누스", L"마렌", L"미카", L"니코", L"노라", L"오딜",
+		L"올가", L"파벨", L"페트라", L"라그나", L"레그", L"리케", L"로잘", L"루나",
+		L"사빈", L"실바", L"스벤", L"타냐", L"테아", L"토르발", L"울라", L"우르",
+		L"발터", L"베라", L"빅토르", L"비다", L"볼프", L"윌렘", L"이리스", L"제노",
+		L"지타", L"아마르", L"바질", L"브론", L"칼라", L"디터", L"에곤", L"엘마",
+		L"에른", L"페른", L"가이아", L"기디언", L"그림", L"하이디", L"이삭", L"잉그리드",
+		L"요나", L"율리아", L"카렐", L"키아", L"라일라", L"레온", L"리나", L"루드",
+		L"마르텐", L"미라", L"네드", L"니나", L"오토", L"파울라", L"퀸", L"라헬",
+		L"렌", L"로자", L"루퍼트", L"자라", L"샤를", L"시몬", L"소냐", L"테렌",
+		L"토마", L"우나", L"발리", L"벤델", L"위나", L"얀", L"이레", L"제다",
+		L"알릭", L"베니", L"브리아", L"카스", L"델라", L"두란", L"에다", L"에릭",
+		L"플로라", L"프란츠", L"겔다", L"하로", L"히로", L"아이다", L"이본", L"조엘",
+		L"카린", L"쿠르트", L"란다", L"레이프", L"로타르", L"마티아스", L"메레", L"모르",
+		L"날라", L"닐스", L"오베", L"펠라", L"라우", L"리코", L"로아", L"산드라",
+		L"셀마", L"스텔라", L"탈리아", L"티모", L"우베", L"바냐", L"베른하르트", L"빌마",
+		L"예나", L"젤다", L"아그네스", L"알도", L"아냐", L"바르톨", L"벨라", L"보도",
+		L"브루노", L"첼시", L"다그", L"에스터", L"파비안", L"게르다", L"그웬", L"하넬",
+		L"이다", L"이고르", L"이르마", L"야르", L"케라", L"콘라드", L"라라", L"레다",
+		L"루치", L"마고", L"마르타", L"미로", L"넬", L"오레", L"오스발", L"피아",
+		L"롤프", L"루비", L"사샤", L"세바", L"시라", L"스텔", L"투르", L"울프",
+		L"바르", L"베스타", L"빈스", L"이자", L"조라", L"엘리안", L"아르네", L"브렌",
+		L"카이라", L"도미닉", L"엘마르", L"핀", L"가스파르", L"하인", L"요르", L"키르",
+		L"레오나", L"마누", L"나디아", L"오렌", L"파스칼", L"라미르", L"세레나", L"토비아스",
+		L"웬", L"이네스", L"제나", L"아벨",
 	};
 
 	const char* GetTaskTag(int32 task);
@@ -106,11 +145,10 @@ namespace
 	std::vector<Arrival> g_arrivals;
 	const ZoneLayout* g_layout = nullptr;
 
-	int32 g_treasury = 0;
 	int32 g_next_corpse_id = 1;
 	int32 g_event_serial = 0;	// 구역을 새로 만들어도 안 되돌린다. 모니터 페이지가 이어 붙인다
-	float g_treasury_carry = 0.f;
-	bool g_treasury_warned = false;
+	int32 g_move_count = 0;
+	std::vector<int32> g_flow_sites;	// 마을 다음 번호 거리 지도의 거점
 
 	int32 g_selected = -1;
 	bool g_follow = false;
@@ -179,7 +217,9 @@ namespace
 				return SHEET_NPC_RAIDER;
 			}
 			case NPC_JOB_MERCHANT:
+			case NPC_JOB_COURIER:
 			{
+				// 전령 그림은 아직 없다. 등짐 진 나그네라 행상 그림을 빌린다
 				return SHEET_NPC_MERCHANT;
 			}
 			case NPC_JOB_GATHERER:
@@ -206,6 +246,7 @@ namespace
 				return SPRITE_NPC_RAIDER;
 			}
 			case NPC_JOB_MERCHANT:
+			case NPC_JOB_COURIER:
 			{
 				return SPRITE_NPC_MERCHANT;
 			}
@@ -270,6 +311,18 @@ namespace
 				npc->attack_interval = 1.0f;
 				npc->goods_capacity = 40;
 				npc->gold = RollInt(30, 50);
+				break;
+			}
+			case NPC_JOB_COURIER:
+			{
+				// 길 위에서 사는 사람이라 발이 빠르다. 싸움은 못 한다
+				npc->max_hp = 60;
+				npc->attack = 4;
+				npc->move_speed = 3.4f;
+				npc->attack_range = 1.1f;
+				npc->attack_interval = 1.2f;
+				npc->goods_capacity = 20;
+				npc->gold = RollInt(20, 40);
 				break;
 			}
 			default:
@@ -376,49 +429,71 @@ namespace
 		return count;
 	}
 
-	int32 PickHomeSite(int32 job, int32 order)
+	// 들개단은 마을에 집이 없다. 소굴 천막이 집이다
+	int32 PickHideout(int32 order)
 	{
-		const int32 town = FindSiteOfKind(SITE_TOWN, 0);
-
-		if (job == NPC_JOB_RAIDER)
+		const int32 hideouts = CountSitesOfKind(SITE_HIDEOUT);
+		if (hideouts > 0)
 		{
-			const int32 hideouts = CountSitesOfKind(SITE_HIDEOUT);
-			if (hideouts > 0)
-			{
-				return FindSiteOfKind(SITE_HIDEOUT, order % hideouts);
-			}
-
-			const int32 villages = CountSitesOfKind(SITE_VILLAGE);
-			if (villages > 0)
-			{
-				return FindSiteOfKind(SITE_VILLAGE, order % villages);
-			}
-
-			return town;
+			return FindSiteOfKind(SITE_HIDEOUT, order % hideouts);
 		}
 
-		if (job == NPC_JOB_MERCHANT)
+		const int32 ruins = CountSitesOfKind(SITE_VILLAGE);
+		if (ruins > 0)
 		{
-			return town;
+			return FindSiteOfKind(SITE_VILLAGE, order % ruins);
 		}
 
-		// 절반쯤은 성채, 나머지는 초소에 기대 산다
-		const int32 outposts = CountSitesOfKind(SITE_OUTPOST);
-		if (outposts > 0 && order % 5 >= 2)
-		{
-			return FindSiteOfKind(SITE_OUTPOST, order % outposts);
-		}
-
-		return town;
+		return FindSiteOfKind(SITE_TOWN, 0);
 	}
 
-	void InitNpc(Npc* npc, int32 job, int32 home_site, const WorldPos& pos)
+	int32 CountRaiderSlots()
+	{
+		int32 hideouts = CountSitesOfKind(SITE_HIDEOUT);
+		if (hideouts < 1)
+		{
+			hideouts = 1;
+		}
+
+		return hideouts * RAIDERS_PER_HIDEOUT;
+	}
+
+	const std::array<int32, NPC_JOB_COUNT>& GetVillageJobs(int32 village)
+	{
+		if (GetVillage(village).is_citadel)
+		{
+			return CITADEL_JOBS;
+		}
+
+		return HAMLET_JOBS;
+	}
+
+	int32 CountVillagerSlots()
+	{
+		int32 total = 0;
+
+		for (int32 village = 0; village < GetVillageCount(); ++village)
+		{
+			for (int32 count : GetVillageJobs(village))
+			{
+				total += count;
+			}
+		}
+
+		return total;
+	}
+
+	void InitNpc(Npc* npc, int32 job, int32 home_site, int32 home_village, const WorldPos& pos)
 	{
 		*npc = Npc();
 		npc->job = job;
 		npc->home_site = home_site;
+		npc->home_village = home_village;
 		npc->is_alive = true;
 		npc->name = PickName();
+		npc->current_village = GetVillageAt(pos);
+		npc->settle_timer = RollRange(SETTLE_MIN_SEC, SETTLE_MAX_SEC);
+		npc->read_timer = RollRange(0.f, 120.f);
 
 		ApplyJobStats(npc);
 		npc->hp = npc->max_hp;
@@ -453,15 +528,49 @@ namespace
 		InitNpcBrain(npc, static_cast<uint32>(GetRandom()()));
 	}
 
-	void SpawnInitial(int32 job, int32 count)
+	// 저마다 제 집 문 앞에서 하루를 시작한다
+	void SpawnVillager(int32 job, int32 village)
 	{
-		for (int32 order = 0; order < count; ++order)
+		Npc npc;
+		g_npcs.push_back(npc);
+
+		const int32 index = static_cast<int32>(g_npcs.size()) - 1;
+		const int32 house = ClaimFreeHouse(village, index);
+
+		WorldPos pos = FindSpawnNear(GetVillage(village).site);
+		if (house >= 0)
 		{
-			const int32 home = PickHomeSite(job, order);
+			pos = GetHouseDoorPos(house);
+		}
+
+		Npc& villager = g_npcs.back();
+		InitNpc(&villager, job, GetVillage(village).site, village, pos);
+		villager.house = house;
+	}
+
+	void SpawnPopulation()
+	{
+		for (int32 village = 0; village < GetVillageCount(); ++village)
+		{
+			const std::array<int32, NPC_JOB_COUNT>& jobs = GetVillageJobs(village);
+
+			for (int32 job = 0; job < NPC_JOB_COUNT; ++job)
+			{
+				for (int32 count = 0; count < jobs[static_cast<size_t>(job)]; ++count)
+				{
+					SpawnVillager(job, village);
+				}
+			}
+		}
+
+		const int32 raiders = CountRaiderSlots();
+		for (int32 order = 0; order < raiders; ++order)
+		{
+			const int32 home = PickHideout(order);
 
 			Npc npc;
 			g_npcs.push_back(npc);
-			InitNpc(&g_npcs.back(), job, home, FindSpawnNear(home));
+			InitNpc(&g_npcs.back(), NPC_JOB_RAIDER, home, -1, FindSpawnNear(home));
 		}
 	}
 
@@ -497,6 +606,11 @@ namespace
 	bool IsNearCamera(const WorldPos& pos)
 	{
 		return DistanceBetween(pos, GetCameraPos()) < TEXT_NEAR_RANGE;
+	}
+
+	bool IsNearDraw(const WorldPos& pos, const WorldPos& camera)
+	{
+		return std::fabs(GetTileDistanceX(camera, pos)) < DRAW_RANGE && std::fabs(GetTileDistanceY(camera, pos)) < DRAW_RANGE;
 	}
 
 	void ClearReferencesTo(int32 index)
@@ -560,14 +674,52 @@ namespace
 		g_fallen.push_back(fallen);
 	}
 
-	void KillNpc(int32 index, const std::wstring& cause, bool drop_gold_to_player)
+	// 게시판에 붙는 이름. 어느 마을 사람인지가 소식의 절반이다
+	std::wstring GetNpcNewsTitle(const Npc& npc)
+	{
+		if (npc.job == NPC_JOB_RAIDER)
+		{
+			return L"들개단 " + npc.name;
+		}
+
+		if (npc.home_village >= 0)
+		{
+			return std::wstring(GetVillageName(npc.home_village)) + L"의 " + GetNpcTitle(npc);
+		}
+
+		return GetNpcTitle(npc);
+	}
+
+	void KillNpc(int32 index, const std::wstring& cause, bool drop_gold_to_player, int32 news_kind)
 	{
 		Npc& npc = g_npcs[static_cast<size_t>(index)];
 
 		npc.is_alive = false;
+		npc.is_inside = false;
 		npc.hp = 0;
 		npc.stall_heartbeat = 0.f;
 		ResetNpcBrain(&npc);
+
+		// 집은 비고, 오기로 한 집 예약도 풀린다. 빈집이 있어야 새 사람이 든다
+		ReleaseHouse(npc.house, index);
+		ReleaseHouse(npc.move_house, index);
+		npc.house = -1;
+		npc.move_house = -1;
+		npc.move_target = -1;
+
+		PostNewsAt(npc.body.m_pos, news_kind, WithSubject(GetNpcNewsTitle(npc)) + cause);
+
+		if (npc.job != NPC_JOB_RAIDER)
+		{
+			NoteVillageDeath(npc.body.m_pos);
+		}
+
+		if (npc.letters.empty() == false && npc.carry_via == VIA_LETTER)
+		{
+			PushNpcEvent(L"편지 " + std::to_wstring(npc.letters.size()) + L"통이 길바닥에 흩어졌다", 0.75f, 0.70f, 0.60f);
+		}
+
+		npc.letters.clear();
 
 		// 주머니는 남는다. 약탈자와 채집꾼이 뒤지러 온다
 		NpcCorpse corpse;
@@ -631,6 +783,10 @@ namespace
 			{
 				return "warden";
 			}
+			case NPC_JOB_COURIER:
+			{
+				return "courier";
+			}
 			default:
 			{
 				return "hunter";
@@ -688,6 +844,32 @@ namespace
 		return L" 굶어 죽었다";
 	}
 
+	// 들개단 · 무법자가 베인 건 그 동네가 안전해졌다는 소식이다
+	int32 GetDeathNewsKind(const Npc& npc, int32 attacker_kind, bool devoured)
+	{
+		if (attacker_kind == NPC_TARGET_MONSTER)
+		{
+			if (devoured)
+			{
+				return NEWS_DEVOURED;
+			}
+
+			return NEWS_DEATH;
+		}
+
+		if (attacker_kind == NPC_TARGET_NPC || attacker_kind == NPC_TARGET_PLAYER)
+		{
+			if (IsNpcOutlaw(npc))
+			{
+				return NEWS_BOUNTY;
+			}
+
+			return NEWS_MURDER;
+		}
+
+		return NEWS_STARVE;
+	}
+
 	void HurtNpc(int32 index, int32 damage, int32 attacker_kind, int32 attacker_index)
 	{
 		if (IsValidNpc(index) == false)
@@ -696,6 +878,12 @@ namespace
 		}
 
 		Npc& npc = g_npcs[static_cast<size_t>(index)];
+
+		// 집 안은 문을 닫아걸었다
+		if (npc.is_inside)
+		{
+			return;
+		}
 
 		npc.hp -= damage;
 		npc.hit_flash = Balance::HIT_FLASH_SEC;
@@ -743,52 +931,107 @@ namespace
 		}
 
 		LogDeath(npc, attacker_kind, attacker_index);
-		KillNpc(index, DescribeKiller(attacker_kind, attacker_index, devoured), attacker_kind == NPC_TARGET_PLAYER);
+		KillNpc(index, DescribeKiller(attacker_kind, attacker_index, devoured), attacker_kind == NPC_TARGET_PLAYER, GetDeathNewsKind(npc, attacker_kind, devoured));
 	}
 
-	void SpawnArrival(const Arrival& arrival)
+	int32 FindFreeSlot()
 	{
-		int32 slot = -1;
-
 		for (size_t index = 0; index < g_npcs.size(); ++index)
 		{
 			if (g_npcs[index].is_alive == false)
 			{
-				slot = static_cast<int32>(index);
-				break;
+				return static_cast<int32>(index);
 			}
 		}
 
+		return -1;
+	}
+
+	// 빈집이 많고 살림이 넉넉한 마을로 새 사람이 모인다
+	int32 PickArrivalVillage()
+	{
+		float total = 0.f;
+		std::array<float, ZONE_VILLAGE_COUNT> weights = {};
+
+		for (int32 village = 0; village < GetVillageCount() && village < ZONE_VILLAGE_COUNT; ++village)
+		{
+			const int32 free = CountFreeHouses(village);
+			if (free <= 0)
+			{
+				continue;
+			}
+
+			const float wealth = 0.6f + std::min(1.4f, static_cast<float>(std::max(0, GetVillageTreasury(village))) / 800.f);
+			const float weight = static_cast<float>(free) * wealth;
+
+			weights[static_cast<size_t>(village)] = weight;
+			total += weight;
+		}
+
+		if (total <= 0.f)
+		{
+			return -1;
+		}
+
+		float roll = RollRange(0.f, total);
+
+		for (int32 village = 0; village < GetVillageCount() && village < ZONE_VILLAGE_COUNT; ++village)
+		{
+			roll -= weights[static_cast<size_t>(village)];
+			if (roll <= 0.f && weights[static_cast<size_t>(village)] > 0.f)
+			{
+				return village;
+			}
+		}
+
+		return -1;
+	}
+
+	// 처음 오는 사람은 마을 들목에서 걸어 들어와 빈집에 짐을 푼다. 짐 풀기는 이사와 같은 길을 탄다
+	bool SpawnArrival(const Arrival& arrival)
+	{
+		const int32 slot = FindFreeSlot();
 		if (slot < 0)
 		{
-			return;
-		}
-
-		const int32 home = PickHomeSite(arrival.job, RollInt(0, 9));
-		int32 entry = home;
-
-		// 벽 안 사람은 성문을 나서서 온다
-		if (arrival.job != NPC_JOB_RAIDER)
-		{
-			const int32 gates = CountSitesOfKind(SITE_GATE);
-			if (gates > 0)
-			{
-				entry = FindSiteOfKind(SITE_GATE, RollInt(0, gates - 1));
-			}
+			return true;
 		}
 
 		// 슬롯을 다시 쓴다. 벡터가 커지면 몬스터와 NPC 가 들고 있는 번호가 어긋난다
 		Npc& npc = g_npcs[static_cast<size_t>(slot)];
-		InitNpc(&npc, arrival.job, home, FindSpawnNear(entry));
 
 		if (arrival.job == NPC_JOB_RAIDER)
 		{
+			const int32 home = PickHideout(RollInt(0, 9));
+			InitNpc(&npc, arrival.job, home, -1, FindSpawnNear(home));
 			PushNpcEvent(L"들개단에 새 얼굴 " + WithSubject(npc.name) + L" 합류했다", 0.85f, 0.45f, 0.40f);
+			return true;
 		}
-		else
+
+		const int32 village = PickArrivalVillage();
+		if (village < 0)
 		{
-			PushNpcEvent(L"새 " + WithSubject(GetNpcTitle(npc)) + L" 성문을 나섰다", 0.45f, 0.85f, 0.80f);
+			return false;
 		}
+
+		const int32 house = ReserveFreeHouse(village, slot);
+		if (house < 0)
+		{
+			return false;
+		}
+
+		const int32 entries = static_cast<int32>(GetVillage(village).entries.size());
+		WorldPos entry = GetVillageEntryPos(village, RollInt(0, std::max(0, entries - 1)));
+		MoveWorldPos(&entry, RollRange(-0.4f, 0.4f), RollRange(-0.4f, 0.4f));
+
+		InitNpc(&npc, arrival.job, GetVillage(village).site, village, entry);
+		npc.move_target = village;
+		npc.move_house = house;
+		npc.move_from = -1;
+		npc.move_reason = L"새로 정착";
+
+		PushNpcEvent(L"새 " + WithSubject(GetNpcTitle(npc)) + L" " + GetVillageName(village) + L" 들목에 들어섰다", 0.45f, 0.85f, 0.80f);
+
+		return true;
 	}
 
 	void UpdateArrivals(float delta_seconds)
@@ -803,9 +1046,15 @@ namespace
 				continue;
 			}
 
-			const Arrival arrival = g_arrivals[index];
+			// 빈집이 하나도 없으면 조금 뒤에 다시 본다
+			if (SpawnArrival(g_arrivals[index]) == false)
+			{
+				g_arrivals[index].timer = ARRIVAL_RETRY_SEC;
+				++index;
+				continue;
+			}
+
 			g_arrivals.erase(g_arrivals.begin() + static_cast<std::ptrdiff_t>(index));
-			SpawnArrival(arrival);
 		}
 	}
 
@@ -870,20 +1119,6 @@ namespace
 		}
 	}
 
-	void UpdateTreasury(float delta_seconds)
-	{
-		g_treasury_carry += TREASURY_INCOME_PER_SEC * delta_seconds;
-
-		const int32 income = static_cast<int32>(g_treasury_carry);
-		g_treasury_carry -= static_cast<float>(income);
-		g_treasury += income;
-
-		if (g_treasury > 40)
-		{
-			g_treasury_warned = false;
-		}
-	}
-
 	void UpdateNeeds(Npc* npc, int32 index, float delta_seconds)
 	{
 		npc->hunger += delta_seconds / HUNGER_FULL_SEC;
@@ -905,7 +1140,7 @@ namespace
 				if (npc->hp <= 0)
 				{
 					LogDeath(*npc, NPC_TARGET_NONE, -1);
-					KillNpc(index, DescribeKiller(NPC_TARGET_NONE, -1, false), false);
+					KillNpc(index, DescribeKiller(NPC_TARGET_NONE, -1, false), false, NEWS_STARVE);
 					return;
 				}
 			}
@@ -950,6 +1185,76 @@ namespace
 		npc->body.m_emissive = 1.f + npc->hit_flash / Balance::HIT_FLASH_SEC * 2.5f;
 	}
 
+	// 마을을 나설 때 그 게시판 소식을 챙긴다. 행상 · 이사꾼은 편지로, 나머지는 들은 말로.
+	// 전령은 게시판 앞에서 직접 챙긴다
+	void PackNews(Npc* npc, int32 village)
+	{
+		if (npc->job == NPC_JOB_COURIER || npc->job == NPC_JOB_RAIDER)
+		{
+			return;
+		}
+
+		int32 count = RUMOR_COUNT;
+		npc->carry_via = VIA_RUMOR;
+
+		if (npc->job == NPC_JOB_MERCHANT || npc->move_target >= 0)
+		{
+			count = MERCHANT_LETTER_COUNT;
+			npc->carry_via = VIA_LETTER;
+		}
+
+		CollectLetters(village, count, &npc->letters);
+		npc->carry_from = village;
+	}
+
+	void UpdateVillagePresence(Npc* npc, float delta_seconds)
+	{
+		npc->village_check_timer -= delta_seconds;
+		if (npc->village_check_timer > 0.f)
+		{
+			return;
+		}
+
+		npc->village_check_timer = VILLAGE_CHECK_SEC;
+
+		const int32 now = GetVillageAt(npc->body.m_pos);
+		if (now == npc->current_village)
+		{
+			return;
+		}
+
+		const int32 previous = npc->current_village;
+		npc->current_village = now;
+
+		if (now < 0)
+		{
+			if (previous >= 0)
+			{
+				PackNews(npc, previous);
+			}
+
+			return;
+		}
+
+		if (npc->job == NPC_JOB_COURIER)
+		{
+			return;
+		}
+
+		// 나갔다 그냥 돌아왔으면 전할 게 없다
+		if (npc->carry_from == now)
+		{
+			npc->letters.clear();
+			npc->carry_from = -1;
+			return;
+		}
+
+		if (npc->carry_from >= 0)
+		{
+			NpcPostLetters(npc, now);
+		}
+	}
+
 	void UpdateNpc(Npc* npc, int32 index, float delta_seconds)
 	{
 		npc->attack_cooldown = CountDown(npc->attack_cooldown, delta_seconds);
@@ -959,8 +1264,10 @@ namespace
 		npc->threat_timer = CountDown(npc->threat_timer, delta_seconds);
 		npc->outlaw_timer = CountDown(npc->outlaw_timer, delta_seconds);
 		npc->stall_heartbeat = CountDown(npc->stall_heartbeat, delta_seconds);
+		npc->settle_timer = CountDown(npc->settle_timer, delta_seconds);
 		npc->since_hit += delta_seconds;
 		npc->idle_timer += delta_seconds;
+		npc->read_timer += delta_seconds;
 
 		UpdateNeeds(npc, index, delta_seconds);
 
@@ -969,33 +1276,59 @@ namespace
 			return;
 		}
 
-		SenseNpc(npc, delta_seconds);
+		// 쉬기가 끊겼는데 집 안에 남아 있으면 안 보이는 사람이 걸어 다닌다
+		if (npc->is_inside && npc->task != NPC_TASK_REST)
+		{
+			NpcLeaveHouse(npc);
+		}
+
+		UpdateVillagePresence(npc, delta_seconds);
+
+		if (npc->is_inside == false)
+		{
+			SenseNpc(npc, delta_seconds);
+		}
+
 		ThinkNpc(npc, delta_seconds);
 
 		UpdateLook(npc);
 	}
 
-	// 광장에서 한 점에 몰려 겹치면 한 사람으로 보인다
+	float GetGlobalX(const WorldPos& pos)
+	{
+		return static_cast<float>(pos.chunk_x * CHUNK_TILE_COUNT) + pos.local_x;
+	}
+
+	// 광장에서 한 점에 몰려 겹치면 한 사람으로 보인다.
+	// 이백 명을 둘씩 다 맞대면 틱마다 이만 번이라 x 순으로 줄 세워 가까운 쌍만 본다
 	void SeparateNpcs(float delta_seconds)
 	{
 		const float push = SEPARATION_SPEED * delta_seconds;
 
-		for (size_t first = 0; first < g_npcs.size(); ++first)
-		{
-			if (g_npcs[first].is_alive == false)
-			{
-				continue;
-			}
+		std::vector<std::pair<float, size_t>> order;
+		order.reserve(g_npcs.size());
 
-			for (size_t second = first + 1; second < g_npcs.size(); ++second)
+		for (size_t index = 0; index < g_npcs.size(); ++index)
+		{
+			if (IsNpcVisible(g_npcs[index]))
 			{
-				if (g_npcs[second].is_alive == false)
+				order.push_back(std::make_pair(GetGlobalX(g_npcs[index].body.m_pos), index));
+			}
+		}
+
+		std::sort(order.begin(), order.end());
+
+		for (size_t first_order = 0; first_order < order.size(); ++first_order)
+		{
+			for (size_t second_order = first_order + 1; second_order < order.size(); ++second_order)
+			{
+				if (order[second_order].first - order[first_order].first > SEPARATION_DISTANCE)
 				{
-					continue;
+					break;
 				}
 
-				Npc& left = g_npcs[first];
-				Npc& right = g_npcs[second];
+				Npc& left = g_npcs[order[first_order].second];
+				Npc& right = g_npcs[order[second_order].second];
 
 				const float delta_x = GetTileDistanceX(left.body.m_pos, right.body.m_pos);
 				const float delta_y = GetTileDistanceY(left.body.m_pos, right.body.m_pos);
@@ -1073,6 +1406,18 @@ namespace
 			{
 				return "wander";
 			}
+			case NPC_TASK_READ:
+			{
+				return "read";
+			}
+			case NPC_TASK_DELIVER:
+			{
+				return "deliver";
+			}
+			case NPC_TASK_MOVE:
+			{
+				return "move";
+			}
 			case NPC_TASK_FIGHT:
 			{
 				return "fight";
@@ -1125,13 +1470,29 @@ namespace
 			<< " merchant " << jobs[NPC_JOB_MERCHANT]
 			<< " gatherer " << jobs[NPC_JOB_GATHERER]
 			<< " warden " << jobs[NPC_JOB_WARDEN]
+			<< " courier " << jobs[NPC_JOB_COURIER]
 			<< " outlaw " << outlaws
 			<< " deaths " << g_death_count
 			<< " robberies " << g_robbery_count
-			<< " treasury " << g_treasury
+			<< " moves " << g_move_count
+			<< " treasury " << GetTotalTreasury()
 			<< " npc_gold " << total_gold
 			<< " tick_us " << static_cast<int32>(g_tick_average_us)
 			<< " paths " << PopNavSearchCount() << "\n";
+
+		// 마을마다 주민 · 빈집 · 금고 · 게시판 소식 수
+		std::cout << "[ Npc - Census ] : villages";
+		for (int32 village = 0; village < GetVillageCount(); ++village)
+		{
+			std::cout << " | " << village
+				<< " res " << CountResidents(village)
+				<< " free " << CountFreeHouses(village)
+				<< " gold " << GetVillageTreasury(village)
+				<< " posts " << GetBoardPosts(village).size()
+				<< " in " << GetVillage(village).moved_in
+				<< " out " << GetVillage(village).moved_out;
+		}
+		std::cout << "\n";
 
 		std::cout << "[ Npc - Census ] : tasks";
 		for (int32 task = 0; task < NPC_TASK_COUNT; ++task)
@@ -1201,6 +1562,55 @@ namespace
 	int32 TileGap(const ZoneTile& left, const ZoneTile& right)
 	{
 		return std::max(std::abs(left.x - right.x), std::abs(left.y - right.y));
+	}
+
+	// 목표가 마을 안이면 그 마을 지도, 거점 둘레면 그 거점 지도. 둘 다 아니면 A* 로 간다
+	int32 FindFlowField(const WorldPos& goal)
+	{
+		const int32 village = GetVillageAt(goal);
+		if (village >= 0)
+		{
+			return village;
+		}
+
+		for (size_t order = 0; order < g_flow_sites.size(); ++order)
+		{
+			if (DistanceBetween(goal, GetSitePos(g_flow_sites[order])) <= FLOW_SITE_RADIUS)
+			{
+				return GetVillageCount() + static_cast<int32>(order);
+			}
+		}
+
+		return -1;
+	}
+
+	bool FollowFlow(Npc* npc, int32 field, float delta_seconds)
+	{
+		if (field < 0 || field >= GetNavFlowCount())
+		{
+			return false;
+		}
+
+		npc->flow_timer -= delta_seconds;
+
+		const bool reached = DistanceBetween(npc->body.m_pos, npc->flow_waypoint) < WAYPOINT_REACH * 2.f;
+		if (npc->flow_field != field || npc->flow_timer <= 0.f || reached)
+		{
+			if (GetNavFlowWaypoint(field, npc->body.m_pos, NPC_BODY_RADIUS, &npc->flow_waypoint) == false)
+			{
+				npc->flow_field = -1;
+				return false;
+			}
+
+			npc->flow_field = field;
+			npc->flow_timer = FLOW_REFRESH_SEC;
+		}
+
+		npc->path.clear();
+		npc->path_cursor = 0;
+		StepToward(npc, npc->flow_waypoint, delta_seconds);
+
+		return true;
 	}
 
 	// 멈춰 있으면 길을 다시 찾는다. 모서리에 끼면 거기서 영원히 걷는 시늉만 한다
@@ -1301,6 +1711,7 @@ namespace
 		if (npc->outlaw_timer <= 0.f)
 		{
 			PushNpcEvent(WithSubject(GetNpcTitle(*npc)) + L" 약탈에 손을 대 무법자가 되었다", 1.f, 0.55f, 0.30f);
+			PostNewsAt(npc->body.m_pos, NEWS_OUTLAW, WithSubject(GetNpcNewsTitle(*npc)) + L" 굶주림에 약탈에 손을 댔다");
 		}
 
 		npc->outlaw_timer = OUTLAW_SEC;
@@ -1323,6 +1734,7 @@ namespace
 		if (kind == MONSTER_DEVOURER)
 		{
 			PushNpcEvent(WithSubject(GetNpcTitle(*npc)) + L" 소거식귀를 쓰러뜨렸다", 0.95f, 0.85f, 0.45f);
+			PostNewsAt(npc->body.m_pos, NEWS_HUNT, WithSubject(GetNpcNewsTitle(*npc)) + L" 소거식귀를 쓰러뜨렸다");
 		}
 	}
 
@@ -1331,10 +1743,10 @@ namespace
 		killer->kills += 1;
 		NpcGainExp(killer, 10 + victim_level * 4);
 
-		// 무법자를 벤 쪽은 성채 금고에서 현상금을 받는다
+		// 무법자를 벤 쪽은 가장 가까운 마을 금고에서 현상금을 받는다
 		if (victim_outlaw && IsNpcOutlaw(*killer) == false)
 		{
-			killer->gold += TakeTreasury(OUTLAW_BOUNTY);
+			killer->gold += TakeVillageTreasury(FindNearestVillage(killer->body.m_pos), OUTLAW_BOUNTY);
 		}
 	}
 
@@ -1424,31 +1836,7 @@ const std::vector<NpcEvent>& GetNpcEvents()
 
 int32 GetTreasury()
 {
-	return g_treasury;
-}
-
-void AddTreasury(int32 amount)
-{
-	g_treasury += amount;
-}
-
-int32 TakeTreasury(int32 amount)
-{
-	int32 paid = amount;
-	if (paid > g_treasury)
-	{
-		paid = g_treasury;
-	}
-
-	g_treasury -= paid;
-
-	if (g_treasury <= 0 && g_treasury_warned == false)
-	{
-		g_treasury_warned = true;
-		PushNpcEvent(L"성채 금고가 바닥났다. 급료와 짐값이 끊긴다", 1.f, 0.35f, 0.25f);
-	}
-
-	return paid;
+	return GetTotalTreasury();
 }
 
 void PushNpcEvent(const std::wstring& text, float r, float g, float b)
@@ -1480,18 +1868,14 @@ bool IsNpcOutlaw(const Npc& npc)
 	return npc.outlaw_timer > 0.f;
 }
 
+bool IsNpcVisible(const Npc& npc)
+{
+	return npc.is_alive && npc.is_inside == false;
+}
+
 bool IsWorldPosInTown(const WorldPos& pos)
 {
-	if (g_layout == nullptr)
-	{
-		return false;
-	}
-
-	int32 x = 0;
-	int32 y = 0;
-	WorldToZoneTile(pos, &x, &y);
-
-	return IsInsideTown(*g_layout, x, y);
+	return GetVillageAt(pos) >= 0;
 }
 
 WorldPos GetSitePos(int32 site)
@@ -1510,7 +1894,7 @@ bool IsSiteInTown(int32 site)
 
 	const ZoneTile tile = g_sites[static_cast<size_t>(site)].tile;
 
-	return IsInsideTown(*g_layout, tile.x, tile.y);
+	return GetZoneVillageAt(*g_layout, tile.x, tile.y) >= 0;
 }
 
 int32 GetNpcIndex(const Npc& npc)
@@ -1611,6 +1995,10 @@ const wchar_t* GetNpcJobName(int32 job)
 		{
 			return L"순찰병";
 		}
+		case NPC_JOB_COURIER:
+		{
+			return L"전령";
+		}
 		default:
 		{
 			return L"사냥꾼";
@@ -1649,6 +2037,27 @@ std::wstring WithObject(const std::wstring& word)
 	}
 
 	return word + L"를";
+}
+
+std::wstring WithToward(const std::wstring& word)
+{
+	if (word.empty())
+	{
+		return word;
+	}
+
+	// 받침이 없거나 ㄹ 받침 ( 8 번 ) 이면 '로'
+	const wchar_t last = word.back();
+	if (last >= 0xAC00 && last <= 0xD7A3)
+	{
+		const int32 final_consonant = static_cast<int32>((last - 0xAC00) % 28);
+		if (final_consonant != 0 && final_consonant != 8)
+		{
+			return word + L"으로";
+		}
+	}
+
+	return word + L"로";
 }
 
 std::wstring GetNpcTitle(const Npc& npc)
@@ -1704,6 +2113,12 @@ int32 NpcMoveTo(Npc* npc, const WorldPos& goal, float arrive_radius, float delta
 	}
 
 	CheckProgress(npc, delta_seconds);
+
+	// 다른 마을까지 가는 먼 길은 A* 대신 그 마을 거리 지도를 따라 내려간다. 마을 안에 들면 아래 A* 로 문 앞까지
+	if (distance > FLOW_RANGE && FollowFlow(npc, FindFlowField(goal), delta_seconds))
+	{
+		return BT_RUNNING;
+	}
 
 	// 가깝고 막힌 게 없으면 길찾기 없이 곧장
 	if (distance < DIRECT_STEER_RANGE && HasNavLine(npc->body.m_pos, goal, NPC_BODY_RADIUS))
@@ -1906,6 +2321,75 @@ void NpcShowText(const Npc& npc, const std::wstring& text, float r, float g, flo
 	AddFloatingText(npc.body.m_pos, 50.f, text, r, g, b);
 }
 
+void NpcEnterHouse(Npc* npc)
+{
+	if (npc->is_inside)
+	{
+		return;
+	}
+
+	npc->is_inside = true;
+	npc->stall_heartbeat = 0.f;
+
+	// 문을 닫으면 쫓던 놈도 놓친다. 묵은 위협 때문에 문을 박차고 나오면 안 된다
+	npc->threat_timer = 0.f;
+	npc->threat_kind = NPC_TARGET_NONE;
+	npc->threat_index = -1;
+	npc->enemy_kind = NPC_TARGET_NONE;
+	npc->enemy_index = -1;
+	npc->stance = NPC_STANCE_IGNORE;
+
+	ClearReferencesTo(GetNpcIndex(*npc));
+}
+
+void NpcLeaveHouse(Npc* npc)
+{
+	npc->is_inside = false;
+}
+
+int32 NpcPostLetters(Npc* npc, int32 village)
+{
+	int32 posted = 0;
+	const std::wstring carrier = GetNpcTitle(*npc);
+
+	for (int32 news : npc->letters)
+	{
+		if (DeliverNews(village, news, npc->carry_via, carrier))
+		{
+			posted += 1;
+		}
+	}
+
+	npc->letters.clear();
+	npc->carry_from = -1;
+
+	if (posted > 0)
+	{
+		if (npc->carry_via == VIA_LETTER)
+		{
+			NpcShowText(*npc, L"편지 " + std::to_wstring(posted) + L"통", 0.95f, 0.88f, 0.62f);
+		}
+		else
+		{
+			NpcShowText(*npc, L"소문 " + std::to_wstring(posted), 0.78f, 0.80f, 0.86f);
+		}
+	}
+
+	return posted;
+}
+
+int32 GetSiteMarketVillage(int32 site)
+{
+	const int32 village = GetVillageOfSite(site);
+	if (village >= 0)
+	{
+		return village;
+	}
+
+	// 초소 장사 몫은 가장 가까운 마을 금고로
+	return FindNearestVillage(GetSitePos(site));
+}
+
 // ------------------------------------------------------------ 바깥 창구
 
 void BuildNpcs(const ZoneLayout& layout)
@@ -1922,29 +2406,43 @@ void BuildNpcs(const ZoneLayout& layout)
 	g_arrivals.clear();
 
 	g_sites = layout.sites;
-	g_treasury = TREASURY_START;
-	g_treasury_carry = 0.f;
-	g_treasury_warned = false;
 	g_selected = -1;
 	g_follow = false;
 	g_census_timer = 0.f;
 	g_death_count = 0;
 	g_robbery_count = 0;
+	g_move_count = 0;
 
 	BuildNavGrid(layout.tiles);
 	BuildNpcBrain();
 	BuildResources(layout);
 
+	// 거리 지도. 앞 일곱 장은 마을 광장 ( 번호가 곧 마을 번호 ), 그 뒤로 성문 · 초소 · 소굴 · 폐촌
+	std::vector<ZoneTile> anchors;
+	for (int32 village = 0; village < GetVillageCount(); ++village)
+	{
+		anchors.push_back(GetVillage(village).center);
+	}
+
+	g_flow_sites.clear();
+	for (size_t site = 0; site < g_sites.size(); ++site)
+	{
+		const int32 kind = g_sites[site].kind;
+		if (kind == SITE_GATE || kind == SITE_OUTPOST || kind == SITE_HIDEOUT || kind == SITE_VILLAGE)
+		{
+			g_flow_sites.push_back(static_cast<int32>(site));
+			anchors.push_back(g_sites[site].tile);
+		}
+	}
+
+	BuildNavFlowFields(anchors);
+
 	// 번호가 몬스터와 다른 NPC 표적으로 쓰이니 한 번 잡은 크기는 안 바꾼다
-	g_npcs.reserve(static_cast<size_t>(WARDEN_COUNT + HUNTER_COUNT + GATHERER_COUNT + MERCHANT_COUNT + RAIDER_COUNT));
+	g_npcs.reserve(static_cast<size_t>(CountVillagerSlots() + CountRaiderSlots()));
 
-	SpawnInitial(NPC_JOB_WARDEN, WARDEN_COUNT);
-	SpawnInitial(NPC_JOB_HUNTER, HUNTER_COUNT);
-	SpawnInitial(NPC_JOB_GATHERER, GATHERER_COUNT);
-	SpawnInitial(NPC_JOB_MERCHANT, MERCHANT_COUNT);
-	SpawnInitial(NPC_JOB_RAIDER, RAIDER_COUNT);
+	SpawnPopulation();
 
-	PushNpcEvent(L"성문의 종이 울린다. 벽 밖의 하루가 시작된다", 0.85f, 0.80f, 0.65f);
+	PushNpcEvent(L"성문의 종이 울린다. 일곱 마을의 하루가 시작된다", 0.85f, 0.80f, 0.65f);
 
 	std::cout << "[ Npc - BuildNpcs ] : npcs " << g_npcs.size()
 		<< " resources " << g_resources.size()
@@ -1956,7 +2454,8 @@ void UpdateNpcs(float delta_seconds)
 	const std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
 
 	ResetNavBudget();
-	UpdateTreasury(delta_seconds);
+	UpdateBoards(delta_seconds);
+	UpdateVillages(delta_seconds);
 	UpdateWorldObjects(delta_seconds);
 
 	for (size_t index = 0; index < g_npcs.size(); ++index)
@@ -1995,9 +2494,11 @@ void UpdateNpcs(float delta_seconds)
 
 void CollectNpcActors()
 {
+	const WorldPos camera = GetCameraPos();
+
 	for (const Npc& npc : g_npcs)
 	{
-		if (npc.is_alive)
+		if (IsNpcVisible(npc) && IsNearDraw(npc.body.m_pos, camera))
 		{
 			AddSceneActor(&npc.body);
 		}
@@ -2005,7 +2506,7 @@ void CollectNpcActors()
 
 	for (const NpcResource& resource : g_resources)
 	{
-		if (resource.regrow_timer <= 0.f)
+		if (resource.regrow_timer <= 0.f && IsNearDraw(resource.body.m_pos, camera))
 		{
 			AddSceneActor(&resource.body);
 		}
@@ -2013,17 +2514,26 @@ void CollectNpcActors()
 
 	for (const NpcCorpse& corpse : g_corpses)
 	{
-		AddSceneActor(&corpse.body);
+		if (IsNearDraw(corpse.body.m_pos, camera))
+		{
+			AddSceneActor(&corpse.body);
+		}
 	}
 
 	for (const Actor& grave : g_graves)
 	{
-		AddSceneActor(&grave);
+		if (IsNearDraw(grave.m_pos, camera))
+		{
+			AddSceneActor(&grave);
+		}
 	}
 
 	for (const FallenBody& fallen : g_fallen)
 	{
-		AddSceneActor(&fallen.body);
+		if (IsNearDraw(fallen.body.m_pos, camera))
+		{
+			AddSceneActor(&fallen.body);
+		}
 	}
 }
 
@@ -2089,18 +2599,26 @@ bool FindNpcForMonster(const WorldPos& pos, float range, int32* npc_index, float
 	{
 		const Npc& npc = g_npcs[index];
 
-		if (npc.is_alive == false)
+		if (IsNpcVisible(npc) == false)
 		{
 			continue;
 		}
 
 		const float npc_distance = DistanceBetween(pos, npc.body.m_pos);
 
-		if (npc_distance < best_distance)
+		if (npc_distance >= best_distance)
 		{
-			best_distance = npc_distance;
-			best = static_cast<int32>(index);
+			continue;
 		}
+
+		// 마을 안 사람은 몬스터가 못 노린다
+		if (IsWorldPosInTown(npc.body.m_pos))
+		{
+			continue;
+		}
+
+		best_distance = npc_distance;
+		best = static_cast<int32>(index);
 	}
 
 	if (best < 0)
@@ -2116,7 +2634,7 @@ bool FindNpcForMonster(const WorldPos& pos, float range, int32* npc_index, float
 
 bool GetNpcPos(int32 npc_index, WorldPos* pos)
 {
-	if (IsValidNpc(npc_index) == false)
+	if (IsValidNpc(npc_index) == false || g_npcs[static_cast<size_t>(npc_index)].is_inside)
 	{
 		return false;
 	}
@@ -2139,7 +2657,7 @@ int32 HitHostileNpcsInFan(const WorldPos& origin, float dir_x, float dir_y, floa
 	{
 		Npc& npc = g_npcs[index];
 
-		if (npc.is_alive == false || IsNpcOutlaw(npc) == false)
+		if (IsNpcVisible(npc) == false || IsNpcOutlaw(npc) == false)
 		{
 			continue;
 		}
@@ -2173,7 +2691,7 @@ int32 PickNpcAt(const WorldPos& pos, float radius)
 
 	for (size_t index = 0; index < g_npcs.size(); ++index)
 	{
-		if (g_npcs[index].is_alive == false)
+		if (IsNpcVisible(g_npcs[index]) == false)
 		{
 			continue;
 		}
@@ -2239,12 +2757,15 @@ void ToggleFollowNpc()
 
 bool GetFollowPos(WorldPos* pos)
 {
-	if (g_follow == false)
+	if (g_follow == false || IsValidNpc(g_selected) == false)
 	{
 		return false;
 	}
 
-	return GetNpcPos(g_selected, pos);
+	// 집 안에 들어가도 카메라는 그 집 앞에 머문다
+	*pos = g_npcs[static_cast<size_t>(g_selected)].body.m_pos;
+
+	return true;
 }
 
 void ForEachLiveNpc(void (*visit)(const WorldPos& pos, int32 job, bool is_outlaw, bool is_selected, void* context), void* context)
@@ -2253,7 +2774,7 @@ void ForEachLiveNpc(void (*visit)(const WorldPos& pos, int32 job, bool is_outlaw
 	{
 		const Npc& npc = g_npcs[index];
 
-		if (npc.is_alive)
+		if (IsNpcVisible(npc))
 		{
 			visit(npc.body.m_pos, npc.job, IsNpcOutlaw(npc), static_cast<int32>(index) == g_selected, context);
 		}
@@ -2263,4 +2784,14 @@ void ForEachLiveNpc(void (*visit)(const WorldPos& pos, int32 job, bool is_outlaw
 void NoteNpcRobbery()
 {
 	g_robbery_count += 1;
+}
+
+void NoteNpcMove()
+{
+	g_move_count += 1;
+}
+
+int32 GetNpcMoveCount()
+{
+	return g_move_count;
 }

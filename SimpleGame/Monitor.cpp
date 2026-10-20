@@ -4,6 +4,7 @@
 #include "NpcBrain.h"
 #include "NpcData.h"
 #include "Player.h"
+#include "Village.h"
 #include "ZoneGen.h"
 
 #include <nlohmann/json.hpp>
@@ -83,6 +84,13 @@ namespace
 		int32 task = 0;
 		int32 home = -1;
 		int32 region = -1;
+		int32 village = -1;
+		std::wstring village_name;	// 마을 목록은 구역을 새로 만들면 지워진다. 복사해 넘긴다
+		int32 house = -1;
+		bool is_inside = false;
+		int32 move_to = -1;
+		int32 letters = 0;
+		int32 carry_via = 0;
 		float hunger = 0.f;
 		float outlaw_sec = 0.f;	// 약탈자가 아닌데 약탈에 손댄 남은 시간
 		float greed = 0.f;
@@ -131,6 +139,21 @@ namespace
 		float b = 1.f;
 	};
 
+	struct VillageRow
+	{
+		std::wstring name;
+		int32 site = -1;
+		bool is_citadel = false;
+		int32 treasury = 0;
+		int32 residents = 0;
+		int32 free_houses = 0;
+		int32 houses = 0;
+		int32 posts = 0;
+		float recent_deaths = 0.f;
+		int32 moved_in = 0;
+		int32 moved_out = 0;
+	};
+
 	struct Snapshot
 	{
 		std::shared_ptr<const ZoneInfo> zone;
@@ -143,6 +166,8 @@ namespace
 		std::vector<MonsterRow> monsters;
 		std::vector<SiteTally> tallies;
 		std::vector<EventRow> events;
+		std::vector<VillageRow> villages;
+		int32 moves = 0;
 
 		std::array<int32, NPC_JOB_COUNT> job_alive = {};
 		int32 npc_alive = 0;
@@ -251,7 +276,7 @@ namespace
 		{
 			case SITE_TOWN:
 			{
-				return L"성채";
+				return L"마을";
 			}
 			case SITE_GATE:
 			{
@@ -293,7 +318,19 @@ namespace
 			const size_t kind = static_cast<size_t>(site.kind);
 			kind_order[kind] += 1;
 
+			// 마을 광장은 마을 이름, 성문은 성채 이름을 붙인다
+			if (site.kind == SITE_TOWN)
+			{
+				names.push_back(GetVillageName(site.village));
+				continue;
+			}
+
 			std::wstring name = GetSiteKindName(site.kind);
+			if (site.kind == SITE_GATE)
+			{
+				name = std::wstring(GetVillageName(site.village)) + L" " + name;
+			}
+
 			if (kind_total[kind] > 1)
 			{
 				name += L" " + std::to_wstring(kind_order[kind]);
@@ -305,15 +342,16 @@ namespace
 		return names;
 	}
 
-	// 성벽 안은 성채, 밖은 가장 가까운 바깥 거점. 어느 자리든 정확히 한 곳에 들어가서 거점별 합이 전체와 같다
-	int32 FindRegion(const std::vector<WorldPos>& spots, const std::vector<ZoneSite>& sites, int32 town, const WorldPos& pos)
+	// 마을 안은 그 마을 광장, 밖은 가장 가까운 바깥 거점. 어느 자리든 정확히 한 곳에 들어가서 거점별 합이 전체와 같다
+	int32 FindRegion(const std::vector<WorldPos>& spots, const std::vector<ZoneSite>& sites, const WorldPos& pos)
 	{
-		if (town >= 0 && IsWorldPosInTown(pos))
+		const int32 village = GetVillageAt(pos);
+		if (village >= 0)
 		{
-			return town;
+			return GetVillage(village).site;
 		}
 
-		int32 best = town;
+		int32 best = -1;
 		float best_distance = 0.f;
 		bool found = false;
 
@@ -355,6 +393,13 @@ namespace
 		row->task = npc.task;
 		row->home = npc.home_site;
 		row->region = region;
+		row->village = npc.home_village;
+		row->village_name = GetVillageName(npc.home_village);
+		row->house = npc.house;
+		row->is_inside = npc.is_inside;
+		row->move_to = npc.move_target;
+		row->letters = static_cast<int32>(npc.letters.size());
+		row->carry_via = npc.carry_via;
 		row->hunger = npc.hunger;
 		row->outlaw_sec = npc.outlaw_timer;
 		row->greed = npc.greed;
@@ -372,7 +417,7 @@ namespace
 		}
 	}
 
-	void GatherNpcs(const std::vector<WorldPos>& spots, int32 town, Snapshot* snapshot)
+	void GatherNpcs(const std::vector<WorldPos>& spots, Snapshot* snapshot)
 	{
 		const std::vector<ZoneSite>& sites = snapshot->zone->sites;
 		const std::vector<Npc>& npc_list = GetNpcList();
@@ -405,7 +450,7 @@ namespace
 					snapshot->outlaws += 1;
 				}
 
-				region = FindRegion(spots, sites, town, npc.body.m_pos);
+				region = FindRegion(spots, sites, npc.body.m_pos);
 				if (region >= 0)
 				{
 					SiteTally& tally = snapshot->tallies[static_cast<size_t>(region)];
@@ -433,7 +478,7 @@ namespace
 		}
 	}
 
-	void GatherMonsters(const std::vector<WorldPos>& spots, int32 town, Snapshot* snapshot)
+	void GatherMonsters(const std::vector<WorldPos>& spots, Snapshot* snapshot)
 	{
 		const std::vector<ZoneSite>& sites = snapshot->zone->sites;
 		snapshot->monster_slots = GetMonsterCount();
@@ -450,7 +495,7 @@ namespace
 			// 다시 나오길 기다리는 몬스터는 처음 선 자리 거점 몫
 			if (report.is_alive == false)
 			{
-				const int32 home_region = FindRegion(spots, sites, town, report.home);
+				const int32 home_region = FindRegion(spots, sites, report.home);
 				if (home_region >= 0)
 				{
 					snapshot->tallies[static_cast<size_t>(home_region)].monster_respawning += 1;
@@ -470,7 +515,7 @@ namespace
 				snapshot->elite_alive += 1;
 			}
 
-			const int32 region = FindRegion(spots, sites, town, report.pos);
+			const int32 region = FindRegion(spots, sites, report.pos);
 			if (region >= 0)
 			{
 				SiteTally& tally = snapshot->tallies[static_cast<size_t>(region)];
@@ -517,22 +562,36 @@ namespace
 
 		const std::vector<ZoneSite>& sites = g_game_zone->sites;
 		std::vector<WorldPos> spots(sites.size());
-		int32 town = -1;
 
 		for (size_t index = 0; index < sites.size(); ++index)
 		{
 			spots[index] = ZoneTileToWorld(sites[index].tile.x, sites[index].tile.y, 0.5f, 0.5f);
-
-			if (sites[index].kind == SITE_TOWN && town < 0)
-			{
-				town = static_cast<int32>(index);
-			}
 		}
 
 		snapshot->tallies.resize(sites.size());
 
-		GatherNpcs(spots, town, snapshot.get());
-		GatherMonsters(spots, town, snapshot.get());
+		GatherNpcs(spots, snapshot.get());
+		GatherMonsters(spots, snapshot.get());
+
+		for (int32 index = 0; index < GetVillageCount(); ++index)
+		{
+			const Village& village = GetVillage(index);
+
+			VillageRow row;
+			row.name = village.name;
+			row.site = village.site;
+			row.is_citadel = village.is_citadel;
+			row.treasury = village.treasury;
+			row.residents = CountResidents(index);
+			row.free_houses = CountFreeHouses(index);
+			row.houses = static_cast<int32>(village.houses.size());
+			row.posts = static_cast<int32>(GetBoardPosts(index).size());
+			row.recent_deaths = village.recent_deaths;
+			row.moved_in = village.moved_in;
+			row.moved_out = village.moved_out;
+
+			snapshot->villages.push_back(row);
+		}
 
 		const Player& player = GetPlayer();
 		snapshot->player_point = ToTilePoint(player.m_pos);
@@ -541,7 +600,7 @@ namespace
 		snapshot->player_level = player.m_level;
 		snapshot->player_gold = GetPlayerGold();
 		snapshot->is_player_dead = IsPlayerDead();
-		snapshot->player_region = FindRegion(spots, sites, town, player.m_pos);
+		snapshot->player_region = FindRegion(spots, sites, player.m_pos);
 
 		snapshot->is_boss_summoned = IsBossSummoned();
 		snapshot->is_boss_dead = IsBossDead();
@@ -567,6 +626,7 @@ namespace
 
 		snapshot->deaths = GetNpcDeathCount();
 		snapshot->robberies = GetNpcRobberyCount();
+		snapshot->moves = GetNpcMoveCount();
 		snapshot->treasury = GetTreasury();
 		snapshot->npc_tick_us = GetNpcTickMicroseconds();
 
@@ -649,6 +709,13 @@ namespace
 		entry["outlaw_sec"] = RoundHundredths(row.outlaw_sec);
 		entry["home"] = row.home;
 		entry["region"] = row.region;
+		entry["village"] = row.village;
+		entry["village_name"] = ToUtf8(row.village_name);
+		entry["house"] = row.house;
+		entry["inside"] = row.is_inside;
+		entry["move_to"] = row.move_to;
+		entry["letters"] = row.letters;
+		entry["carry_via"] = row.carry_via;
 		entry["x"] = RoundHundredths(row.point.x);
 		entry["y"] = RoundHundredths(row.point.y);
 		entry["brain"] = JoinBrain(row.brain);
@@ -757,6 +824,7 @@ namespace
 		summary["outlaws"] = snapshot.outlaws;
 		summary["deaths"] = snapshot.deaths;
 		summary["robberies"] = snapshot.robberies;
+		summary["moves"] = snapshot.moves;
 		summary["treasury"] = snapshot.treasury;
 		summary["npc_tick_us"] = RoundHundredths(snapshot.npc_tick_us);
 		summary["monster_alive"] = snapshot.monster_alive;
@@ -774,7 +842,27 @@ namespace
 		state["summary"] = summary;
 		state["player"] = player;
 		state["boss"] = boss;
+		Json villages = Json::array();
+		for (const VillageRow& row : snapshot.villages)
+		{
+			Json entry;
+			entry["name"] = ToUtf8(row.name);
+			entry["site"] = row.site;
+			entry["citadel"] = row.is_citadel;
+			entry["treasury"] = row.treasury;
+			entry["residents"] = row.residents;
+			entry["free_houses"] = row.free_houses;
+			entry["houses"] = row.houses;
+			entry["posts"] = row.posts;
+			entry["recent_deaths"] = RoundHundredths(row.recent_deaths);
+			entry["moved_in"] = row.moved_in;
+			entry["moved_out"] = row.moved_out;
+
+			villages.push_back(entry);
+		}
+
 		state["sites"] = sites;
+		state["villages"] = villages;
 		state["npcs"] = npcs;
 		state["monsters"] = monsters;
 		state["events"] = events;

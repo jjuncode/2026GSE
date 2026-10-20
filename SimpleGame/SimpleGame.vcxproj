@@ -204,6 +204,9 @@
     <ClInclude Include="UiDraw.h" />
     <ClInclude Include="UiWindows.h" />
     <ClInclude Include="Monitor.h" />
+    <ClInclude Include="Village.h" />
+    <ClInclude Include="HouseArt.h" />
+    <ClInclude Include="Board.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
@@ -247,6 +250,9 @@
     <ClCompile Include="UiDraw.cpp" />
     <ClCompile Include="UiWindows.cpp" />
     <ClCompile Include="Monitor.cpp" />
+    <ClCompile Include="Village.cpp" />
+    <ClCompile Include="HouseArt.cpp" />
+    <ClCompile Include="Board.cpp" />
     <ClCompile Include="SimpleGame.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

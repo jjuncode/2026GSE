@@ -2,17 +2,20 @@
 #include "Monster.h"
 #include "Audio.h"
 #include "Balance.h"
+#include "Board.h"
 #include "CombatDraw.h"
 #include "Drop.h"
 #include "Feel.h"
 #include "FloatingText.h"
 #include "GameConfig.h"
 #include "Npc.h"
+#include "NpcData.h"
 #include "Player.h"
 #include "Renderer.h"
 #include "SceneGraph.h"
 #include "SpriteAtlas.h"
 #include "Text.h"
+#include "Village.h"
 #include "World.h"
 #include "ZoneGen.h"
 
@@ -543,6 +546,13 @@ namespace
 			SpawnRing(m_pos, 4.f, 2.4f, 1.6f, 0.8f, 1.f);
 			AddDamageText(m_pos, lift + 40.f, std::wstring(m_data->name) + L" 쓰러지다", DAMAGE_STYLE_BANNER_GOOD);
 		}
+
+		// 개척대원이 큰 놈을 베면 가장 가까운 마을 게시판에 붙고, 편지를 타고 퍼진다
+		if (m_grade == GRADE_BOSS || m_grade == GRADE_ELITE || m_is_elite)
+		{
+			const std::wstring near_village = GetVillageName(FindNearestVillage(m_pos));
+			PostNewsAt(m_pos, NEWS_HERO, L"개척대원이 " + near_village + L" 근처에서 " + WithObject(m_data->name) + L" 베었다");
+		}
 	}
 
 	void Monster::OnParried(const HitInfo& hit)
@@ -621,7 +631,8 @@ namespace
 		int32 best_kind = TARGET_NONE;
 		int32 best_npc = -1;
 
-		if (IsPlayerDead() == false)
+		// 마을 안은 몬스터가 손대지 못하는 곳이다. 마을이 일곱이라 이 규칙 없이는 주민이 경계에서 몰살된다
+		if (IsPlayerDead() == false && GetVillageAt(GetPlayer().m_pos) < 0)
 		{
 			const float distance = DistanceBetween(m_pos, GetPlayer().m_pos);
 			if (distance <= best_distance)
@@ -809,8 +820,8 @@ namespace
 
 	void Monster::UpdateChase(float delta_seconds)
 	{
-		// 리쉬 - 이동보다 먼저 봐야 넘긴 틱에 한 걸음 더 가지 않는다
-		if (IsOverLeash())
+		// 리쉬 - 이동보다 먼저 봐야 넘긴 틱에 한 걸음 더 가지 않는다. 마을 경계를 밟아도 물러난다
+		if (IsOverLeash() || GetVillageAt(m_pos) >= 0)
 		{
 			m_ai = AI_RETURN;
 			m_target = TARGET_NONE;
@@ -822,7 +833,8 @@ namespace
 		WorldPos target_pos;
 		float target_radius = 0.f;
 
-		if (GetTargetPos(&target_pos, &target_radius) == false || DistanceBetween(m_pos, target_pos) > m_data->search_range * LOSE_TARGET_RATE)
+		const bool has_target = GetTargetPos(&target_pos, &target_radius);
+		if (has_target == false || DistanceBetween(m_pos, target_pos) > m_data->search_range * LOSE_TARGET_RATE || GetVillageAt(target_pos) >= 0)
 		{
 			if (SearchTarget() == false)
 			{

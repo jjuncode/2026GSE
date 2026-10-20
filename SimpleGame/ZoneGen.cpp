@@ -1,6 +1,7 @@
 ﻿#include "stdafx.h"
 #include "ZoneGen.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdlib>
@@ -9,49 +10,75 @@
 
 namespace
 {
+	const float PI = 3.14159265f;
+
 	constexpr int32 BORDER = 2;
 	constexpr float INITIAL_FILL = 0.40f;
 	constexpr int32 SMOOTH_PASS_COUNT = 4;
 	constexpr int32 MIN_REGION_SIZE = 24;	// 이보다 작은 빈 터는 뚫지 않고 메운다
-	constexpr int32 MAX_CONNECT_PASS = 256;
-	constexpr int32 MAX_PICK_TRY = 4000;
+	constexpr int32 MAX_PICK_TRY = 6000;
 
 	// 성채
-	constexpr float WALL_INNER_RADIUS = 20.f;
-	constexpr float WALL_OUTER_RADIUS = 22.f;
-	constexpr float TOWN_CLEAR_RADIUS = 25.f;	// 성벽 밖 빈 고리. 어느 성문으로 나가도 돌아 들어올 수 있다
+	constexpr float WALL_INNER_RADIUS = 22.f;
+	constexpr float WALL_OUTER_RADIUS = 24.f;
+	constexpr float TOWN_CLEAR_RADIUS = 27.f;	// 성벽 밖 빈 고리. 어느 성문으로 나가도 돌아 들어올 수 있다
 	constexpr float PLAZA_RADIUS = 5.f;
-	constexpr float HOUSE_MIN_RADIUS = 7.5f;
-	constexpr float HOUSE_MAX_RADIUS = 16.5f;	// 성벽 안쪽에 한 바퀴 도는 길을 남긴다
-	constexpr int32 HOUSE_LATTICE = 4;	// 집은 최대 3 칸이라 사이에 한 칸 골목이 꼭 남는다
+	constexpr float CITADEL_HOUSE_MIN = 7.5f;
+	constexpr float CITADEL_HOUSE_MAX = 19.5f;	// 성벽 안쪽에 한 바퀴 도는 길을 남긴다
+	constexpr int32 CITADEL_RADIUS = 24;
 	constexpr int32 GATE_HALF_WIDTH = 1;
-	constexpr int32 GATE_ROAD_LENGTH = 34;	// 성문 밖 곧은 길 끝 ( 광장 기준 )
+	constexpr int32 GATE_ROAD_LENGTH = 36;	// 성문 밖 곧은 길 끝 ( 광장 기준 )
+
+	// 개척촌. 이웃 마을 경계에서 경계까지 초속 4 칸으로 20 초 ( 80 칸 ) 안팎
+	constexpr float HAMLET_RING_RADIUS = 124.f;	// 118 일 때 경계 사이 길이 62 ~ 86 칸 ( 평균 72 ) 이라 늘렸다
+	constexpr float HAMLET_RING_JITTER = 5.f;
+	constexpr float HAMLET_ANGLE_JITTER = 0.09f;
+	constexpr float HAMLET_CLEAR_RADIUS = 24.f;
+	constexpr float HAMLET_PLAZA_RADIUS = 4.5f;
+	constexpr float HAMLET_HOUSE_MIN = 6.5f;
+	constexpr float HAMLET_HOUSE_MAX = 19.5f;
+	constexpr int32 HAMLET_RADIUS = 22;
+	constexpr int32 HOUSE_LATTICE = 4;	// 집은 최대 3 칸이라 사이에 한 칸 골목이 꼭 남는다
+	constexpr int32 HOUSES_PER_VILLAGE = 36;	// 주민 30 + 이사 올 빈집
+	constexpr int32 STREET_KEEP_CLEAR = 2;	// 길 칸 둘레 이만큼은 집을 안 짓는다
+
+	// 교역로
+	constexpr float ROAD_CARVE_RADIUS = 1.7f;
+	constexpr float ROAD_BEND = 9.f;
+	constexpr float ROAD_WIGGLE = 2.5f;
+	constexpr float ROAD_SAMPLE_STEP = 0.4f;
+	constexpr float OUTPOST_ROAD_OFFSET = 5.f;	// 길 바로 위가 아니라 길가에 친다
 
 	// 거점
-	constexpr int32 OUTPOST_COUNT = 5;
-	constexpr int32 HIDEOUT_COUNT = 2;
-	constexpr int32 VILLAGE_COUNT = 3;
-	constexpr float OUTPOST_SPACING = 30.f;
-	constexpr float HIDEOUT_SPACING = 45.f;
-	constexpr float VILLAGE_SPACING = 24.f;
+	constexpr int32 HIDEOUT_COUNT = 3;
+	constexpr int32 RUIN_COUNT = 4;
+	constexpr float HIDEOUT_SPACING = 60.f;
+	constexpr float RUIN_SPACING = 40.f;
+	constexpr float HIDEOUT_VILLAGE_CLEARANCE = 50.f;
+	constexpr float RUIN_VILLAGE_CLEARANCE = 44.f;
+	constexpr float HIDEOUT_ROAD_CLEARANCE = 14.f;
+	constexpr float RUIN_ROAD_CLEARANCE = 8.f;
 	constexpr int32 OUTPOST_CLEAR_RADIUS = 3;
 	constexpr int32 HIDEOUT_CLEAR_RADIUS = 4;
-	constexpr int32 VILLAGE_CLEAR_RADIUS = 6;
+	constexpr int32 RUIN_CLEAR_RADIUS = 6;
 	constexpr int32 LAIR_CLEAR_RADIUS = 5;
-	constexpr float LAIR_WALK_RATIO = 0.78f;	// 제일 먼 칸에 두면 구역 경계에 붙는다
+	constexpr float LAIR_WALK_RATIO = 0.8f;	// 제일 먼 칸에 두면 구역 경계에 붙는다
+	constexpr float LAIR_VILLAGE_CLEARANCE = 60.f;
 	constexpr int32 LAIR_EDGE_MARGIN = 24;
 
-	// 몬스터 무리
-	constexpr int32 PACK_MIN_WALK = 30;	// 성문 앞 몇 걸음은 비워 둔다
-	constexpr int32 BAND_FIELD_WALK = 55;
-	constexpr int32 BAND_OUTER_WALK = 105;
-	constexpr int32 PACK_INTRO_COUNT = 6;
-	constexpr int32 PACK_FIELD_COUNT = 10;
-	constexpr int32 PACK_OUTER_COUNT = 12;
+	// 몬스터 무리. 마을 경계 가까이는 성문 앞 띠, 마을 사이는 들판, 고리 바깥 먼 곳은 깊은 곳.
+	// 성채에서 걸은 거리로만 가르면 개척촌 여섯이 통째로 들판 한복판이라 주민이 209 초에 109 명 죽었다
+	constexpr int32 PACK_MIN_WALK = 36;	// 성문 앞 몇 걸음은 비워 둔다
+	constexpr float BAND_INTRO_EDGE = 40.f;	// 마을 경계에서 이 안은 타락자뿐
+	constexpr int32 BAND_OUTER_WALK = 170;	// 개척촌 고리 ( 124 + 22 ) 바깥
+	constexpr int32 PACK_INTRO_COUNT = 16;
+	constexpr int32 PACK_FIELD_COUNT = 20;
+	constexpr int32 PACK_OUTER_COUNT = 16;
 	constexpr int32 PACK_COUNT = PACK_INTRO_COUNT + PACK_FIELD_COUNT + PACK_OUTER_COUNT;
 	constexpr float PACK_SPACING = 10.f;
 	constexpr float PACK_INTRO_SPACING = 8.f;
 	constexpr float PACK_SITE_SPACING = 20.f;	// 배회 3 + 어그로 8 + 여유. 이보다 가까우면 거점이 늘 싸움판이다
+	constexpr float PACK_VILLAGE_SPACING = 18.f;	// 마을 경계에서
 	constexpr float PACK_LAIR_SPACING = 14.f;
 
 	// 지형
@@ -59,12 +86,18 @@ namespace
 	constexpr float SCATTER_TREE_CHANCE = 0.025f;
 	constexpr float SCATTER_ROCK_CHANCE = 0.010f;
 	constexpr float BLIGHT_START_RATIO = 0.6f;	// 가장 먼 거리의 이 비율부터 재에 물든다
-	constexpr int32 HERB_MAX_COUNT = 50;
-	constexpr int32 RELIC_PER_VILLAGE = 4;
-	constexpr int32 RELIC_WILD_COUNT = 18;
+	constexpr int32 HERB_MAX_COUNT = 100;
+	constexpr int32 RELIC_PER_RUIN = 4;
+	constexpr int32 RELIC_WILD_COUNT = 30;
 
 	const std::array<int32, 4> STEP_X = { 1, -1, 0, 0 };
 	const std::array<int32, 4> STEP_Y = { 0, 0, 1, -1 };
+
+	struct RoadPoint
+	{
+		float x = 0.f;
+		float y = 0.f;
+	};
 
 	size_t ToIndex(int32 x, int32 y)
 	{
@@ -253,6 +286,35 @@ namespace
 		}
 	}
 
+	void ClearDisk(std::vector<uint8>* tiles, float center_x, float center_y, float radius)
+	{
+		const int32 min_x = static_cast<int32>(std::floor(center_x - radius));
+		const int32 max_x = static_cast<int32>(std::ceil(center_x + radius));
+		const int32 min_y = static_cast<int32>(std::floor(center_y - radius));
+		const int32 max_y = static_cast<int32>(std::ceil(center_y + radius));
+
+		for (int32 y = min_y; y <= max_y; ++y)
+		{
+			for (int32 x = min_x; x <= max_x; ++x)
+			{
+				if (IsInside(x, y) == false || IsBorder(x, y))
+				{
+					continue;
+				}
+
+				const float delta_x = static_cast<float>(x) + 0.5f - center_x;
+				const float delta_y = static_cast<float>(y) + 0.5f - center_y;
+
+				if (delta_x * delta_x + delta_y * delta_y > radius * radius)
+				{
+					continue;
+				}
+
+				(*tiles)[ToIndex(x, y)] = TILE_OPEN;
+			}
+		}
+	}
+
 	// 성채 둘레를 비우는 원이 성벽을 파고들면 안 된다
 	void CarveCircle(std::vector<uint8>* tiles, const ZoneTile& center, int32 radius, const ZoneTile& town)
 	{
@@ -357,26 +419,57 @@ namespace
 		return best;
 	}
 
-	bool FindOrphan(const std::vector<uint8>& tiles, const std::vector<int32>& distances, ZoneTile* orphan)
+	// 닿은 표시를 넓힌다. 거리는 안 재고 이어졌는지만 본다. 넘긴 목록이 있으면 새로 닿은 칸을 담는다
+	int32 FloodMark(const std::vector<uint8>& tiles, const ZoneTile& start, uint8 mark, std::vector<uint8>* marks, std::vector<ZoneTile>* region)
 	{
-		for (int32 y = 0; y < ZONE_TILE_COUNT; ++y)
+		if (IsOpenAt(tiles, start.x, start.y) == false || (*marks)[ToIndex(start.x, start.y)] == mark)
 		{
-			for (int32 x = 0; x < ZONE_TILE_COUNT; ++x)
+			return 0;
+		}
+
+		std::deque<ZoneTile> queue;
+		(*marks)[ToIndex(start.x, start.y)] = mark;
+		queue.push_back(start);
+		int32 count = 0;
+
+		while (queue.empty() == false)
+		{
+			const ZoneTile current = queue.front();
+			queue.pop_front();
+			count += 1;
+
+			if (region != nullptr)
 			{
-				if (IsOpenAt(tiles, x, y) && distances[ToIndex(x, y)] < 0)
+				region->push_back(current);
+			}
+
+			for (size_t dir = 0; dir < STEP_X.size(); ++dir)
+			{
+				ZoneTile next;
+				next.x = current.x + STEP_X[dir];
+				next.y = current.y + STEP_Y[dir];
+
+				if (IsOpenAt(tiles, next.x, next.y) == false)
 				{
-					orphan->x = x;
-					orphan->y = y;
-					return true;
+					continue;
 				}
+
+				const size_t next_index = ToIndex(next.x, next.y);
+				if ((*marks)[next_index] == mark)
+				{
+					continue;
+				}
+
+				(*marks)[next_index] = mark;
+				queue.push_back(next);
 			}
 		}
 
-		return false;
+		return count;
 	}
 
 	// 광장과 이어진 칸에 닿을 때까지 파 들어간다
-	void CarveCorridor(std::vector<uint8>* tiles, const std::vector<int32>& reached, const ZoneTile& from, const ZoneTile& to)
+	void CarveCorridor(std::vector<uint8>* tiles, const std::vector<uint8>& reached, const ZoneTile& from, const ZoneTile& to)
 	{
 		ZoneTile current = from;
 		bool moving_x = true;
@@ -384,7 +477,7 @@ namespace
 		for (int32 guard = 0; guard < ZONE_TILE_COUNT * 4; ++guard)
 		{
 			const size_t index = ToIndex(current.x, current.y);
-			if (reached[index] >= 0)
+			if (reached[index] == 1)
 			{
 				return;
 			}
@@ -428,43 +521,50 @@ namespace
 		}
 	}
 
+	// 갇힌 빈 터마다 광장 쪽으로 통로를 판다.
+	// 매번 처음부터 다시 재면 구역이 커진 만큼 수백 번 전체를 훑는다. 판 통로에서 닿은 표시만 넓힌다
 	void ConnectRegions(std::vector<uint8>* tiles, const ZoneTile& start)
 	{
-		std::vector<int32> reached;
-		std::vector<int32> region_distances;
+		std::vector<uint8> reached(tiles->size(), 0);
+		FloodMark(*tiles, start, 1, &reached, nullptr);
 
-		for (int32 pass = 0; pass < MAX_CONNECT_PASS; ++pass)
+		std::vector<uint8> scratch(tiles->size(), 0);
+		std::vector<ZoneTile> region;
+
+		for (int32 y = 0; y < ZONE_TILE_COUNT; ++y)
 		{
-			MeasureDistance(*tiles, start, &reached);
-
-			ZoneTile orphan;
-			if (FindOrphan(*tiles, reached, &orphan) == false)
+			for (int32 x = 0; x < ZONE_TILE_COUNT; ++x)
 			{
-				return;
-			}
-
-			MeasureDistance(*tiles, orphan, &region_distances);
-
-			const int32 region_size = CountReachedTiles(region_distances);
-
-			if (region_size < MIN_REGION_SIZE)
-			{
-				for (size_t index = 0; index < region_distances.size(); ++index)
+				const size_t index = ToIndex(x, y);
+				if (IsBlockingTile((*tiles)[index]) || reached[index] == 1 || scratch[index] == 1)
 				{
-					if (region_distances[index] >= 0)
-					{
-						(*tiles)[index] = TILE_CLIFF;
-					}
+					continue;
 				}
 
-				continue;
-			}
+				ZoneTile orphan;
+				orphan.x = x;
+				orphan.y = y;
 
-			CarveCorridor(tiles, reached, orphan, start);
+				region.clear();
+				const int32 region_size = FloodMark(*tiles, orphan, 1, &scratch, &region);
+
+				if (region_size < MIN_REGION_SIZE)
+				{
+					for (const ZoneTile& tile : region)
+					{
+						(*tiles)[ToIndex(tile.x, tile.y)] = TILE_CLIFF;
+					}
+
+					continue;
+				}
+
+				CarveCorridor(tiles, reached, orphan, start);
+				FloodMark(*tiles, orphan, 1, &reached, nullptr);
+			}
 		}
 	}
 
-	// 연결 패스 횟수가 모자라도 갇힌 빈 칸이 절대 안 남게 마지막에 메운다
+	// 연결이 끝난 뒤에도 갇힌 빈 칸이 절대 안 남게 마지막에 메운다
 	void FillUnreached(std::vector<uint8>* tiles, const ZoneTile& start, uint8 fill)
 	{
 		std::vector<int32> distances;
@@ -485,6 +585,34 @@ namespace
 		*along_y = STEP_Y[dir];
 		*side_x = std::abs(STEP_Y[dir]);
 		*side_y = std::abs(STEP_X[dir]);
+	}
+
+	// ------------------------------------------------------------ 마을 자리
+
+	// 성채가 가운데, 개척촌 여섯이 둘레 육각형. 육각형이라 이웃끼리도 성채와도 같은 거리다
+	void PlaceVillages(uint32 seed, ZoneLayout* layout)
+	{
+		layout->villages.clear();
+
+		ZoneVillage citadel;
+		citadel.center = layout->center;
+		citadel.radius = CITADEL_RADIUS;
+		citadel.is_citadel = true;
+		layout->villages.push_back(citadel);
+
+		for (int32 index = 1; index < ZONE_VILLAGE_COUNT; ++index)
+		{
+			const float jitter_angle = (HashToUnit(HashZoneTile(seed + 1201u, index, 0)) - 0.5f) * 2.f * HAMLET_ANGLE_JITTER;
+			const float jitter_radius = (HashToUnit(HashZoneTile(seed + 1203u, index, 0)) - 0.5f) * 2.f * HAMLET_RING_JITTER;
+			const float angle = static_cast<float>(index - 1) * PI / 3.f + jitter_angle;
+			const float radius = HAMLET_RING_RADIUS + jitter_radius;
+
+			ZoneVillage hamlet;
+			hamlet.center.x = layout->center.x + static_cast<int32>(std::lround(std::cos(angle) * radius));
+			hamlet.center.y = layout->center.y + static_cast<int32>(std::lround(std::sin(angle) * radius));
+			hamlet.radius = HAMLET_RADIUS;
+			layout->villages.push_back(hamlet);
+		}
 	}
 
 	// 성벽을 세우기 전에 성채 자리와 성문 밖 곧은 길을 비운다. 연결 보장이 이 빈터를 기준으로 돈다
@@ -532,6 +660,288 @@ namespace
 			}
 		}
 	}
+
+	void ClearHamlets(ZoneLayout* layout)
+	{
+		for (const ZoneVillage& village : layout->villages)
+		{
+			if (village.is_citadel)
+			{
+				continue;
+			}
+
+			ClearDisk(&layout->tiles, static_cast<float>(village.center.x) + 0.5f, static_cast<float>(village.center.y) + 0.5f, HAMLET_CLEAR_RADIUS);
+		}
+	}
+
+	// ------------------------------------------------------------ 교역로
+
+	// 성채 쪽 끝은 개척촌 방향에 가장 가까운 성문 길 끝
+	RoadPoint GetCitadelRoadEnd(const ZoneLayout& layout, const ZoneTile& toward)
+	{
+		const ZoneTile& center = layout.center;
+		const float delta_x = static_cast<float>(toward.x - center.x);
+		const float delta_y = static_cast<float>(toward.y - center.y);
+
+		size_t best_dir = 0;
+		float best_dot = -1.0e9f;
+
+		for (size_t dir = 0; dir < STEP_X.size(); ++dir)
+		{
+			const float dot = delta_x * static_cast<float>(STEP_X[dir]) + delta_y * static_cast<float>(STEP_Y[dir]);
+			if (dot > best_dot)
+			{
+				best_dot = dot;
+				best_dir = dir;
+			}
+		}
+
+		RoadPoint point;
+		point.x = static_cast<float>(center.x + STEP_X[best_dir] * GATE_ROAD_LENGTH) + 0.5f;
+		point.y = static_cast<float>(center.y + STEP_Y[best_dir] * GATE_ROAD_LENGTH) + 0.5f;
+
+		return point;
+	}
+
+	RoadPoint GetVillageRoadEnd(const ZoneLayout& layout, int32 village, int32 other)
+	{
+		if (layout.villages[static_cast<size_t>(village)].is_citadel)
+		{
+			return GetCitadelRoadEnd(layout, layout.villages[static_cast<size_t>(other)].center);
+		}
+
+		const ZoneTile& center = layout.villages[static_cast<size_t>(village)].center;
+
+		RoadPoint point;
+		point.x = static_cast<float>(center.x) + 0.5f;
+		point.y = static_cast<float>(center.y) + 0.5f;
+
+		return point;
+	}
+
+	// 곧게 그으면 자로 그은 길이라 굽이를 준다. 양 끝은 마을 광장으로 곧게 들어간다
+	void TraceRoad(uint32 seed, int32 road_index, const RoadPoint& from, const RoadPoint& to, std::vector<RoadPoint>* points)
+	{
+		points->clear();
+
+		const float delta_x = to.x - from.x;
+		const float delta_y = to.y - from.y;
+		const float length = std::sqrt(delta_x * delta_x + delta_y * delta_y);
+
+		if (length < 1.f)
+		{
+			return;
+		}
+
+		const float normal_x = -delta_y / length;
+		const float normal_y = delta_x / length;
+		const float bend = (HashToUnit(HashZoneTile(seed + 1301u, road_index, 0)) - 0.5f) * 2.f * ROAD_BEND;
+		const float phase = HashToUnit(HashZoneTile(seed + 1303u, road_index, 0)) * PI * 2.f;
+		const int32 steps = static_cast<int32>(length / ROAD_SAMPLE_STEP) + 1;
+
+		for (int32 step = 0; step <= steps; ++step)
+		{
+			const float t = static_cast<float>(step) / static_cast<float>(steps);
+			const float envelope = std::sin(PI * t);
+			const float offset = bend * envelope + ROAD_WIGGLE * std::sin(PI * 3.f * t + phase) * envelope;
+
+			RoadPoint point;
+			point.x = from.x + delta_x * t + normal_x * offset;
+			point.y = from.y + delta_y * t + normal_y * offset;
+			points->push_back(point);
+		}
+	}
+
+	// 점을 칸으로. 대각선으로 건너뛴 곳은 한 칸 끼워 4 방향으로 잇는다 ( 칠할 때 끊기지 않게 )
+	void RasterizeRoad(const std::vector<RoadPoint>& points, std::vector<ZoneTile>* path)
+	{
+		path->clear();
+
+		for (const RoadPoint& point : points)
+		{
+			ZoneTile tile;
+			tile.x = static_cast<int32>(std::floor(point.x));
+			tile.y = static_cast<int32>(std::floor(point.y));
+
+			if (IsInside(tile.x, tile.y) == false)
+			{
+				continue;
+			}
+
+			if (path->empty() == false)
+			{
+				const ZoneTile last = path->back();
+				if (last.x == tile.x && last.y == tile.y)
+				{
+					continue;
+				}
+
+				if (last.x != tile.x && last.y != tile.y)
+				{
+					ZoneTile bridge;
+					bridge.x = tile.x;
+					bridge.y = last.y;
+					path->push_back(bridge);
+				}
+			}
+
+			path->push_back(tile);
+		}
+	}
+
+	float MeasureRoadOutside(const ZoneLayout& layout, const ZoneRoad& road, const std::vector<RoadPoint>& points)
+	{
+		const ZoneVillage& village_a = layout.villages[static_cast<size_t>(road.village_a)];
+		const ZoneVillage& village_b = layout.villages[static_cast<size_t>(road.village_b)];
+		float length = 0.f;
+
+		for (size_t index = 1; index < points.size(); ++index)
+		{
+			const RoadPoint& point = points[index];
+			const ZoneTile tile = { static_cast<int32>(point.x), static_cast<int32>(point.y) };
+
+			if (TileDistance(tile, village_a.center) < static_cast<float>(village_a.radius))
+			{
+				continue;
+			}
+
+			if (TileDistance(tile, village_b.center) < static_cast<float>(village_b.radius))
+			{
+				continue;
+			}
+
+			const float delta_x = point.x - points[index - 1].x;
+			const float delta_y = point.y - points[index - 1].y;
+			length += std::sqrt(delta_x * delta_x + delta_y * delta_y);
+		}
+
+		return length;
+	}
+
+	void AddRoad(uint32 seed, int32 village_a, int32 village_b, ZoneLayout* layout)
+	{
+		ZoneRoad road;
+		road.village_a = village_a;
+		road.village_b = village_b;
+
+		std::vector<RoadPoint> points;
+		const int32 road_index = static_cast<int32>(layout->roads.size());
+		TraceRoad(seed, road_index, GetVillageRoadEnd(*layout, village_a, village_b), GetVillageRoadEnd(*layout, village_b, village_a), &points);
+
+		for (const RoadPoint& point : points)
+		{
+			ClearDisk(&layout->tiles, point.x, point.y, ROAD_CARVE_RADIUS);
+		}
+
+		RasterizeRoad(points, &road.path);
+
+		std::cout << "[ ZoneGen - AddRoad ] : road " << village_a << "-" << village_b
+			<< " outside " << static_cast<int32>(MeasureRoadOutside(*layout, road, points)) << " tiles\n";
+
+		layout->villages[static_cast<size_t>(village_a)].neighbors.push_back(village_b);
+		layout->villages[static_cast<size_t>(village_b)].neighbors.push_back(village_a);
+		layout->roads.push_back(road);
+	}
+
+	// 성채에서 개척촌마다 하나, 이웃 개척촌끼리 하나씩. 열두 갈래
+	void CarveRoads(uint32 seed, ZoneLayout* layout)
+	{
+		layout->roads.clear();
+
+		for (int32 index = 1; index < ZONE_VILLAGE_COUNT; ++index)
+		{
+			AddRoad(seed, ZONE_CITADEL, index, layout);
+		}
+
+		for (int32 index = 1; index < ZONE_VILLAGE_COUNT; ++index)
+		{
+			int32 next = index + 1;
+			if (next >= ZONE_VILLAGE_COUNT)
+			{
+				next = 1;
+			}
+
+			AddRoad(seed, index, next, layout);
+		}
+	}
+
+	// 길이 마을 경계를 처음 넘는 칸. 새 사람이 이 길로 걸어 들어온다
+	void FindRoadEntries(ZoneLayout* layout)
+	{
+		for (const ZoneRoad& road : layout->roads)
+		{
+			const std::array<int32, 2> ends = { road.village_a, road.village_b };
+
+			for (size_t end = 0; end < ends.size(); ++end)
+			{
+				ZoneVillage& village = layout->villages[static_cast<size_t>(ends[end])];
+				const float radius = static_cast<float>(village.radius) + 1.f;
+
+				for (size_t step = 0; step < road.path.size(); ++step)
+				{
+					size_t index = step;
+					if (end == 1)
+					{
+						index = road.path.size() - 1 - step;
+					}
+
+					const ZoneTile& tile = road.path[index];
+					if (TileDistance(tile, village.center) >= radius)
+					{
+						village.entries.push_back(tile);
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	// 마을 안 길 둘레는 집을 안 짓는다. 성채는 성문 축이 큰길이다
+	void MarkStreets(const ZoneLayout& layout, std::vector<uint8>* keep_clear)
+	{
+		keep_clear->assign(layout.tiles.size(), 0);
+
+		for (const ZoneRoad& road : layout.roads)
+		{
+			for (const ZoneTile& tile : road.path)
+			{
+				for (int32 offset_y = -STREET_KEEP_CLEAR; offset_y <= STREET_KEEP_CLEAR; ++offset_y)
+				{
+					for (int32 offset_x = -STREET_KEEP_CLEAR; offset_x <= STREET_KEEP_CLEAR; ++offset_x)
+					{
+						const int32 x = tile.x + offset_x;
+						const int32 y = tile.y + offset_y;
+
+						if (IsInside(x, y))
+						{
+							(*keep_clear)[ToIndex(x, y)] = 1;
+						}
+					}
+				}
+			}
+		}
+
+		const ZoneTile& center = layout.center;
+		const int32 reach = static_cast<int32>(WALL_OUTER_RADIUS) + 1;
+
+		for (int32 y = center.y - reach; y <= center.y + reach; ++y)
+		{
+			for (int32 x = center.x - reach; x <= center.x + reach; ++x)
+			{
+				if (IsInside(x, y) == false)
+				{
+					continue;
+				}
+
+				if (std::abs(x - center.x) < 3 || std::abs(y - center.y) < 3)
+				{
+					(*keep_clear)[ToIndex(x, y)] = 1;
+				}
+			}
+		}
+	}
+
+	// ------------------------------------------------------------ 성채
 
 	void BuildWallRing(ZoneLayout* layout)
 	{
@@ -607,15 +1017,54 @@ namespace
 
 			ZoneSite gate;
 			gate.kind = SITE_GATE;
+			gate.village = ZONE_CITADEL;
 			gate.tile.x = center.x + along_x * static_cast<int32>(WALL_OUTER_RADIUS + 2.f);
 			gate.tile.y = center.y + along_y * static_cast<int32>(WALL_OUTER_RADIUS + 2.f);
 			layout->sites.push_back(gate);
 		}
 	}
 
-	bool CanPlaceTownLot(const ZoneLayout& layout, int32 base_x, int32 base_y, int32 size_x, int32 size_y)
+	void BuildHamletPlazas(ZoneLayout* layout)
 	{
-		const ZoneTile& center = layout.center;
+		for (const ZoneVillage& village : layout->villages)
+		{
+			if (village.is_citadel)
+			{
+				continue;
+			}
+
+			const int32 reach = static_cast<int32>(HAMLET_PLAZA_RADIUS) + 1;
+
+			for (int32 y = village.center.y - reach; y <= village.center.y + reach; ++y)
+			{
+				for (int32 x = village.center.x - reach; x <= village.center.x + reach; ++x)
+				{
+					if (CenterDistance(x, y, village.center) < HAMLET_PLAZA_RADIUS)
+					{
+						layout->tiles[ToIndex(x, y)] = TILE_PLAZA;
+					}
+				}
+			}
+		}
+	}
+
+	// ------------------------------------------------------------ 집
+
+	struct LotCandidate
+	{
+		ZoneTile base;
+		float order = 0.f;	// 작을수록 광장에 가깝다
+	};
+
+	bool CanPlaceLot(const ZoneLayout& layout, const std::vector<uint8>& keep_clear, const ZoneVillage& village, int32 base_x, int32 base_y, int32 size_x, int32 size_y)
+	{
+		float min_radius = HAMLET_HOUSE_MIN;
+		float max_radius = HAMLET_HOUSE_MAX;
+		if (village.is_citadel)
+		{
+			min_radius = CITADEL_HOUSE_MIN;
+			max_radius = CITADEL_HOUSE_MAX;
+		}
 
 		for (int32 y = base_y; y < base_y + size_y; ++y)
 		{
@@ -626,19 +1075,14 @@ namespace
 					return false;
 				}
 
-				const float distance = CenterDistance(x, y, center);
-				if (distance < HOUSE_MIN_RADIUS || distance > HOUSE_MAX_RADIUS)
+				const float distance = CenterDistance(x, y, village.center);
+				if (distance < min_radius || distance > max_radius)
 				{
 					return false;
 				}
 
-				// 성문으로 가는 큰길에서 한 칸 띄운다
-				if (std::abs(x - center.x) < 3 || std::abs(y - center.y) < 3)
-				{
-					return false;
-				}
-
-				if (layout.tiles[ToIndex(x, y)] != TILE_OPEN)
+				const size_t index = ToIndex(x, y);
+				if (keep_clear[index] == 1 || layout.tiles[index] != TILE_OPEN)
 				{
 					return false;
 				}
@@ -659,44 +1103,110 @@ namespace
 		}
 	}
 
-	// 격자 칸마다 집 / 밭 / 빈 마당 중 하나. 칸 간격이 4 라 골목이 끊기지 않는다
-	void BuildHouses(uint32 seed, ZoneLayout* layout)
+	void PickHouseSize(uint32 hash, int32* size_x, int32* size_y)
 	{
-		const ZoneTile& center = layout->center;
-		const int32 reach = static_cast<int32>(HOUSE_MAX_RADIUS) + 1;
+		const float roll = HashToUnit(hash);
 
-		for (int32 base_y = center.y - reach; base_y <= center.y + reach; base_y += HOUSE_LATTICE)
+		*size_x = 2;
+		*size_y = 2;
+
+		if (roll < 0.15f)
 		{
-			for (int32 base_x = center.x - reach; base_x <= center.x + reach; base_x += HOUSE_LATTICE)
-			{
-				const uint32 hash = HashZoneTile(seed + 606u, base_x, base_y);
-				const float roll = HashToUnit(hash);
-
-				if (roll < 0.18f)
-				{
-					if (CanPlaceTownLot(*layout, base_x, base_y, 3, 3))
-					{
-						FillLot(layout, base_x, base_y, 3, 3, TILE_FIELD);
-					}
-
-					continue;
-				}
-
-				if (roll > 0.82f)
-				{
-					continue;
-				}
-
-				const int32 size_x = 2 + static_cast<int32>((hash >> 17) & 1u);
-				const int32 size_y = 2 + static_cast<int32>((hash >> 19) & 1u);
-
-				if (CanPlaceTownLot(*layout, base_x, base_y, size_x, size_y))
-				{
-					FillLot(layout, base_x, base_y, size_x, size_y, TILE_HOUSE);
-				}
-			}
+			*size_x = 3;
+		}
+		else if (roll < 0.30f)
+		{
+			*size_y = 3;
+		}
+		else if (roll < 0.40f)
+		{
+			*size_x = 3;
+			*size_y = 3;
 		}
 	}
+
+	// 문은 카메라 쪽 면 ( +y ) 에 낸다. 문 앞은 격자 골목이라 늘 비어 있다
+	void AddHouse(int32 village_index, int32 base_x, int32 base_y, int32 size_x, int32 size_y, uint32 hash, ZoneLayout* layout)
+	{
+		ZoneHouse house;
+		house.village = village_index;
+		house.lot.x = base_x;
+		house.lot.y = base_y;
+		house.size_x = size_x;
+		house.size_y = size_y;
+		house.door_on_x = false;
+		house.door.x = base_x + static_cast<int32>((hash >> 9) % static_cast<uint32>(size_x));
+		house.door.y = base_y + size_y;
+
+		FillLot(layout, base_x, base_y, size_x, size_y, TILE_HOUSE);
+		layout->houses.push_back(house);
+	}
+
+	// 광장에 가까운 칸부터 집을 채우고, 바깥 칸은 밭과 마당으로 남긴다
+	void BuildVillageHouses(uint32 seed, int32 village_index, const std::vector<uint8>& keep_clear, ZoneLayout* layout)
+	{
+		const ZoneVillage village = layout->villages[static_cast<size_t>(village_index)];
+		const int32 reach = static_cast<int32>(HAMLET_HOUSE_MAX) + 2;
+		std::vector<LotCandidate> candidates;
+
+		for (int32 base_y = village.center.y - reach; base_y <= village.center.y + reach; base_y += HOUSE_LATTICE)
+		{
+			for (int32 base_x = village.center.x - reach; base_x <= village.center.x + reach; base_x += HOUSE_LATTICE)
+			{
+				if (CanPlaceLot(*layout, keep_clear, village, base_x, base_y, 2, 2) == false)
+				{
+					continue;
+				}
+
+				LotCandidate candidate;
+				candidate.base.x = base_x;
+				candidate.base.y = base_y;
+				candidate.order = CenterDistance(base_x + 1, base_y + 1, village.center) + HashToUnit(HashZoneTile(seed + 611u, base_x, base_y)) * 4.f;
+				candidates.push_back(candidate);
+			}
+		}
+
+		std::sort(candidates.begin(), candidates.end(),
+			[](const LotCandidate& left, const LotCandidate& right)
+			{
+				return left.order < right.order;
+			});
+
+		int32 built = 0;
+
+		for (const LotCandidate& candidate : candidates)
+		{
+			const int32 base_x = candidate.base.x;
+			const int32 base_y = candidate.base.y;
+			const uint32 hash = HashZoneTile(seed + 606u, base_x, base_y);
+
+			if (built < HOUSES_PER_VILLAGE)
+			{
+				int32 size_x = 2;
+				int32 size_y = 2;
+				PickHouseSize(hash, &size_x, &size_y);
+
+				if (CanPlaceLot(*layout, keep_clear, village, base_x, base_y, size_x, size_y) == false)
+				{
+					size_x = 2;
+					size_y = 2;
+				}
+
+				AddHouse(village_index, base_x, base_y, size_x, size_y, hash, layout);
+				built += 1;
+				continue;
+			}
+
+			if (HashToUnit(hash >> 3) < 0.6f && CanPlaceLot(*layout, keep_clear, village, base_x, base_y, 3, 3))
+			{
+				FillLot(layout, base_x, base_y, 3, 3, TILE_FIELD);
+			}
+		}
+
+		std::cout << "[ ZoneGen - BuildVillageHouses ] : village " << village_index << " houses " << built << " lots " << candidates.size() << "\n";
+	}
+
+	// ------------------------------------------------------------ 등불 · 게시판
 
 	void AddLamp(ZoneLayout* layout, int32 x, int32 y)
 	{
@@ -713,25 +1223,86 @@ namespace
 
 	void PlaceLamps(ZoneLayout* layout)
 	{
-		const ZoneTile& center = layout->center;
-
-		AddLamp(layout, center.x + 3, center.y + 3);
-		AddLamp(layout, center.x - 3, center.y - 3);
-		AddLamp(layout, center.x + 3, center.y - 3);
-		AddLamp(layout, center.x - 3, center.y + 3);
-
-		for (size_t dir = 0; dir < STEP_X.size(); ++dir)
+		for (const ZoneVillage& village : layout->villages)
 		{
-			int32 along_x = 0;
-			int32 along_y = 0;
-			int32 side_x = 0;
-			int32 side_y = 0;
-			GetGateAxis(dir, &along_x, &along_y, &side_x, &side_y);
+			const ZoneTile& center = village.center;
 
-			const int32 along = 12;
-			AddLamp(layout, center.x + along_x * along + side_x * 2, center.y + along_y * along + side_y * 2);
+			AddLamp(layout, center.x + 3, center.y + 3);
+			AddLamp(layout, center.x - 3, center.y - 3);
+			AddLamp(layout, center.x + 3, center.y - 3);
+			AddLamp(layout, center.x - 3, center.y + 3);
+
+			if (village.is_citadel)
+			{
+				for (size_t dir = 0; dir < STEP_X.size(); ++dir)
+				{
+					int32 along_x = 0;
+					int32 along_y = 0;
+					int32 side_x = 0;
+					int32 side_y = 0;
+					GetGateAxis(dir, &along_x, &along_y, &side_x, &side_y);
+
+					const int32 along = 13;
+					AddLamp(layout, center.x + along_x * along + side_x * 2, center.y + along_y * along + side_y * 2);
+				}
+
+				continue;
+			}
+
+			// 길이 마을로 들어서는 자리마다 등불. 밤길에 마을 입구가 보여야 한다
+			for (const ZoneTile& entry : village.entries)
+			{
+				const float delta_x = static_cast<float>(entry.x - center.x);
+				const float delta_y = static_cast<float>(entry.y - center.y);
+				const float length = std::sqrt(delta_x * delta_x + delta_y * delta_y);
+
+				if (length < 1.f)
+				{
+					continue;
+				}
+
+				const int32 inward_x = entry.x - static_cast<int32>(std::lround(delta_x / length * 3.f));
+				const int32 inward_y = entry.y - static_cast<int32>(std::lround(delta_y / length * 3.f));
+				AddLamp(layout, inward_x + static_cast<int32>(std::lround(-delta_y / length * 3.f)), inward_y + static_cast<int32>(std::lround(delta_x / length * 3.f)));
+			}
 		}
 	}
+
+	// 광장 가장자리 빈 칸. 길 위는 피한다
+	void PlaceBoards(const std::vector<uint8>& keep_clear, ZoneLayout* layout)
+	{
+		const std::array<ZoneTile, 8> offsets =
+		{ {
+			{ 3, -2 }, { -2, 3 }, { 3, 2 }, { -3, -2 }, { 2, -3 }, { -3, 2 }, { 2, 3 }, { -2, -3 },
+		} };
+
+		for (ZoneVillage& village : layout->villages)
+		{
+			village.board = village.center;
+
+			for (const ZoneTile& offset : offsets)
+			{
+				const int32 x = village.center.x + offset.x;
+				const int32 y = village.center.y + offset.y;
+
+				if (IsOpenAt(layout->tiles, x, y) == false)
+				{
+					continue;
+				}
+
+				if (village.is_citadel == false && keep_clear[ToIndex(x, y)] == 1)
+				{
+					continue;
+				}
+
+				village.board.x = x;
+				village.board.y = y;
+				break;
+			}
+		}
+	}
+
+	// ------------------------------------------------------------ 거점
 
 	bool IsFarFromSites(const ZoneTile& tile, const std::vector<ZoneSite>& sites, int32 kind, float spacing)
 	{
@@ -751,10 +1322,58 @@ namespace
 		return true;
 	}
 
-	// 걸어서 제일 먼 칸은 거의 언제나 구역 가장자리다. 최대 거리의 일정 비율 지점을 고른다
-	ZoneTile FindWalkRatioTile(const std::vector<int32>& distances, const ZoneTile& fallback, float ratio)
+	bool IsFarFromVillages(const ZoneTile& tile, const std::vector<ZoneVillage>& villages, float spacing)
 	{
-		const int32 target = static_cast<int32>(static_cast<float>(FindMaxDistance(distances)) * ratio);
+		for (const ZoneVillage& village : villages)
+		{
+			if (TileDistance(tile, village.center) < spacing)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	// 마을 경계에서 잰다
+	bool IsFarFromVillageEdges(const ZoneTile& tile, const std::vector<ZoneVillage>& villages, float spacing)
+	{
+		for (const ZoneVillage& village : villages)
+		{
+			if (TileDistance(tile, village.center) < static_cast<float>(village.radius) + spacing)
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	bool IsFarFromRoads(const ZoneTile& tile, const std::vector<ZoneRoad>& roads, float spacing)
+	{
+		const float spacing_sq = spacing * spacing;
+
+		for (const ZoneRoad& road : roads)
+		{
+			for (const ZoneTile& point : road.path)
+			{
+				const float delta_x = static_cast<float>(point.x - tile.x);
+				const float delta_y = static_cast<float>(point.y - tile.y);
+
+				if (delta_x * delta_x + delta_y * delta_y < spacing_sq)
+				{
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	// 걸어서 제일 먼 칸은 거의 언제나 구역 가장자리다. 최대 거리의 일정 비율 지점을 고른다
+	ZoneTile FindLairTile(const ZoneLayout& layout, const std::vector<int32>& distances, const ZoneTile& fallback)
+	{
+		const int32 target = static_cast<int32>(static_cast<float>(FindMaxDistance(distances)) * LAIR_WALK_RATIO);
 
 		ZoneTile found = fallback;
 		int32 closest_gap = ZONE_TILE_COUNT * ZONE_TILE_COUNT;
@@ -772,20 +1391,29 @@ namespace
 				}
 
 				const int32 gap = std::abs(distance - target);
-
-				if (gap < closest_gap)
+				if (gap >= closest_gap)
 				{
-					closest_gap = gap;
-					found.x = x;
-					found.y = y;
+					continue;
 				}
+
+				ZoneTile tile;
+				tile.x = x;
+				tile.y = y;
+
+				if (IsFarFromVillages(tile, layout.villages, LAIR_VILLAGE_CLEARANCE) == false)
+				{
+					continue;
+				}
+
+				closest_gap = gap;
+				found = tile;
 			}
 		}
 
 		return found;
 	}
 
-	void PickSites(uint32* random_state, const std::vector<int32>& distances, int32 kind, int32 count, int32 min_walk, int32 max_walk, float spacing, ZoneLayout* layout)
+	void PickSites(uint32* random_state, const std::vector<int32>& distances, int32 kind, int32 count, int32 min_walk, int32 max_walk, float spacing, float village_clearance, float road_clearance, ZoneLayout* layout)
 	{
 		int32 placed = 0;
 
@@ -815,6 +1443,16 @@ namespace
 				continue;
 			}
 
+			if (IsFarFromVillages(tile, layout->villages, village_clearance) == false)
+			{
+				continue;
+			}
+
+			if (IsFarFromRoads(tile, layout->roads, road_clearance) == false)
+			{
+				continue;
+			}
+
 			ZoneSite site;
 			site.tile = tile;
 			site.kind = kind;
@@ -822,6 +1460,55 @@ namespace
 			layout->sites.push_back(site);
 
 			placed += 1;
+		}
+	}
+
+	// 고리 길 한가운데 길가에 초소. 마을 사이 20 초 길에서 쉬어 갈 자리
+	void PlaceOutposts(ZoneLayout* layout)
+	{
+		for (const ZoneRoad& road : layout->roads)
+		{
+			if (road.village_a == ZONE_CITADEL || road.village_b == ZONE_CITADEL || road.path.size() < 8)
+			{
+				continue;
+			}
+
+			const size_t middle = road.path.size() / 2;
+			const ZoneTile& before = road.path[middle - 4];
+			const ZoneTile& after = road.path[middle + 4];
+			const float delta_x = static_cast<float>(after.x - before.x);
+			const float delta_y = static_cast<float>(after.y - before.y);
+			const float length = std::sqrt(delta_x * delta_x + delta_y * delta_y);
+
+			if (length < 0.5f)
+			{
+				continue;
+			}
+
+			// 바깥쪽 ( 성채 반대편 ) 길가에 친다
+			float normal_x = -delta_y / length;
+			float normal_y = delta_x / length;
+			const ZoneTile& mid = road.path[middle];
+			const float out_x = static_cast<float>(mid.x - layout->center.x);
+			const float out_y = static_cast<float>(mid.y - layout->center.y);
+
+			if (normal_x * out_x + normal_y * out_y < 0.f)
+			{
+				normal_x = -normal_x;
+				normal_y = -normal_y;
+			}
+
+			ZoneSite outpost;
+			outpost.kind = SITE_OUTPOST;
+			outpost.tile.x = mid.x + static_cast<int32>(std::lround(normal_x * OUTPOST_ROAD_OFFSET));
+			outpost.tile.y = mid.y + static_cast<int32>(std::lround(normal_y * OUTPOST_ROAD_OFFSET));
+
+			if (IsInside(outpost.tile.x, outpost.tile.y) == false || IsBorder(outpost.tile.x, outpost.tile.y))
+			{
+				continue;
+			}
+
+			layout->sites.push_back(outpost);
 		}
 	}
 
@@ -839,7 +1526,7 @@ namespace
 			}
 			case SITE_VILLAGE:
 			{
-				return VILLAGE_CLEAR_RADIUS;
+				return RUIN_CLEAR_RADIUS;
 			}
 			case SITE_LAIR:
 			{
@@ -851,6 +1538,8 @@ namespace
 			}
 		}
 	}
+
+	// ------------------------------------------------------------ 지형 꾸미기
 
 	// 테두리에 붙은 막힌 덩어리는 균열, 가운데 떠 있으면 크기에 따라 바위 / 죽은 숲 / 늪
 	void ClassifyBlockedRegions(uint32 seed, std::vector<uint8>* tiles)
@@ -1054,18 +1743,14 @@ namespace
 		}
 	}
 
-	void ScatterObstacles(uint32 seed, ZoneLayout* layout)
+	void ScatterObstacles(uint32 seed, const std::vector<uint8>& keep_clear, ZoneLayout* layout)
 	{
 		for (int32 y = BORDER; y < ZONE_TILE_COUNT - BORDER; ++y)
 		{
 			for (int32 x = BORDER; x < ZONE_TILE_COUNT - BORDER; ++x)
 			{
-				if (layout->tiles[ToIndex(x, y)] != TILE_OPEN)
-				{
-					continue;
-				}
-
-				if (CenterDistance(x, y, layout->center) < TOWN_CLEAR_RADIUS + 3.f)
+				const size_t index = ToIndex(x, y);
+				if (layout->tiles[index] != TILE_OPEN || keep_clear[index] == 1)
 				{
 					continue;
 				}
@@ -1073,6 +1758,11 @@ namespace
 				ZoneTile tile;
 				tile.x = x;
 				tile.y = y;
+
+				if (IsFarFromVillageEdges(tile, layout->villages, 3.f) == false)
+				{
+					continue;
+				}
 
 				if (IsFarFromSites(tile, layout->sites, -1, 7.f) == false)
 				{
@@ -1093,11 +1783,11 @@ namespace
 
 				if (roll < SCATTER_TREE_CHANCE)
 				{
-					layout->tiles[ToIndex(x, y)] = TILE_TREE;
+					layout->tiles[index] = TILE_TREE;
 				}
 				else
 				{
-					layout->tiles[ToIndex(x, y)] = TILE_ROCK;
+					layout->tiles[index] = TILE_ROCK;
 				}
 			}
 		}
@@ -1119,61 +1809,55 @@ namespace
 		}
 	}
 
-	// 거점에서 광장 쪽으로 거리가 줄어드는 칸만 밟아 내려간다. 그게 곧 가장 짧은 교역로다
-	void PaintRoadFrom(const ZoneTile& from, const std::vector<int32>& distances, ZoneLayout* layout)
+	// 길 칸과 그 +x · +y 칸. 대각선 길에서도 띠가 끊기지 않는다
+	void PaintRoads(ZoneLayout* layout)
 	{
-		ZoneTile current = from;
-		size_t last_dir = 0;
-
-		for (int32 guard = 0; guard < ZONE_TILE_COUNT * 4; ++guard)
+		for (const ZoneRoad& road : layout->roads)
 		{
-			const int32 distance = distances[ToIndex(current.x, current.y)];
-			if (distance <= 0)
+			for (const ZoneTile& tile : road.path)
 			{
-				return;
-			}
-
-			if (CenterDistance(current.x, current.y, layout->center) < WALL_INNER_RADIUS)
-			{
-				return;
-			}
-
-			PaintRoadTile(layout, current.x, current.y);
-
-			// 가던 방향을 먼저 본다. 안 그러면 계단처럼 지그재그로 꺾인다
-			bool moved = false;
-
-			for (size_t attempt = 0; attempt < STEP_X.size(); ++attempt)
-			{
-				const size_t dir = (last_dir + attempt) % STEP_X.size();
-				const int32 next_x = current.x + STEP_X[dir];
-				const int32 next_y = current.y + STEP_Y[dir];
-
-				if (IsInside(next_x, next_y) == false)
+				if (IsInsideTown(*layout, tile.x, tile.y))
 				{
 					continue;
 				}
 
-				if (distances[ToIndex(next_x, next_y)] != distance - 1)
-				{
-					continue;
-				}
-
-				// 폭 2
-				PaintRoadTile(layout, current.x + std::abs(STEP_Y[dir]), current.y + std::abs(STEP_X[dir]));
-
-				current.x = next_x;
-				current.y = next_y;
-				last_dir = dir;
-				moved = true;
-				break;
-			}
-
-			if (moved == false)
-			{
-				return;
+				PaintRoadTile(layout, tile.x, tile.y);
+				PaintRoadTile(layout, tile.x + 1, tile.y);
+				PaintRoadTile(layout, tile.x, tile.y + 1);
 			}
 		}
+	}
+
+	void BuildVillageMap(ZoneLayout* layout)
+	{
+		layout->village_map.assign(layout->tiles.size(), ZONE_NO_VILLAGE);
+
+		for (size_t village_index = 0; village_index < layout->villages.size(); ++village_index)
+		{
+			const ZoneVillage& village = layout->villages[village_index];
+			const int32 radius = village.radius;
+
+			for (int32 y = village.center.y - radius; y <= village.center.y + radius; ++y)
+			{
+				for (int32 x = village.center.x - radius; x <= village.center.x + radius; ++x)
+				{
+					if (IsInside(x, y) == false)
+					{
+						continue;
+					}
+
+					if (CenterDistance(x, y, village.center) <= static_cast<float>(radius))
+					{
+						layout->village_map[ToIndex(x, y)] = static_cast<uint8>(village_index);
+					}
+				}
+			}
+		}
+	}
+
+	bool IsInVillage(const ZoneLayout& layout, int32 x, int32 y)
+	{
+		return layout.village_map[ToIndex(x, y)] != ZONE_NO_VILLAGE;
 	}
 
 	// 멀어질수록 바닥이 재에 물든다. 거리가 곧 위험이라는 걸 바닥색이 먼저 말한다
@@ -1190,7 +1874,7 @@ namespace
 			for (int32 x = 0; x < ZONE_TILE_COUNT; ++x)
 			{
 				const size_t index = ToIndex(x, y);
-				if (layout->tiles[index] != TILE_OPEN || distances[index] < 0)
+				if (layout->tiles[index] != TILE_OPEN || distances[index] < 0 || IsInVillage(*layout, x, y))
 				{
 					continue;
 				}
@@ -1234,7 +1918,7 @@ namespace
 	}
 
 	// 폐촌 둘레 말라 죽은 밭
-	void PaintVillageFields(uint32 seed, ZoneLayout* layout)
+	void PaintRuinFields(uint32 seed, ZoneLayout* layout)
 	{
 		for (const ZoneSite& site : layout->sites)
 		{
@@ -1264,9 +1948,27 @@ namespace
 		}
 	}
 
-	int32 GetBandOf(int32 walk_distance)
+	// ------------------------------------------------------------ 몬스터 · 자원
+
+	float GetVillageEdgeDistance(const ZoneTile& tile, const std::vector<ZoneVillage>& villages)
 	{
-		if (walk_distance < BAND_FIELD_WALK)
+		float nearest = 1.0e9f;
+
+		for (const ZoneVillage& village : villages)
+		{
+			const float edge = TileDistance(tile, village.center) - static_cast<float>(village.radius);
+			if (edge < nearest)
+			{
+				nearest = edge;
+			}
+		}
+
+		return nearest;
+	}
+
+	int32 GetBandOf(const ZoneTile& tile, int32 walk_distance, const std::vector<ZoneVillage>& villages)
+	{
+		if (GetVillageEdgeDistance(tile, villages) < BAND_INTRO_EDGE)
 		{
 			return BAND_INTRO;
 		}
@@ -1334,7 +2036,7 @@ namespace
 
 	void PickPacks(uint32* random_state, const std::vector<int32>& distances, ZoneLayout* layout)
 	{
-		for (int32 attempt = 0; attempt < MAX_PICK_TRY * 2; ++attempt)
+		for (int32 attempt = 0; attempt < MAX_PICK_TRY * 3; ++attempt)
 		{
 			if (static_cast<int32>(layout->packs.size()) >= PACK_COUNT)
 			{
@@ -1359,6 +2061,12 @@ namespace
 				continue;
 			}
 
+			// 마을 안은 몬스터가 못 들어오는 곳이다. 경계에서 배회 · 추격 거리만큼 띄운다
+			if (IsFarFromVillageEdges(tile, layout->villages, PACK_VILLAGE_SPACING) == false)
+			{
+				continue;
+			}
+
 			if (IsFarFromSites(tile, layout->sites, SITE_OUTPOST, PACK_SITE_SPACING) == false)
 			{
 				continue;
@@ -1370,7 +2078,7 @@ namespace
 			}
 
 			// 띠마다 정원이 따로다. 안 나누면 넓은 바깥 띠가 무리를 다 가져간다
-			const int32 band = GetBandOf(walk_distance);
+			const int32 band = GetBandOf(tile, walk_distance, layout->villages);
 			if (CountPacksInBand(layout->packs, band) >= GetBandPackCount(band))
 			{
 				continue;
@@ -1428,7 +2136,7 @@ namespace
 			for (int32 x = 0; x < ZONE_TILE_COUNT; ++x)
 			{
 				const size_t index = ToIndex(x, y);
-				if (layout->tiles[index] != TILE_OPEN || distances[index] < PACK_MIN_WALK)
+				if (layout->tiles[index] != TILE_OPEN || distances[index] < PACK_MIN_WALK || IsInVillage(*layout, x, y))
 				{
 					continue;
 				}
@@ -1495,9 +2203,9 @@ namespace
 
 			int32 placed = 0;
 
-			for (int32 offset_y = -8; offset_y <= 8 && placed < RELIC_PER_VILLAGE; ++offset_y)
+			for (int32 offset_y = -8; offset_y <= 8 && placed < RELIC_PER_RUIN; ++offset_y)
 			{
-				for (int32 offset_x = -8; offset_x <= 8 && placed < RELIC_PER_VILLAGE; ++offset_x)
+				for (int32 offset_x = -8; offset_x <= 8 && placed < RELIC_PER_RUIN; ++offset_x)
 				{
 					const int32 x = site.tile.x + offset_x;
 					const int32 y = site.tile.y + offset_y;
@@ -1532,12 +2240,12 @@ namespace
 		{
 			const ZoneTile tile = PickRandomTile(random_state);
 
-			if (IsOpenAt(layout->tiles, tile.x, tile.y) == false)
+			if (IsOpenAt(layout->tiles, tile.x, tile.y) == false || IsInVillage(*layout, tile.x, tile.y))
 			{
 				continue;
 			}
 
-			if (distances[ToIndex(tile.x, tile.y)] < 40)
+			if (distances[ToIndex(tile.x, tile.y)] < 50)
 			{
 				continue;
 			}
@@ -1559,6 +2267,7 @@ void GenerateZone(uint32 seed, ZoneLayout* layout)
 	layout->tiles.assign(static_cast<size_t>(ZONE_TILE_COUNT * ZONE_TILE_COUNT), TILE_OPEN);
 	layout->packs.clear();
 	layout->sites.clear();
+	layout->houses.clear();
 	layout->herbs.clear();
 	layout->relics.clear();
 	layout->lamps.clear();
@@ -1575,20 +2284,41 @@ void GenerateZone(uint32 seed, ZoneLayout* layout)
 		Smooth(&layout->tiles);
 	}
 
-	// 성벽이 없을 때 연결을 보장하고 나서 성벽을 세운다. 성벽 밖 빈 고리가 모든 바깥 땅을 성문으로 잇는다
+	// 마을 터와 교역로를 먼저 비운다. 연결 보장이 이 빈터를 기준으로 돌아 길이 끊기지 않는다
+	PlaceVillages(seed, layout);
 	ClearTownArea(layout);
+	ClearHamlets(layout);
+	CarveRoads(seed, layout);
+
+	// 성벽이 없을 때 연결을 보장하고 나서 성벽을 세운다. 성벽 밖 빈 고리가 모든 바깥 땅을 성문으로 잇는다
 	ConnectRegions(&layout->tiles, layout->center);
 	FillUnreached(&layout->tiles, layout->center, TILE_CLIFF);
 
 	BuildWallRing(layout);
 	BuildGates(layout);
-	BuildHouses(seed, layout);
-	PlaceLamps(layout);
+	BuildHamletPlazas(layout);
+	FindRoadEntries(layout);
 
-	ZoneSite town;
-	town.tile = layout->center;
-	town.kind = SITE_TOWN;
-	layout->sites.push_back(town);
+	std::vector<uint8> keep_clear;
+	MarkStreets(*layout, &keep_clear);
+
+	for (int32 village = 0; village < ZONE_VILLAGE_COUNT; ++village)
+	{
+		BuildVillageHouses(seed, village, keep_clear, layout);
+	}
+
+	PlaceLamps(layout);
+	PlaceBoards(keep_clear, layout);
+
+	for (size_t index = 0; index < layout->villages.size(); ++index)
+	{
+		ZoneSite town;
+		town.tile = layout->villages[index].center;
+		town.kind = SITE_TOWN;
+		town.village = static_cast<int32>(index);
+		layout->villages[index].site = static_cast<int32>(layout->sites.size());
+		layout->sites.push_back(town);
+	}
 
 	std::vector<int32> distances;
 	MeasureDistance(layout->tiles, layout->center, &distances);
@@ -1606,7 +2336,7 @@ void GenerateZone(uint32 seed, ZoneLayout* layout)
 
 	const int32 max_walk = FindMaxDistance(distances);
 
-	layout->boss = FindWalkRatioTile(distances, layout->spawn, LAIR_WALK_RATIO);
+	layout->boss = FindLairTile(*layout, distances, layout->spawn);
 
 	ZoneSite lair;
 	lair.tile = layout->boss;
@@ -1614,9 +2344,9 @@ void GenerateZone(uint32 seed, ZoneLayout* layout)
 	lair.walk_distance = distances[ToIndex(layout->boss.x, layout->boss.y)];
 	layout->sites.push_back(lair);
 
-	PickSites(&random_state, distances, SITE_HIDEOUT, HIDEOUT_COUNT, max_walk * 45 / 100, max_walk * 90 / 100, HIDEOUT_SPACING, layout);
-	PickSites(&random_state, distances, SITE_OUTPOST, OUTPOST_COUNT, 40, max_walk * 85 / 100, OUTPOST_SPACING, layout);
-	PickSites(&random_state, distances, SITE_VILLAGE, VILLAGE_COUNT, 30, max_walk * 80 / 100, VILLAGE_SPACING, layout);
+	PlaceOutposts(layout);
+	PickSites(&random_state, distances, SITE_HIDEOUT, HIDEOUT_COUNT, 70, max_walk * 90 / 100, HIDEOUT_SPACING, HIDEOUT_VILLAGE_CLEARANCE, HIDEOUT_ROAD_CLEARANCE, layout);
+	PickSites(&random_state, distances, SITE_VILLAGE, RUIN_COUNT, 50, max_walk * 85 / 100, RUIN_SPACING, RUIN_VILLAGE_CLEARANCE, RUIN_ROAD_CLEARANCE, layout);
 
 	for (const ZoneSite& site : layout->sites)
 	{
@@ -1627,24 +2357,18 @@ void GenerateZone(uint32 seed, ZoneLayout* layout)
 		}
 	}
 
+	BuildVillageMap(layout);
 	ClassifyBlockedRegions(seed, &layout->tiles);
 	PlaceRuins(&random_state, layout);
-	ScatterObstacles(seed, layout);
+	ScatterObstacles(seed, keep_clear, layout);
 
 	MeasureDistance(layout->tiles, layout->center, &distances);
 
-	for (const ZoneSite& site : layout->sites)
-	{
-		if (site.kind == SITE_OUTPOST || site.kind == SITE_VILLAGE)
-		{
-			PaintRoadFrom(site.tile, distances, layout);
-		}
-	}
-
+	PaintRoads(layout);
 	PaintBlight(seed, distances, layout);
-	PaintVillageFields(seed, layout);
+	PaintRuinFields(seed, layout);
 
-	// 칠하기만 했지 막힘은 안 바꿨다. 그래도 보장을 한 번 더 건다 ( 성 안 막힌 틈은 바위로 메운다 )
+	// 칠하기만 했지 막힘은 안 바꿨다. 그래도 보장을 한 번 더 건다 ( 막힌 틈은 바위로 메운다 )
 	FillUnreached(&layout->tiles, layout->center, TILE_ROCK);
 	MeasureDistance(layout->tiles, layout->center, &distances);
 
@@ -1660,6 +2384,8 @@ void GenerateZone(uint32 seed, ZoneLayout* layout)
 	layout->walk_distance = distances;
 
 	std::cout << "[ ZoneGen - GenerateZone ] : sites " << layout->sites.size()
+		<< " villages " << layout->villages.size()
+		<< " houses " << layout->houses.size()
 		<< " packs " << layout->packs.size()
 		<< " herbs " << layout->herbs.size()
 		<< " relics " << layout->relics.size() << "\n";
@@ -1693,6 +2419,22 @@ int32 GetZoneWalkDistance(const ZoneLayout& layout, int32 x, int32 y)
 bool IsInsideTown(const ZoneLayout& layout, int32 x, int32 y)
 {
 	return CenterDistance(x, y, layout.center) < WALL_INNER_RADIUS;
+}
+
+int32 GetZoneVillageAt(const ZoneLayout& layout, int32 x, int32 y)
+{
+	if (IsInside(x, y) == false || layout.village_map.empty())
+	{
+		return -1;
+	}
+
+	const uint8 village = layout.village_map[ToIndex(x, y)];
+	if (village == ZONE_NO_VILLAGE)
+	{
+		return -1;
+	}
+
+	return static_cast<int32>(village);
 }
 
 WorldPos ZoneTileToWorld(int32 x, int32 y, float offset_x, float offset_y)

@@ -5,6 +5,8 @@
 #include "NpcData.h"
 #include "Player.h"
 #include "Renderer.h"
+#include "Text.h"
+#include "Village.h"
 #include "ZoneGen.h"
 
 #include <array>
@@ -13,8 +15,8 @@
 namespace
 {
 	// 칸 하나가 화면에서 차지하는 반폭 ( 픽셀 ). 아이소라 세로는 이 절반
-	const float TILE_SPAN = 0.7f;
-	const float CENTER_X = 470.f;
+	const float TILE_SPAN = 0.8f;	// 352 칸이라 224 칸 때 크기로 줄이면 마을 이름 일곱이 한데 엉킨다
+	const float CENTER_X = 340.f;
 	const float CENTER_Y = 40.f;	// 오른쪽 가운데. 아래는 경험치 글자, 위는 조작 안내가 있다
 
 	GLuint g_texture = 0;
@@ -125,6 +127,10 @@ namespace
 			{
 				return { 0.95f, 0.88f, 0.55f };
 			}
+			case NPC_JOB_COURIER:
+			{
+				return { 1.f, 0.66f, 0.22f };
+			}
 			default:
 			{
 				return { 0.35f, 0.95f, 0.88f };
@@ -200,6 +206,13 @@ namespace
 			else if (site.kind == SITE_VILLAGE)
 			{
 				renderer->DrawSolidBox(x, y, 6.f, 6.f, 0.60f, 0.58f, 0.50f, 1.f);
+			}
+			else if (site.kind == SITE_TOWN)
+			{
+				// 일곱 마을은 이름까지. 어디로 가는 길인지가 지도에서 먼저 읽혀야 한다
+				renderer->DrawSolidBox(x, y, 12.f, 12.f, 0.02f, 0.02f, 0.02f, 1.f);
+				renderer->DrawSolidBox(x, y, 8.f, 8.f, 1.f, 0.78f, 0.38f, 1.f);
+				DrawStringShadow(renderer, GetVillageName(site.village), x, y + 30.f, TEXT_ALIGN_CENTER, 1.f, 0.88f, 0.66f, 0.95f);
 			}
 		}
 	}
