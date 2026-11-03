@@ -9,26 +9,10 @@ namespace
 	const int32 KEY_TABLE_SIZE = 256;
 
 	std::array<bool, KEY_TABLE_SIZE> g_key_down = {};
-	std::array<bool, KEY_TABLE_SIZE> g_special_key_down = {};
 
 	ScreenPos g_mouse_screen;
 	bool g_attack_held = false;
 	bool g_attack_queued = false;
-
-	bool IsIndexValid(int32 index)
-	{
-		if (index < 0)
-		{
-			return false;
-		}
-
-		if (index >= KEY_TABLE_SIZE)
-		{
-			return false;
-		}
-
-		return true;
-	}
 
 	// 대소문자를 갈라 두면 쉬프트를 누른 순간 이동이 끊긴다
 	uint8 ToLowerKey(uint8 key)
@@ -47,41 +31,9 @@ void SetKeyDown(uint8 key, bool down)
 	g_key_down[static_cast<size_t>(ToLowerKey(key))] = down;
 }
 
-void SetSpecialKeyDown(int32 key, bool down)
-{
-	if (IsIndexValid(key) == false)
-	{
-		return;
-	}
-
-	g_special_key_down[static_cast<size_t>(key)] = down;
-}
-
-void ClearAllKeys()
-{
-	for (int32 index = 0; index < KEY_TABLE_SIZE; ++index)
-	{
-		g_key_down[static_cast<size_t>(index)] = false;
-		g_special_key_down[static_cast<size_t>(index)] = false;
-	}
-
-	g_attack_held = false;
-	g_attack_queued = false;
-}
-
 bool IsKeyDown(uint8 key)
 {
 	return g_key_down[static_cast<size_t>(ToLowerKey(key))];
-}
-
-bool IsSpecialKeyDown(int32 key)
-{
-	if (IsIndexValid(key) == false)
-	{
-		return false;
-	}
-
-	return g_special_key_down[static_cast<size_t>(key)];
 }
 
 void SetMouseWindowPos(int32 x, int32 y)

@@ -2,9 +2,9 @@
 
 class Renderer;
 
-constexpr int32 UI_MOUSE_LEFT = 0;	// glut 버튼 번호와 같다
-constexpr int32 UI_MOUSE_MIDDLE = 1;
-constexpr int32 UI_MOUSE_RIGHT = 2;
+constexpr int32 UI_MOUSE_LEFT = 0;	// glfw 버튼 번호와 같다
+constexpr int32 UI_MOUSE_MIDDLE = 2;
+constexpr int32 UI_MOUSE_RIGHT = 1;
 
 // 가방 · 능력치 · 스킬 트리 · 강화 창과 파괴 확인
 void ToggleInventoryWindow();

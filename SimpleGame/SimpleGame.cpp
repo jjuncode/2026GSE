@@ -12,7 +12,6 @@ but WITHOUT ANY WARRANTY.
 #include <iostream>
 #include <cmath>
 #include "Dependencies\glew.h"
-#include "Dependencies\freeglut.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -21,6 +20,12 @@ but WITHOUT ANY WARRANTY.
 #define NOMINMAX
 #endif
 #include <windows.h>
+#include <timeapi.h>
+
+// windows.h 뒤. glfw3.h 가 APIENTRY 를 정의한 채로 두어서 거꾸로면 재정의 경고다
+// gl 헤더는 glew 가 이미 넣었다
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
 
 #include "Renderer.h"
 #include "WorldPos.h"
@@ -47,6 +52,7 @@ but WITHOUT ANY WARRANTY.
 #include "UiWindows.h"
 #include "Monitor.h"
 
+const uint8 KEY_NONE = 0;
 const uint8 KEY_ESCAPE = 27;
 const uint8 KEY_ENTER = 13;
 const uint8 KEY_TAB = 9;
@@ -61,15 +67,8 @@ float g_accumulated_seconds = 0.f;
 
 bool g_post_ready = false;
 
-// 쉬프트는 glut 가 따로 안 알려 준다. 매 프레임 직접 묻고 눌린 순간만 쓴다
-bool g_shift_was_down = false;
 bool g_left_held = false;
 float g_quit_confirm_timer = 0.f;
-
-static bool IsWindowFocused()
-{
-	return GetForegroundWindow() == FindWindowA(nullptr, "Ashen Walls - Game Software Engineering KPU");
-}
 
 static void ApplyInput(float delta_seconds)
 {
@@ -104,14 +103,6 @@ static void ApplyInput(float delta_seconds)
 		PressPlayerAttack();
 	}
 
-	const bool shift_down = (GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0 && IsWindowFocused();
-	if (shift_down && g_shift_was_down == false)
-	{
-		PressPlayerDodge(111);
-	}
-
-	g_shift_was_down = shift_down;
-
 	if (g_quit_confirm_timer > 0.f)
 	{
 		g_quit_confirm_timer -= delta_seconds;
@@ -140,7 +131,7 @@ void Update()
 }
 
 
-void RenderScene()
+void RenderScene(GLFWwindow* window)
 {
 	// 상태 변경이라 지우기 전에 정해야 이번 프레임부터 먹는다
 	BeginScenePass();
@@ -163,7 +154,7 @@ void RenderScene()
 	// 프레임 경계. 남은 것이 있으면 다음 프레임 첫 층 뒤로 밀린다
 	FlushRenderBatch();
 
-	glutSwapBuffers();
+	glfwSwapBuffers(window);
 
 	EndProfileFrame();
 
@@ -171,28 +162,25 @@ void RenderScene()
 	SaveTextCache();
 }
 
-void Idle()
+void MouseInput(GLFWwindow* window, int32 button, int32 action, int32 mods)
 {
-	Update();
+	double cursor_x = 0.0;
+	double cursor_y = 0.0;
+	glfwGetCursorPos(window, &cursor_x, &cursor_y);
 
-	glutPostRedisplay();
-}
-
-void MouseInput(int32 button, int32 state, int32 x, int32 y)
-{
-	SetMouseWindowPos(x, y);
+	SetMouseWindowPos(static_cast<int32>(cursor_x), static_cast<int32>(cursor_y));
 	const ScreenPos screen = GetMouseScreenPos();
 
-	if (state != GLUT_DOWN)
+	if (action != GLFW_PRESS)
 	{
 		UiMouseUp(button, screen.x, screen.y);
 
 		// 뗄 때는 창 위여도 풀어야 버튼이 눌린 채로 안 남는다
-		if (button == GLUT_LEFT_BUTTON)
+		if (button == GLFW_MOUSE_BUTTON_LEFT)
 		{
 			g_left_held = false;
 		}
-		else if (button == GLUT_RIGHT_BUTTON)
+		else if (button == GLFW_MOUSE_BUTTON_RIGHT)
 		{
 			SetPlayerGuard(false);
 		}
@@ -207,18 +195,18 @@ void MouseInput(int32 button, int32 state, int32 x, int32 y)
 
 	switch (button)
 	{
-		case GLUT_LEFT_BUTTON:
+		case GLFW_MOUSE_BUTTON_LEFT:
 		{
 			PressPlayerAttack();
 			g_left_held = true;
 			break;
 		}
-		case GLUT_RIGHT_BUTTON:
+		case GLFW_MOUSE_BUTTON_RIGHT:
 		{
 			SetPlayerGuard(true);
 			break;
 		}
-		case GLUT_MIDDLE_BUTTON:
+		case GLFW_MOUSE_BUTTON_MIDDLE:
 		{
 			// 관찰은 휠 버튼. 좌우 버튼은 전투가 쓴다
 			SelectNpcAtCursor();
@@ -231,15 +219,15 @@ void MouseInput(int32 button, int32 state, int32 x, int32 y)
 	}
 }
 
-void MouseMotion(int32 x, int32 y)
+void MouseMotion(GLFWwindow* window, double x, double y)
 {
-	SetMouseWindowPos(x, y);
+	SetMouseWindowPos(static_cast<int32>(x), static_cast<int32>(y));
 
 	const ScreenPos screen = GetMouseScreenPos();
 	UiMouseMove(screen.x, screen.y);
 }
 
-void KeyInput(uint8 key, int32 x, int32 y)
+void KeyInput(GLFWwindow* window, uint8 key)
 {
 	SetKeyDown(key, true);
 
@@ -407,7 +395,7 @@ void KeyInput(uint8 key, int32 x, int32 y)
 
 			if (g_quit_confirm_timer > 0.f)
 			{
-				glutLeaveMainLoop();
+				glfwSetWindowShouldClose(window, GLFW_TRUE);
 				break;
 			}
 
@@ -422,7 +410,7 @@ void KeyInput(uint8 key, int32 x, int32 y)
 	}
 }
 
-void KeyUpInput(uint8 key, int32 x, int32 y)
+void KeyUpInput(uint8 key)
 {
 	SetKeyDown(key, false);
 
@@ -432,44 +420,142 @@ void KeyUpInput(uint8 key, int32 x, int32 y)
 	}
 }
 
-void SpecialKeyInput(int32 key, int32 x, int32 y)
+// 게임 키 처리는 freeglut 시절 문자 코드로 짜여 있다. 글자는 소문자로 준다
+static uint8 ToGameKey(int32 key)
 {
-	SetSpecialKeyDown(key, true);
-}
-
-void SpecialKeyUpInput(int32 key, int32 x, int32 y)
-{
-	SetSpecialKeyDown(key, false);
-}
-
-void WindowEntry(int32 state)
-{
-	if (state == GLUT_LEFT)
+	if (key >= GLFW_KEY_A && key <= GLFW_KEY_Z)
 	{
-		// 창 밖에서 뗀 키는 뗌 통보가 안 와서 눌린 채로 남는다
-		ClearAllKeys();
-		g_left_held = false;
-		SetPlayerGuard(false);
-		SetInteractHeld(false);
+		return static_cast<uint8>('a' + (key - GLFW_KEY_A));
+	}
+
+	if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9)
+	{
+		return static_cast<uint8>('0' + (key - GLFW_KEY_0));
+	}
+
+	if (key >= GLFW_KEY_KP_0 && key <= GLFW_KEY_KP_9)
+	{
+		return static_cast<uint8>('0' + (key - GLFW_KEY_KP_0));
+	}
+
+	switch (key)
+	{
+		case GLFW_KEY_SPACE:
+		{
+			return KEY_SPACE;
+		}
+		case GLFW_KEY_MINUS:
+		case GLFW_KEY_KP_SUBTRACT:
+		{
+			return '-';
+		}
+		case GLFW_KEY_EQUAL:
+		{
+			return '=';
+		}
+		case GLFW_KEY_KP_ADD:
+		{
+			return '+';
+		}
+		case GLFW_KEY_ESCAPE:
+		{
+			return KEY_ESCAPE;
+		}
+		case GLFW_KEY_ENTER:
+		case GLFW_KEY_KP_ENTER:
+		{
+			return KEY_ENTER;
+		}
+		case GLFW_KEY_TAB:
+		{
+			return KEY_TAB;
+		}
+		default:
+		{
+			return KEY_NONE;
+		}
 	}
 }
 
-int main(int argc, char** argv)
+void KeyboardInput(GLFWwindow* window, int32 key, int32 scancode, int32 action, int32 mods)
+{
+	// 반복 통보를 받으면 누른 채로 토글이 연타된다
+	if (action == GLFW_REPEAT)
+	{
+		return;
+	}
+
+	if (key == GLFW_KEY_LEFT_SHIFT || key == GLFW_KEY_RIGHT_SHIFT)
+	{
+		if (action == GLFW_PRESS)
+		{
+			PressPlayerDodge(111);
+		}
+
+		return;
+	}
+
+	const uint8 game_key = ToGameKey(key);
+	if (game_key == KEY_NONE)
+	{
+		return;
+	}
+
+	if (action == GLFW_PRESS)
+	{
+		KeyInput(window, game_key);
+	}
+	else
+	{
+		KeyUpInput(game_key);
+	}
+}
+
+void GlfwError(int32 code, const char* description)
+{
+	std::cout << "[ SimpleGame - GlfwError ] : " << code << " " << description << "\n";
+}
+
+int main()
 {
 	// 파일로 넘기면 버퍼에 갇혀 있다가 강제 종료 때 통째로 날아간다
 	std::cout << std::unitbuf;
 
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
-	glutInitWindowPosition(0, 0);
-	glutInitWindowSize(WINDOW_SIZE_X, WINDOW_SIZE_Y);
-	glutCreateWindow("Ashen Walls - Game Software Engineering KPU");
+	// freeglut 때처럼 DPI 비인식. glfwInit 이 인식으로 바꾸기 전에 먼저 정해 둔다
+	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_UNAWARE);
 
-	// 이걸 줘야 glutMainLoop 가 돌아와서 뒤쪽 정리 코드가 실행된다
-	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
+	// freeglut 이 glutInit 에서 걸던 1ms 타이머. 모니터 스레드 select 대기가 이걸 탄다
+	timeBeginPeriod(1);
 
-	// 자동 반복을 끄지 않으면 누른 채로 눌림 통보가 계속 와서 토글이 연타된다
-	glutIgnoreKeyRepeat(1);
+	glfwSetErrorCallback(GlfwError);
+	if (glfwInit() == GLFW_FALSE)
+	{
+		std::cout << "[ SimpleGame - main ] : glfw init failed\n";
+		return 1;
+	}
+
+	// freeglut 기본과 같은 호환 컨텍스트. 깊이 버퍼는 안 쓴다(2.4)
+	glfwWindowHint(GLFW_DEPTH_BITS, 0);
+	glfwWindowHint(GLFW_STENCIL_BITS, 0);
+	glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+
+	GLFWwindow* window = glfwCreateWindow(WINDOW_SIZE_X, WINDOW_SIZE_Y, "Ashen Walls - Game Software Engineering KPU", nullptr, nullptr);
+	if (window == nullptr)
+	{
+		std::cout << "[ SimpleGame - main ] : glfw window failed\n";
+		glfwTerminate();
+		return 1;
+	}
+
+	// glfw 위치는 그리는 영역 기준이라 0, 0 이면 제목 표시줄이 화면 밖이다. 테두리만큼 민다
+	int32 frame_left = 0;
+	int32 frame_top = 0;
+	glfwGetWindowFrameSize(window, &frame_left, &frame_top, nullptr, nullptr);
+	glfwSetWindowPos(window, frame_left, frame_top);
+	glfwShowWindow(window);
+
+	// 수직동기는 freeglut 때처럼 드라이버 기본값. glfwSwapInterval 을 부르면 바뀐다
+	glfwMakeContextCurrent(window);
 
 	glewInit();
 	if (glewIsSupported("GL_VERSION_3_0"))
@@ -577,18 +663,22 @@ int main(int argc, char** argv)
 	std::cout << "B           : monitor page in browser\n";
 	std::cout << "ESC         : close window, twice to quit\n";
 
-	glutDisplayFunc(RenderScene);
-	glutIdleFunc(Idle);
-	glutKeyboardFunc(KeyInput);
-	glutKeyboardUpFunc(KeyUpInput);
-	glutSpecialFunc(SpecialKeyInput);
-	glutSpecialUpFunc(SpecialKeyUpInput);
-	glutMouseFunc(MouseInput);
-	glutMotionFunc(MouseMotion);
-	glutPassiveMotionFunc(MouseMotion);
-	glutEntryFunc(WindowEntry);
+	// 포커스를 잃으면 glfw 가 눌린 키 · 버튼마다 뗌을 보내 준다. 창 밖에서 떼도 눌린 채로 안 남는다
+	glfwSetKeyCallback(window, KeyboardInput);
+	glfwSetMouseButtonCallback(window, MouseInput);
+	glfwSetCursorPosCallback(window, MouseMotion);
 
-	glutMainLoop();
+	while (glfwWindowShouldClose(window) == GLFW_FALSE)
+	{
+		glfwPollEvents();
+		Update();
+
+		// 최소화 중엔 freeglut 처럼 그리기를 건너뛰고 갱신만 돈다
+		if (glfwGetWindowAttrib(window, GLFW_ICONIFIED) == GLFW_FALSE)
+		{
+			RenderScene(window);
+		}
+	}
 
 	ShutdownMonitor();
 	ShutdownAudio();
@@ -604,6 +694,10 @@ int main(int argc, char** argv)
 
 	delete g_renderer;
 	g_renderer = nullptr;
+
+	glfwDestroyWindow(window);
+	glfwTerminate();
+	timeEndPeriod(1);
 
 	return 0;
 }
