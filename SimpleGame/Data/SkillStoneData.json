@@ -1,0 +1,31 @@
+{
+  "upgrade_item": 33,
+  "upgrade_max": 5,
+  "upgrade_damage_rate": 0.08,
+  "inscriptions": [
+    {
+      "item": 34,
+      "skill": 108,
+      "name": "감시자의 지면 강타",
+      "damage_rate": 0.4,
+      "stun_sec": 0.8,
+      "cooldown_cut": 0.0
+    },
+    {
+      "item": 35,
+      "skill": 106,
+      "name": "기사단장의 돌진",
+      "damage_rate": 0.35,
+      "stun_sec": 0.0,
+      "cooldown_cut": 2.5
+    },
+    {
+      "item": 36,
+      "skill": 107,
+      "name": "군단장의 칼날 폭풍",
+      "damage_rate": 0.6,
+      "stun_sec": 0.4,
+      "cooldown_cut": 3.0
+    }
+  ]
+}

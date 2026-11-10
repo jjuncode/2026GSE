@@ -57,6 +57,9 @@
     <ClInclude Include="Board.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="SkillStone.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
     <ClInclude Include="UiCard.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -240,6 +243,9 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="Board.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="SkillStone.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="UiCard.cpp">

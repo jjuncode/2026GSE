@@ -8,6 +8,7 @@
 #include "GameConfig.h"
 #include "Hud.h"
 #include "Npc.h"
+#include "SkillStone.h"
 #include "Story.h"
 #include "Renderer.h"
 #include "SpriteAtlas.h"
@@ -1383,6 +1384,12 @@ bool UseBagItem(int32 slot_idx)
 
 		g_player.RecalcStat();
 		PlaySfx(SFX_EQUIP, 0.8f);
+		return true;
+	}
+
+	// 스킬석은 기타 아이템이지만 쓸 수 있다
+	if (UseSkillStoneItem(slot_idx))
+	{
 		return true;
 	}
 

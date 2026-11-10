@@ -165,6 +165,46 @@
       "icon": "ext:icon_shadow_crystal",
       "price": 300,
       "desc": "정예 그림자의 심장에서 굳은 결정. 빛을 빨아들인다"
+    },
+    {
+      "item_id": 33,
+      "name": "스킬 강화석",
+      "category": "ETC",
+      "equip_area": "NONE",
+      "max_stack": 99,
+      "icon": "ext:icon_skill_stone",
+      "price": 500,
+      "desc": "스킬에 새기면 그 스킬이 한 단계 강해진다. 스킬 창( K )에서 해금한 스킬을 누른다"
+    },
+    {
+      "item_id": 34,
+      "name": "감시자의 스킬석",
+      "category": "ETC",
+      "equip_area": "NONE",
+      "max_stack": 9,
+      "icon": "ext:icon_boss_stone",
+      "price": 2000,
+      "desc": "그림자 감시자의 힘이 굳은 돌. 쓰면 도약 내려찍기에 지면 강타가 새겨진다"
+    },
+    {
+      "item_id": 35,
+      "name": "기사단장의 스킬석",
+      "category": "ETC",
+      "equip_area": "NONE",
+      "max_stack": 9,
+      "icon": "ext:icon_boss_stone",
+      "price": 2000,
+      "desc": "그림자 기사단장의 힘이 굳은 돌. 쓰면 돌진 베기에 기사단장의 돌진이 새겨진다"
+    },
+    {
+      "item_id": 36,
+      "name": "군단장의 스킬석",
+      "category": "ETC",
+      "equip_area": "NONE",
+      "max_stack": 9,
+      "icon": "ext:icon_boss_stone",
+      "price": 5000,
+      "desc": "제1군단장의 힘이 굳은 돌. 쓰면 회전 베기에 칼날 폭풍이 새겨진다"
     }
   ]
 }

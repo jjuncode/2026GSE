@@ -11,6 +11,7 @@
 #include "Renderer.h"
 #include "Scene.h"
 #include "Shop.h"
+#include "SkillStone.h"
 #include "SpriteAtlas.h"
 #include "Text.h"
 #include "UiCard.h"
@@ -893,11 +894,18 @@ namespace
 			return true;
 		}
 
-		if (check != UNLOCK_ALREADY_OWNED)
+		// 이미 가진 공격 스킬을 누르면 스킬 강화석으로 강화한다
+		if (check == UNLOCK_ALREADY_OWNED)
 		{
-			PlaySfx(SFX_UI_ERROR, 0.5f);
+			if (TryUpgradeSkill(node->skill_id) == false)
+			{
+				PlaySfx(SFX_UI_ERROR, 0.5f);
+			}
+
+			return true;
 		}
 
+		PlaySfx(SFX_UI_ERROR, 0.5f);
 		return true;
 	}
 
@@ -976,6 +984,28 @@ namespace
 			cooldown.g = 0.75f;
 			cooldown.b = 1.f;
 			lines->push_back(cooldown);
+		}
+
+		if (skill.skill_type == SKILL_TYPE_ATTACK && player.HasSkill(skill_id))
+		{
+			TooltipLine upgrade;
+			const int32 level = GetSkillUpgradeLevel(skill_id);
+			upgrade.text = L"강화 " + std::to_wstring(level) + L" / " + std::to_wstring(GetSkillUpgradeMax()) + L"  ·  피해 x" + FormatRate(GetPlayerSkillDamageRate(skill_id)) + L"  ( 누르면 스킬 강화석 하나 )";
+			upgrade.r = 0.55f;
+			upgrade.g = 0.85f;
+			upgrade.b = 1.f;
+			lines->push_back(upgrade);
+
+			const std::wstring inscription = GetSkillInscriptionName(skill_id);
+			if (inscription.empty() == false)
+			{
+				TooltipLine inscribed;
+				inscribed.text = L"각인  " + inscription;
+				inscribed.r = 1.f;
+				inscribed.g = 0.4f;
+				inscribed.b = 0.5f;
+				lines->push_back(inscribed);
+			}
 		}
 
 		TooltipLine state;

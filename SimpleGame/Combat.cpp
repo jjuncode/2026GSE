@@ -1,6 +1,7 @@
 ﻿#include "stdafx.h"
 #include "Combat.h"
 #include "Feel.h"
+#include "SkillStone.h"
 #include "World.h"
 
 #include <algorithm>
@@ -156,10 +157,16 @@ namespace
 		}
 		else
 		{
-			// 스턴이 붙은 스킬은 경직을 대신한다
-			if (hit.skill->stun_sec > 0.f)
+			// 스턴이 붙은 스킬은 경직을 대신한다. 보스 스킬석 각인이 스턴을 더한다
+			float stun_sec = hit.skill->stun_sec;
+			if (hit.attacker != nullptr && hit.attacker->m_team == TEAM_PLAYER)
 			{
-				const float stun = ApplyToughness(hit.skill->stun_sec, victim->m_stat.toughness);
+				stun_sec += GetPlayerSkillExtraStun(hit.skill->skill_id);
+			}
+
+			if (stun_sec > 0.f)
+			{
+				const float stun = ApplyToughness(stun_sec, victim->m_stat.toughness);
 				victim->m_stun_timer = std::max(victim->m_stun_timer, stun);
 			}
 
@@ -438,11 +445,18 @@ void Creature::StartCooldown(const SkillData& skill)
 		return;
 	}
 
+	// 각인이 쿨을 줄인다. 아무리 줄여도 0.5 초는 남긴다 - 0 이면 연타 버튼이 된다
+	float cooldown = skill.cooldown_sec;
+	if (m_team == TEAM_PLAYER)
+	{
+		cooldown = std::max(0.5f, cooldown - GetPlayerSkillCooldownCut(skill.skill_id));
+	}
+
 	for (OwnedSkill& owned : m_skills)
 	{
 		if (owned.skill_id == skill.skill_id)
 		{
-			owned.cooldown = skill.cooldown_sec;
+			owned.cooldown = cooldown;
 			return;
 		}
 	}
@@ -709,6 +723,12 @@ void Creature::TickMotion(float delta_seconds)
 void Creature::RollWindowDamage(const HitWindow& window)
 {
 	float damage = static_cast<float>(m_cast_power) * window.damage_rate;
+
+	// 스킬 강화석 단계와 보스 스킬석 각인
+	if (m_team == TEAM_PLAYER && m_cast_skill != nullptr)
+	{
+		damage *= GetPlayerSkillDamageRate(m_cast_skill->skill_id);
+	}
 
 	// 창마다 한 번 굴린다. 이 창에 맞은 대상은 같이 치명타
 	m_window_critical = RollPercent() <= m_stat.crit_rate;

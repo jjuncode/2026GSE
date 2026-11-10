@@ -13,6 +13,7 @@
 #include "Quest.h"
 #include "Rank.h"
 #include "Scene.h"
+#include "SkillStone.h"
 #include "Story.h"
 #include "UiWindows.h"
 #include "Village.h"
@@ -1170,6 +1171,55 @@ void UpdateAutoTest(float real_seconds)
 			{
 				CloseTopWindow();
 			}
+		}
+
+		return;
+	}
+
+	if (g_mode == "stone")
+	{
+		// 보스 스킬석 둘을 새기고 회전 베기에 강화석 둘을 쓴다. 피해 배율 · 쿨 · 스킬 창 툴팁을 본다
+		Player& player = MutablePlayer();
+		const auto crossed = [](float mark)
+		{
+			return g_time - FIXED_STEP_SECONDS < mark && g_time >= mark;
+		};
+
+		if (crossed(0.5f))
+		{
+			player.AddExp(5000);
+			for (int32 skill_id : { 107, 106, 108 })
+			{
+				player.TryUnlockSkill(skill_id);
+			}
+
+			GivePlayerItem(33, 3);
+			GivePlayerItem(34, 1);
+			GivePlayerItem(36, 1);
+			UseBagItem(player.m_inventory.FindFirst(34));
+			UseBagItem(player.m_inventory.FindFirst(36));
+			TryUpgradeSkill(107);
+			TryUpgradeSkill(107);
+
+			player.StartCooldown(GetSkillData(107));
+			std::cout << "[ AutoTest ] : stone rate 107 " << GetPlayerSkillDamageRate(107) << " 108 " << GetPlayerSkillDamageRate(108) << " 106 " << GetPlayerSkillDamageRate(106)
+				<< " stun 108 " << GetPlayerSkillExtraStun(108) << " cooldown 107 " << player.GetSkillCooldown(107) << " / " << GetSkillData(107).cooldown_sec
+				<< " stones left " << player.m_inventory.CountItem(33) << " boss stones " << player.m_inventory.CountItem(34) + player.m_inventory.CountItem(36) << "\n";
+		}
+
+		if (crossed(1.0f))
+		{
+			ToggleSkillWindow();
+		}
+
+		if (crossed(1.3f))
+		{
+			UiMouseMove(-260.f, 6.f);
+		}
+
+		if (crossed(1.6f))
+		{
+			Capture("stone");
 		}
 
 		return;

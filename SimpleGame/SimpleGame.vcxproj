@@ -207,6 +207,7 @@
     <ClInclude Include="Village.h" />
     <ClInclude Include="HouseArt.h" />
     <ClInclude Include="Board.h" />
+    <ClInclude Include="SkillStone.h" />
     <ClInclude Include="UiCard.h" />
     <ClInclude Include="Card.h" />
     <ClInclude Include="Story.h" />
@@ -263,6 +264,7 @@
     <ClCompile Include="Village.cpp" />
     <ClCompile Include="HouseArt.cpp" />
     <ClCompile Include="Board.cpp" />
+    <ClCompile Include="SkillStone.cpp" />
     <ClCompile Include="UiCard.cpp" />
     <ClCompile Include="Card.cpp" />
     <ClCompile Include="Story.cpp" />
@@ -302,6 +304,7 @@
     <None Include="Data\AnimationData.json" />
     <None Include="Data\LevelTable.json" />
     <None Include="Data\NewPlayerPreset.json" />
+    <None Include="Data\SkillStoneData.json" />
     <None Include="Data\CardData.json" />
     <None Include="Data\StoryData.json" />
     <None Include="Data\CinematicData.json" />

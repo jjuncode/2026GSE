@@ -213,3 +213,26 @@ def rank_badges():
 
 
 FLAT.append(('rank_badge', rank_badges))
+
+
+def skill_stone():
+    # 푸른 룬이 새겨진 납작한 돌
+    b = Builder(0.0)
+    b.ellipsoid((0.0, 0.0, 0.16), (0.2, 0.17, 0.14), I3, 'stone', 1)
+    b.decal((0.12, -0.06, 0.2), (120, 200, 255))
+    b.decal((0.13, 0.04, 0.16), (120, 200, 255))
+    b.decal((0.1, 0.0, 0.26), (200, 240, 255))
+    return b
+
+
+def boss_stone():
+    # 그림자 결정에 붉은 심지 - 보스의 힘
+    b = Builder(15.0)
+    b.ellipsoid((0.0, 0.0, 0.18), (0.18, 0.18, 0.2), I3, 'shadow_gem', 1)
+    b.ellipsoid((0.08, 0.0, 0.22), (0.06, 0.06, 0.07), I3, 'red', 2)
+    b.decal((0.12, -0.05, 0.3), (255, 160, 170))
+    return b
+
+
+ICONS.append(('icon_skill_stone', skill_stone, 1.6))
+ICONS.append(('icon_boss_stone', boss_stone, 1.6))

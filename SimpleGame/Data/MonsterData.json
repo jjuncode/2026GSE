@@ -167,6 +167,12 @@
             "rate": 35.0,
             "min_count": 1,
             "max_count": 1
+          },
+          {
+            "item_id": 33,
+            "rate": 5.0,
+            "min_count": 1,
+            "max_count": 1
           }
         ]
       }
@@ -225,6 +231,12 @@
             "rate": 100.0,
             "min_count": 3,
             "max_count": 3
+          },
+          {
+            "item_id": 33,
+            "rate": 50.0,
+            "min_count": 1,
+            "max_count": 1
           }
         ]
       }
@@ -409,6 +421,12 @@
             "rate": 100.0,
             "min_count": 3,
             "max_count": 5
+          },
+          {
+            "item_id": 33,
+            "rate": 15.0,
+            "min_count": 1,
+            "max_count": 1
           }
         ]
       },
@@ -476,6 +494,12 @@
             "rate": 80.0,
             "min_count": 2,
             "max_count": 4
+          },
+          {
+            "item_id": 33,
+            "rate": 15.0,
+            "min_count": 1,
+            "max_count": 1
           }
         ]
       },
@@ -542,6 +566,12 @@
             "rate": 100.0,
             "min_count": 6,
             "max_count": 9
+          },
+          {
+            "item_id": 33,
+            "rate": 25.0,
+            "min_count": 1,
+            "max_count": 1
           }
         ]
       },
@@ -676,6 +706,18 @@
             "rate": 30.0,
             "min_count": 1,
             "max_count": 1
+          },
+          {
+            "item_id": 33,
+            "rate": 40.0,
+            "min_count": 1,
+            "max_count": 2
+          },
+          {
+            "item_id": 35,
+            "rate": 30.0,
+            "min_count": 1,
+            "max_count": 1
           }
         ]
       },
@@ -807,6 +849,18 @@
             "rate": 60.0,
             "min_count": 1,
             "max_count": 2
+          },
+          {
+            "item_id": 33,
+            "rate": 60.0,
+            "min_count": 1,
+            "max_count": 2
+          },
+          {
+            "item_id": 34,
+            "rate": 50.0,
+            "min_count": 1,
+            "max_count": 1
           }
         ]
       },
@@ -950,6 +1004,18 @@
             "rate": 100.0,
             "min_count": 8,
             "max_count": 12
+          },
+          {
+            "item_id": 33,
+            "rate": 100.0,
+            "min_count": 2,
+            "max_count": 3
+          },
+          {
+            "item_id": 36,
+            "rate": 100.0,
+            "min_count": 1,
+            "max_count": 1
           }
         ]
       },

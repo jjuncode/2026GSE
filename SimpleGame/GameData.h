@@ -385,6 +385,25 @@ struct CardData
 	int32 value = 0;
 };
 
+// 보스 스킬석이 스킬 하나에 새기는 힘
+struct SkillInscription
+{
+	int32 item_id = ITEM_ID_NONE;
+	int32 skill_id = SKILL_ID_NONE;
+	std::wstring name;
+	float damage_rate = 0.f;	// 더하는 피해 비율
+	float stun_sec = 0.f;
+	float cooldown_cut = 0.f;
+};
+
+struct SkillStoneConfig
+{
+	int32 upgrade_item = ITEM_ID_NONE;	// 스킬 강화석
+	int32 upgrade_max = 5;
+	float upgrade_damage_rate = 0.08f;	// 단계마다
+	std::vector<SkillInscription> inscriptions;
+};
+
 struct ShopData
 {
 	int32 kind = SHOP_GENERAL;
@@ -505,6 +524,7 @@ const std::vector<StoryStep>& GetStorySteps();
 const StoryConfig& GetStoryConfig();
 const std::vector<CardData>& GetCardDatas();
 const std::vector<int32>& GetCardLevelCopies();	// 레벨마다 필요한 누적 장 수
+const SkillStoneConfig& GetSkillStoneConfig();
 
 // 아이템 그림판을 읽은 뒤 부른다. "ext:" 아이콘을 그림 번호로 잇는다
 void BindItemArt();

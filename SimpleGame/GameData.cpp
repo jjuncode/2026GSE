@@ -44,6 +44,7 @@ namespace
 	StoryConfig g_story_config;
 	std::vector<CardData> g_cards;
 	std::vector<int32> g_card_level_copies = { 1, 3, 6 };
+	SkillStoneConfig g_skill_stone;
 
 	const std::vector<int32> EMPTY_LINKS;
 
@@ -1297,6 +1298,36 @@ namespace
 		}
 	}
 
+	void LoadSkillStones()
+	{
+		Json root;
+		if (ReadJson("SkillStoneData.json", &root) == false)
+		{
+			return;
+		}
+
+		g_skill_stone.upgrade_item = ReadInt(root, "upgrade_item", ITEM_ID_NONE);
+		g_skill_stone.upgrade_max = ReadInt(root, "upgrade_max", g_skill_stone.upgrade_max);
+		g_skill_stone.upgrade_damage_rate = ReadFloat(root, "upgrade_damage_rate", g_skill_stone.upgrade_damage_rate);
+
+		if (root.contains("inscriptions") == false || root["inscriptions"].is_array() == false)
+		{
+			return;
+		}
+
+		for (const Json& entry : root["inscriptions"])
+		{
+			SkillInscription inscription;
+			inscription.item_id = ReadInt(entry, "item", ITEM_ID_NONE);
+			inscription.skill_id = ReadInt(entry, "skill", SKILL_ID_NONE);
+			inscription.name = Utf8ToWide(ReadString(entry, "name"));
+			inscription.damage_rate = ReadFloat(entry, "damage_rate", 0.f);
+			inscription.stun_sec = ReadFloat(entry, "stun_sec", 0.f);
+			inscription.cooldown_cut = ReadFloat(entry, "cooldown_cut", 0.f);
+			g_skill_stone.inscriptions.push_back(inscription);
+		}
+	}
+
 	void LoadRanks()
 	{
 		Json root;
@@ -1396,6 +1427,7 @@ bool LoadGameData()
 	LoadCinematics();
 	LoadStory();
 	LoadCards();
+	LoadSkillStones();
 	BuildComboChain();
 
 	if (g_skills.empty() || g_items.empty() || g_monsters.empty())
@@ -1517,6 +1549,11 @@ const std::vector<CardData>& GetCardDatas()
 const std::vector<int32>& GetCardLevelCopies()
 {
 	return g_card_level_copies;
+}
+
+const SkillStoneConfig& GetSkillStoneConfig()
+{
+	return g_skill_stone;
 }
 
 void BindItemArt()
