@@ -37,6 +37,7 @@ namespace
 	std::array<ShopData, SHOP_KIND_COUNT> g_shops;
 	QuestConfig g_quest_config;
 	std::vector<QuestTemplate> g_quest_templates;
+	RankConfig g_rank_config;
 
 	const std::vector<int32> EMPTY_LINKS;
 
@@ -920,6 +921,38 @@ namespace
 		return 2;
 	}
 
+	QuestTemplate ReadQuestTemplate(const Json& entry)
+	{
+		QuestTemplate quest;
+		quest.tier = ParseQuestTier(ReadString(entry, "tier"));
+		quest.goal = ParseQuestGoal(ReadString(entry, "goal"));
+		quest.monster_type = ReadInt(entry, "monster", MONSTER_TYPE_NONE);
+		quest.item_id = ReadInt(entry, "item", ITEM_ID_NONE);
+		quest.site_kind = ParseSiteKind(ReadString(entry, "site"));
+		quest.level = ReadInt(entry, "level", 1);
+		quest.level_bonus = ReadInt(entry, "level_bonus", 0);
+		quest.title = Utf8ToWide(ReadString(entry, "title"));
+		quest.desc = Utf8ToWide(ReadString(entry, "desc"));
+
+		const std::vector<int32> count = ReadIntArray(entry, "count");
+		if (count.size() == 2)
+		{
+			quest.count_min = count[0];
+			quest.count_max = std::max(count[0], count[1]);
+		}
+
+		if (entry.contains("reward"))
+		{
+			const Json& reward = entry["reward"];
+			quest.reward.gold = ReadInt(reward, "gold", 0);
+			quest.reward.exp = ReadInt(reward, "exp", 0);
+			quest.reward.trace = ReadInt(reward, "trace", 0);
+			quest.reward.item_id = ReadInt(reward, "item", ITEM_ID_NONE);
+		}
+
+		return quest;
+	}
+
 	void LoadQuests()
 	{
 		Json root;
@@ -951,34 +984,62 @@ namespace
 
 		for (const Json& entry : root["templates"])
 		{
-			QuestTemplate quest;
-			quest.tier = ParseQuestTier(ReadString(entry, "tier"));
-			quest.goal = ParseQuestGoal(ReadString(entry, "goal"));
-			quest.monster_type = ReadInt(entry, "monster", MONSTER_TYPE_NONE);
-			quest.item_id = ReadInt(entry, "item", ITEM_ID_NONE);
-			quest.site_kind = ParseSiteKind(ReadString(entry, "site"));
-			quest.level = ReadInt(entry, "level", 1);
-			quest.level_bonus = ReadInt(entry, "level_bonus", 0);
-			quest.title = Utf8ToWide(ReadString(entry, "title"));
-			quest.desc = Utf8ToWide(ReadString(entry, "desc"));
+			g_quest_templates.push_back(ReadQuestTemplate(entry));
+		}
+	}
 
-			const std::vector<int32> count = ReadIntArray(entry, "count");
-			if (count.size() == 2)
+	void LoadRanks()
+	{
+		Json root;
+		if (ReadJson("RankData.json", &root) == false)
+		{
+			return;
+		}
+
+		RankConfig& config = g_rank_config;
+		const std::vector<int32> points = ReadIntArray(root, "tier_points");
+		const std::vector<int32> min_rank = ReadIntArray(root, "tier_min_rank");
+
+		for (size_t tier = 0; tier < config.tier_points.size(); ++tier)
+		{
+			if (tier < points.size())
 			{
-				quest.count_min = count[0];
-				quest.count_max = std::max(count[0], count[1]);
+				config.tier_points[tier] = points[tier];
 			}
 
-			if (entry.contains("reward"))
+			if (tier < min_rank.size())
 			{
-				const Json& reward = entry["reward"];
-				quest.reward.gold = ReadInt(reward, "gold", 0);
-				quest.reward.exp = ReadInt(reward, "exp", 0);
-				quest.reward.trace = ReadInt(reward, "trace", 0);
-				quest.reward.item_id = ReadInt(reward, "item", ITEM_ID_NONE);
+				config.tier_min_rank[tier] = min_rank[tier];
+			}
+		}
+
+		if (root.contains("ranks") == false || root["ranks"].is_array() == false)
+		{
+			return;
+		}
+
+		for (const Json& entry : root["ranks"])
+		{
+			RankData rank;
+			rank.name = Utf8ToWide(ReadString(entry, "name"));
+			rank.need_points = ReadInt(entry, "need", 0);
+
+			if (entry.contains("color") && entry["color"].is_array() && entry["color"].size() == 3)
+			{
+				for (size_t index = 0; index < 3; ++index)
+				{
+					rank.color[index] = entry["color"][index].get<float>();
+				}
 			}
 
-			g_quest_templates.push_back(quest);
+			if (entry.contains("exam"))
+			{
+				rank.has_exam = true;
+				rank.exam = ReadQuestTemplate(entry["exam"]);
+				rank.exam.tier = QUEST_TIER_TRIAL;
+			}
+
+			config.ranks.push_back(rank);
 		}
 	}
 
@@ -1021,6 +1082,7 @@ bool LoadGameData()
 	LoadPreset();
 	LoadShops();
 	LoadQuests();
+	LoadRanks();
 	BuildComboChain();
 
 	if (g_skills.empty() || g_items.empty() || g_monsters.empty())
@@ -1099,6 +1161,11 @@ const QuestConfig& GetQuestConfig()
 const std::vector<QuestTemplate>& GetQuestTemplates()
 {
 	return g_quest_templates;
+}
+
+const RankConfig& GetRankConfig()
+{
+	return g_rank_config;
 }
 
 void BindItemArt()

@@ -8,6 +8,7 @@
 #include "Player.h"
 #include "Profiler.h"
 #include "Quest.h"
+#include "Rank.h"
 #include "Renderer.h"
 #include "SpriteAtlas.h"
 #include "Text.h"
@@ -295,6 +296,24 @@ namespace
 		DrawString(renderer, std::to_wstring(percent) + L"%", left + width + 8.f, EXP_Y + 12.f, TEXT_ALIGN_LEFT, 0.7f, 0.62f, 0.85f, 1.f);
 	}
 
+	// 지갑 위에 모험가 등급. 무엇을 할 수 있는 몸인지가 레벨만큼 중요하다
+	void DrawRank(Renderer* renderer)
+	{
+		const float x = -static_cast<float>(WINDOW_SIZE_X) * 0.5f + 30.f;
+		const float y = ACTION_Y + 96.f;
+		const int32 rank = GetPlayerRank();
+		const RankData& data = GetRankData(rank);
+
+		DrawRankBadge(renderer, rank, x, y - 18.f, UI_SPRITE_SCALE);
+		DrawStringShadow(renderer, data.name, x + 22.f, y + 12.f, TEXT_ALIGN_LEFT, data.color[0], data.color[1], data.color[2], 1.f);
+
+		if (IsRankExamReady())
+		{
+			const float pulse = GetUiPulse();
+			DrawStringShadow(renderer, L"승급 심사", x + 22.f + MeasureString(data.name) + 10.f, y + 12.f, TEXT_ALIGN_LEFT, pulse, 0.85f * pulse, 0.3f, 1.f);
+		}
+	}
+
 	void DrawWallet(Renderer* renderer)
 	{
 		const Player& player = GetPlayer();
@@ -504,6 +523,7 @@ void DrawHud(Renderer* renderer)
 	DrawActionBar(renderer);
 	DrawExpBar(renderer);
 	DrawWallet(renderer);
+	DrawRank(renderer);
 	DrawPointBadges(renderer);
 	DrawIntroHint(renderer);
 

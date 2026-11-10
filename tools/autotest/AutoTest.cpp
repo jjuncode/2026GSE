@@ -9,6 +9,7 @@
 #include "NpcData.h"
 #include "Player.h"
 #include "Quest.h"
+#include "Rank.h"
 #include "Scene.h"
 #include "UiWindows.h"
 #include "Village.h"
@@ -852,7 +853,7 @@ void UpdateAutoTest(float real_seconds)
 
 		if (crossed(1.2f))
 		{
-			UiMouseMove(-231.f, 174.f - 42.f * 4.f);
+			UiMouseMove(-231.f, 174.f - 38.f * 4.f);
 		}
 
 		if (crossed(1.4f))
@@ -867,7 +868,7 @@ void UpdateAutoTest(float real_seconds)
 			const float at = 1.6f + static_cast<float>(index) * 0.3f;
 			if (crossed(at))
 			{
-				click(-231.f, 174.f - 42.f * static_cast<float>(rows[index]));
+				click(-231.f, 174.f - 38.f * static_cast<float>(rows[index]));
 			}
 
 			if (crossed(at + 0.15f))
@@ -955,6 +956,110 @@ void UpdateAutoTest(float real_seconds)
 		if (crossed(6.7f))
 		{
 			Capture("quest_reported");
+		}
+
+		return;
+	}
+
+	if (g_mode == "rank")
+	{
+		// 공헌을 채워 승급 심사를 띄우고, 받아서 넘겨 실버가 되는지 본다
+		const auto crossed = [](float mark)
+		{
+			return g_time - FIXED_STEP_SECONDS < mark && g_time >= mark;
+		};
+
+		const auto click = [](float x, float y)
+		{
+			UiMouseMove(x, y);
+			UiMouseDown(UI_MOUSE_LEFT, x, y);
+			UiMouseUp(UI_MOUSE_LEFT, x, y);
+		};
+
+		const auto log_rank = [](const char* tag)
+		{
+			std::cout << "[ AutoTest ] : " << tag << " rank " << GetPlayerRank() << " points " << GetRankPoints() << " exam_ready " << IsRankExamReady()
+				<< " offers0 " << GetBoardQuests(ZONE_CITADEL).size() << " first_is_exam " << (GetBoardQuests(ZONE_CITADEL).empty() == false && GetBoardQuests(ZONE_CITADEL).front().is_exam) << "\n";
+		};
+
+		if (crossed(0.5f))
+		{
+			WorldPos spot = GetBoardPos(ZONE_CITADEL);
+			MoveWorldPos(&spot, 1.2f, 1.2f);
+			PlacePlayer(spot);
+			log_rank("start");
+		}
+
+		if (crossed(1.0f))
+		{
+			Interact();
+		}
+
+		// 고난 의뢰 ( 8 번째 줄 ) 는 브론즈라 막혀야 한다
+		if (crossed(1.2f))
+		{
+			click(-231.f, 174.f - 38.f * 7.f);
+		}
+
+		if (crossed(1.35f))
+		{
+			click(211.f, -250.f);
+			std::cout << "[ AutoTest ] : hard accept as bronze active " << GetActiveQuests().size() << "\n";
+		}
+
+		if (crossed(1.6f))
+		{
+			Capture("rank_locked");
+		}
+
+		if (crossed(1.8f))
+		{
+			AddRankPoints(60);
+			CloseTopWindow();
+		}
+
+		// 공헌이 차도 심사는 게시판을 다시 열 때 붙는다
+		if (crossed(2.2f))
+		{
+			ReportQuestsAt(ZONE_CITADEL);
+			Interact();
+			log_rank("after points");
+		}
+
+		if (crossed(2.4f))
+		{
+			click(-231.f, 174.f);
+		}
+
+		if (crossed(2.6f))
+		{
+			Capture("rank_exam");
+			click(211.f, -250.f);
+		}
+
+		if (crossed(2.9f))
+		{
+			const std::vector<Quest> quests = GetActiveQuests();
+			for (const Quest& quest : quests)
+			{
+				for (int32 count = 0; count < quest.need; ++count)
+				{
+					NotifyQuestKill(quest.target, quest.goal == QUEST_GOAL_ELITE, quest.goal == QUEST_GOAL_BOSS, 99);
+				}
+			}
+
+			CloseTopWindow();
+		}
+
+		if (crossed(3.4f))
+		{
+			Interact();
+			log_rank("reported exam");
+		}
+
+		if (crossed(3.8f))
+		{
+			Capture("rank_up");
 		}
 
 		return;

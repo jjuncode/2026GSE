@@ -3,7 +3,9 @@
 #include "Audio.h"
 #include "Player.h"
 #include "Quest.h"
+#include "Rank.h"
 #include "Renderer.h"
+#include "SpriteAtlas.h"
 #include "Text.h"
 #include "UiDraw.h"
 
@@ -14,7 +16,7 @@
 
 namespace
 {
-	const float ROW_HEIGHT = 42.f;
+	const float ROW_HEIGHT = 38.f;	// 심사까지 열한 줄이 아래 안내 줄 위에 들어간다
 	const float ACCEPT_WIDTH = 180.f;
 	const float ACCEPT_HEIGHT = 36.f;
 	const float LIST_SHARE = 0.47f;	// 창 폭 중 목록 몫
@@ -171,7 +173,13 @@ namespace
 		float level_b = 0.f;
 		GetLevelColor(quest.level, &level_r, &level_g, &level_b);
 
-		DrawStringShadow(renderer, GetQuestTierName(quest.tier) + L" 의뢰", left, y, TEXT_ALIGN_LEFT, tier_r, tier_g, tier_b, 1.f);
+		std::wstring heading = GetQuestTierName(quest.tier) + L" 의뢰";
+		if (quest.is_exam)
+		{
+			heading = L"승급 심사  ·  " + GetRankName(quest.exam_rank) + L" 등급";
+		}
+
+		DrawStringShadow(renderer, heading, left, y, TEXT_ALIGN_LEFT, tier_r, tier_g, tier_b, 1.f);
 		DrawStringShadow(renderer, L"권장 Lv " + std::to_wstring(quest.level), rect.right - 24.f, y, TEXT_ALIGN_RIGHT, level_r, level_g, level_b, 1.f);
 		y -= 34.f;
 
@@ -208,12 +216,17 @@ namespace
 
 		const int32 active = static_cast<int32>(GetActiveQuests().size());
 		const int32 max_active = GetQuestConfig().max_active;
+		const bool rank_ok = quest.is_exam || CanAcceptQuestTier(quest.tier);
 		std::wstring label = L"수락";
-		bool enabled = quest.state == QUEST_STATE_OFFERED && active < max_active;
+		bool enabled = quest.state == QUEST_STATE_OFFERED && active < max_active && rank_ok;
 
 		if (quest.state != QUEST_STATE_OFFERED)
 		{
 			label = GetStateLabel(quest.state);
+		}
+		else if (rank_ok == false)
+		{
+			label = GetRankName(GetTierMinRank(quest.tier)) + L" 등급부터";
 		}
 		else if (active >= max_active)
 		{
@@ -297,7 +310,13 @@ void DrawQuestBoardTab(Renderer* renderer, int32 village, const BoardRect& rect,
 			title_b = 0.5f;
 		}
 
-		const std::wstring tag = L"[" + GetQuestTierName(quest.tier) + L"]";
+		if (quest.is_exam && quest.state == QUEST_STATE_OFFERED)
+		{
+			const float breath = 0.5f + 0.5f * GetUiPulse();
+			renderer->DrawSolidBox(list_center, center_y, list_right - list_left, ROW_HEIGHT - 4.f, 0.3f * breath, 0.22f * breath, 0.05f, 0.6f);
+		}
+
+		const std::wstring tag = L"[" + GetQuestTagName(quest) + L"]";
 		DrawStringShadow(renderer, tag, list_left + 8.f, y, TEXT_ALIGN_LEFT, tier_r, tier_g, tier_b, 1.f);
 		const float title_x = list_left + 16.f + MeasureString(tag);
 		DrawStringShadow(renderer, quest.title, title_x, y, TEXT_ALIGN_LEFT, title_r, title_g, title_b, 1.f);
@@ -314,6 +333,13 @@ void DrawQuestBoardTab(Renderer* renderer, int32 village, const BoardRect& rect,
 			continue;
 		}
 
+		// 등급이 모자란 의뢰는 무엇이 필요한지 적는다. 다음 등급의 목표가 된다
+		if (quest.is_exam == false && CanAcceptQuestTier(quest.tier) == false)
+		{
+			DrawStringShadow(renderer, GetRankName(GetTierMinRank(quest.tier)) + L"부터", list_right - 8.f, y, TEXT_ALIGN_RIGHT, 0.5f, 0.48f, 0.45f, 1.f);
+			continue;
+		}
+
 		float level_r = 0.f;
 		float level_g = 0.f;
 		float level_b = 0.f;
@@ -327,7 +353,22 @@ void DrawQuestBoardTab(Renderer* renderer, int32 village, const BoardRect& rect,
 	DrawDetail(renderer, offers[static_cast<size_t>(g_selected)], rect, mouse_x, mouse_y);
 
 	const int32 minutes = static_cast<int32>(std::ceil(GetBoardRefreshLeft(village) / 60.f));
-	DrawStringShadow(renderer, L"새 의뢰까지 " + std::to_wstring(minutes) + L"분  ·  끝낸 의뢰는 아무 게시판에서나 보고", list_center, rect.bottom + 18.f, TEXT_ALIGN_CENTER, 0.55f, 0.52f, 0.46f, 1.f);
+	DrawStringShadow(renderer, L"새 의뢰까지 " + std::to_wstring(minutes) + L"분  ·  끝낸 의뢰는 아무 게시판에서나 보고", list_left + 8.f, rect.bottom + 18.f, TEXT_ALIGN_LEFT, 0.55f, 0.52f, 0.46f, 1.f);
+
+	// 모험가 등급과 다음 등급까지의 공헌
+	const int32 rank = GetPlayerRank();
+	const RankData& now = GetRankData(rank);
+	std::wstring progress = L"최고 등급";
+	if (rank + 1 < GetRankCount())
+	{
+		progress = L"공헌 " + std::to_wstring(GetRankPoints()) + L" / " + std::to_wstring(GetRankData(rank + 1).need_points);
+	}
+
+	const float badge_x = list_left + 18.f;
+	const float rank_y = rect.bottom + 50.f;
+	DrawRankBadge(renderer, rank, badge_x, rank_y - 26.f, UI_SPRITE_SCALE);
+	DrawStringShadow(renderer, now.name + L" 등급", badge_x + 22.f, rank_y, TEXT_ALIGN_LEFT, now.color[0], now.color[1], now.color[2], 1.f);
+	DrawStringShadow(renderer, progress, badge_x + 22.f + MeasureString(now.name + L" 등급") + 14.f, rank_y, TEXT_ALIGN_LEFT, 0.62f, 0.58f, 0.5f, 1.f);
 }
 
 bool HandleQuestBoardDown(int32 village, const BoardRect& rect, float x, float y)
@@ -364,6 +405,12 @@ bool HandleQuestBoardDown(int32 village, const BoardRect& rect, float x, float y
 	else if (result == QUEST_ACCEPT_FULL)
 	{
 		g_message = L"진행 중인 의뢰가 꽉 찼다";
+		g_message_good = false;
+		PlaySfx(SFX_UI_ERROR, 0.6f);
+	}
+	else if (result == QUEST_ACCEPT_RANK)
+	{
+		g_message = L"모험가 등급이 모자라다";
 		g_message_good = false;
 		PlaySfx(SFX_UI_ERROR, 0.6f);
 	}

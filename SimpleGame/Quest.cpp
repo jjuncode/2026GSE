@@ -8,6 +8,7 @@
 #include "Monster.h"
 #include "NavGrid.h"
 #include "Player.h"
+#include "Rank.h"
 #include "Renderer.h"
 #include "Text.h"
 #include "UiDraw.h"
@@ -62,6 +63,10 @@ namespace
 	int32 g_path_to_y = -9999;
 
 	const std::vector<Quest> EMPTY_QUESTS;
+
+	// 승급 심사는 게시판마다 같은 것 하나를 맨 앞에 붙인다. 어느 게시판에서 받든 같은 의뢰다
+	Quest g_exam;
+	bool g_has_exam = false;
 
 	float NextBannerLift()
 	{
@@ -409,7 +414,48 @@ namespace
 			board.offers.resize(static_cast<size_t>(config.board_size));
 		}
 
+		// 판을 갈아도 아직 안 받은 심사는 그대로 붙어 있다
+		if (g_has_exam && g_exam.state != QUEST_STATE_REPORTED)
+		{
+			board.offers.insert(board.offers.begin(), g_exam);
+		}
+
 		board.refresh_timer = config.refresh_sec;
+	}
+
+	// 공헌이 차면 다음 등급 심사를 성채 기준으로 하나 만들어 모든 게시판 맨 앞에 붙인다
+	void UpdateExamOffer()
+	{
+		if (g_has_exam && g_exam.state != QUEST_STATE_REPORTED)
+		{
+			return;
+		}
+
+		if (IsRankExamReady() == false)
+		{
+			return;
+		}
+
+		const RankData& next = GetRankData(GetPlayerRank() + 1);
+		std::mt19937 rng(g_seed ^ static_cast<uint32>(GetPlayerRank() * 31337));
+
+		Quest exam;
+		if (MakeQuest(next.exam, ZONE_CITADEL, &rng, &exam) == false)
+		{
+			return;
+		}
+
+		exam.is_exam = true;
+		exam.exam_rank = GetPlayerRank() + 1;
+		g_exam = exam;
+		g_has_exam = true;
+
+		for (BoardState& board : g_boards)
+		{
+			board.offers.insert(board.offers.begin(), g_exam);
+		}
+
+		std::cout << "[ Quest - UpdateExamOffer ] : rank " << GetPlayerRank() + 1 << " serial " << exam.serial << "\n";
 	}
 
 	Quest* FindActive(int32 serial)
@@ -427,6 +473,11 @@ namespace
 
 	void MarkOffer(int32 serial, int32 state)
 	{
+		if (g_has_exam && g_exam.serial == serial)
+		{
+			g_exam.state = state;
+		}
+
 		for (BoardState& board : g_boards)
 		{
 			for (Quest& offer : board.offers)
@@ -608,12 +659,15 @@ void BuildQuests(const ZoneLayout& layout)
 	g_active.clear();
 	g_tracked_serial = -1;
 	g_path.clear();
+	g_has_exam = false;
 
 	g_boards.assign(static_cast<size_t>(GetVillageCount()), BoardState());
 	for (int32 village = 0; village < GetVillageCount(); ++village)
 	{
 		FillBoard(village);
 	}
+
+	UpdateExamOffer();
 
 	std::cout << "[ Quest - BuildQuests ] : boards " << g_boards.size() << " offers " << g_boards.front().offers.size() << "\n";
 }
@@ -623,6 +677,7 @@ void UpdateQuests(float real_seconds)
 	g_time += real_seconds;
 
 	UpdateBoards(real_seconds);
+	UpdateExamOffer();
 	UpdateLiveProgress();
 	RefreshPath(real_seconds);
 }
@@ -694,12 +749,17 @@ int32 AcceptBoardQuest(int32 village, int32 index)
 		return QUEST_ACCEPT_TAKEN;
 	}
 
+	if (offer.is_exam == false && CanAcceptQuestTier(offer.tier) == false)
+	{
+		return QUEST_ACCEPT_RANK;
+	}
+
 	if (static_cast<int32>(g_active.size()) >= GetQuestConfig().max_active)
 	{
 		return QUEST_ACCEPT_FULL;
 	}
 
-	offer.state = QUEST_STATE_ACTIVE;
+	MarkOffer(offer.serial, QUEST_STATE_ACTIVE);
 
 	Quest quest = offer;
 	quest.progress = 0;
@@ -746,6 +806,15 @@ int32 ReportQuestsAt(int32 village)
 		GrantReward(quest);
 		MarkOffer(quest.serial, QUEST_STATE_REPORTED);
 
+		if (quest.is_exam)
+		{
+			PromotePlayerRank();
+		}
+		else
+		{
+			AddRankPoints(GetRankConfig().tier_points[static_cast<size_t>(quest.tier)]);
+		}
+
 		std::cout << "[ Quest - ReportQuestsAt ] : village " << village << " serial " << quest.serial << " gold " << quest.reward.gold << " exp " << quest.reward.exp << "\n";
 
 		g_active.erase(g_active.begin() + static_cast<std::ptrdiff_t>(index));
@@ -755,6 +824,7 @@ int32 ReportQuestsAt(int32 village)
 	if (reported > 0)
 	{
 		PlaySfx(SFX_ENHANCE_SUCCESS, 0.9f);
+		UpdateExamOffer();
 	}
 
 	return reported;
@@ -848,6 +918,16 @@ std::wstring DescribeQuestGoal(const Quest& quest, bool with_progress)
 	}
 
 	return text + L"  " + std::to_wstring(quest.need);
+}
+
+std::wstring GetQuestTagName(const Quest& quest)
+{
+	if (quest.is_exam)
+	{
+		return L"승급";
+	}
+
+	return GetQuestTierName(quest.tier);
 }
 
 std::wstring GetQuestTierName(int32 tier)
@@ -1078,7 +1158,7 @@ void DrawQuestTracker(Renderer* renderer, bool hidden)
 			renderer->DrawSolidDiamond(left + 2.f, y - 12.f, 0.22f, 1.f, 0.82f * breath, 0.35f, 1.f);
 		}
 
-		const std::wstring tag = L"[" + GetQuestTierName(quest.tier) + L"] ";
+		const std::wstring tag = L"[" + GetQuestTagName(quest) + L"] ";
 		DrawStringShadow(renderer, tag, text_left, y, TEXT_ALIGN_LEFT, tier_r, tier_g, tier_b, 1.f);
 
 		const float title_x = text_left + MeasureString(tag);

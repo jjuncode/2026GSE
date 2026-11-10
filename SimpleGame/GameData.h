@@ -236,6 +236,23 @@ struct QuestConfig
 	std::array<std::wstring, QUEST_TIER_COUNT> tier_names;
 };
 
+// 모험가 등급. 의뢰를 넘길 때마다 공헌이 쌓이고, 다음 등급 기준을 넘으면 승급 심사 의뢰가 붙는다
+struct RankData
+{
+	std::wstring name;
+	std::array<float, 3> color = { 1.f, 1.f, 1.f };
+	int32 need_points = 0;
+	bool has_exam = false;
+	QuestTemplate exam;
+};
+
+struct RankConfig
+{
+	std::vector<RankData> ranks;
+	std::array<int32, QUEST_TIER_COUNT> tier_points = { 10, 25, 60, 150 };
+	std::array<int32, QUEST_TIER_COUNT> tier_min_rank = { 0, 0, 1, 2 };	// 이 등급부터 받는다
+};
+
 struct ShopData
 {
 	int32 kind = SHOP_GENERAL;
@@ -348,6 +365,7 @@ const PlayerPreset& GetPlayerPreset();
 const ShopData& GetShopData(int32 kind);
 const QuestConfig& GetQuestConfig();
 const std::vector<QuestTemplate>& GetQuestTemplates();
+const RankConfig& GetRankConfig();
 
 // 아이템 그림판을 읽은 뒤 부른다. "ext:" 아이콘을 그림 번호로 잇는다
 void BindItemArt();

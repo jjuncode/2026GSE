@@ -17,6 +17,7 @@ constexpr int32 QUEST_STATE_REPORTED = 3;
 constexpr int32 QUEST_ACCEPT_OK = 0;
 constexpr int32 QUEST_ACCEPT_FULL = 1;	// 진행 중이 꽉 찼다
 constexpr int32 QUEST_ACCEPT_TAKEN = 2;
+constexpr int32 QUEST_ACCEPT_RANK = 3;	// 모험가 등급이 모자라다
 
 // 게시판에 붙은 의뢰 하나. 받으면 같은 것을 진행 목록에 복사한다
 struct Quest
@@ -31,6 +32,8 @@ struct Quest
 	int32 progress = 0;
 	int32 level = 1;	// 권장 레벨
 	int32 state = QUEST_STATE_OFFERED;
+	bool is_exam = false;	// 승급 심사. 넘기면 등급이 오른다
+	int32 exam_rank = 0;	// 넘기면 오를 등급
 	bool has_place = false;
 	WorldPos place;
 	std::wstring place_name;
@@ -56,6 +59,7 @@ int32 GetTrackedQuest();	// 길 안내를 받는 진행 중 번호. 없으면 -1
 void CycleTrackedQuest();
 std::wstring DescribeQuestGoal(const Quest& quest, bool with_progress);
 std::wstring GetQuestTierName(int32 tier);
+std::wstring GetQuestTagName(const Quest& quest);	// 승급 심사면 "승급"
 void GetQuestTierColor(int32 tier, float* r, float* g, float* b);
 bool GetQuestGuide(const Quest& quest, WorldPos* pos);	// 가야 할 곳. 끝냈으면 가장 가까운 게시판
 float GetPlayerDistanceTo(const WorldPos& pos);	// 칸

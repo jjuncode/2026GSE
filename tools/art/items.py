@@ -132,3 +132,47 @@ FLAT = [
     ('sign_potion', signboard('icon_potion_big')),
     ('sign_general', signboard('icon_pouch')),
 ]
+
+
+# ------------------------------------------------------------ 모험가 등급 휘장 ( 2D, RankData.json 순서 )
+
+RANK_COLORS = [
+    ((92, 56, 30), (176, 112, 62), (226, 160, 104)),     # 브론즈
+    ((88, 96, 108), (176, 184, 196), (236, 240, 246)),   # 실버
+    ((120, 84, 20), (226, 182, 60), (255, 236, 150)),    # 골드
+    ((40, 104, 104), (128, 214, 206), (210, 255, 250)),  # 플래티넘
+    ((20, 92, 44), (70, 196, 110), (170, 255, 190)),     # 에메랄드
+    ((50, 84, 150), (130, 182, 255), (226, 240, 255)),   # 다이아
+    ((110, 14, 30), (226, 52, 76), (255, 160, 170)),     # 루비
+]
+
+
+def rank_badges():
+    import vfx
+    out = []
+    for dark, mid, light in RANK_COLORS:
+        c = vfx.Canvas(16, 18)
+        # 방패 - 위는 곧고 아래로 갈수록 좁아져 끝이 뾰족하다
+        for y in range(1, 17):
+            half = 6.5
+            if y > 9:
+                half = 6.5 * (1.0 - (y - 9) / 8.0)
+            for x in range(16):
+                dx = abs(x - 7.5)
+                if dx > half:
+                    continue
+                color = mid
+                if dx > half - 1.2 or y == 1:
+                    color = dark
+                elif x < 7.5 and y < 8:
+                    color = light
+                c.put(x, y, color)
+        # 가운데 칼 한 자루
+        c.line(7.5, 3, 7.5, 12, (250, 250, 250))
+        c.line(5.5, 10, 9.5, 10, dark)
+        c.outline(INK)
+        out.append(c.px)
+    return out
+
+
+FLAT.append(('rank_badge', rank_badges))
