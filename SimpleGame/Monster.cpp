@@ -21,6 +21,7 @@
 #include "ZoneGen.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -107,19 +108,20 @@ namespace
 		return std::sqrt(delta_x * delta_x + delta_y * delta_y);
 	}
 
+	// 그림 시트는 데이터의 sprite 로 고른다. 그림자 괴물이 본뜬 몬스터 시트를 그대로 쓴다
 	int32 GetMonsterSheet(int32 kind)
 	{
-		switch (kind)
+		switch (GetMonsterData(kind + 1).sprite)
 		{
-			case MONSTER_HOUND:
+			case SPRITE_HOUND:
 			{
 				return SHEET_HOUND;
 			}
-			case MONSTER_DEVOURER:
+			case SPRITE_DEVOURER:
 			{
 				return SHEET_DEVOURER;
 			}
-			case MONSTER_GATEBREAKER:
+			case SPRITE_GATEBREAKER:
 			{
 				return SHEET_GATEBREAKER;
 			}
@@ -129,6 +131,15 @@ namespace
 			}
 		}
 	}
+
+	// 테두리를 도트 하나씩 네 방향으로 민다
+	const std::array<std::array<float, 2>, 4> SHADOW_RIM_OFFSETS =
+	{
+		std::array<float, 2>{ -1.f, 0.f },
+		std::array<float, 2>{ 1.f, 0.f },
+		std::array<float, 2>{ 0.f, 1.f },
+		std::array<float, 2>{ 0.f, -1.f },
+	};
 
 	float GetBandPower(int32 band)
 	{
@@ -522,9 +533,17 @@ namespace
 
 		const float lift = GetChestLift();
 
-		// 재로 흩어진다
-		SpawnDust(m_pos, 10, 0.25f, 0.24f, 0.24f);
-		SpawnSparks(m_pos, lift, 0.f, 1.f, 12, 120.f, 2.4f, 1.6f, 0.6f, 0.3f, 0.6f);
+		// 재로 흩어진다. 그림자는 검은 연기와 보랏빛 불티
+		if (m_data->is_shadow)
+		{
+			SpawnDust(m_pos, 16, 0.08f, 0.04f, 0.12f);
+			SpawnSparks(m_pos, lift, 0.f, 1.f, 16, 140.f, 2.6f, 1.1f, 0.4f, 1.8f, 0.7f);
+		}
+		else
+		{
+			SpawnDust(m_pos, 10, 0.25f, 0.24f, 0.24f);
+			SpawnSparks(m_pos, lift, 0.f, 1.f, 12, 120.f, 2.4f, 1.6f, 0.6f, 0.3f, 0.6f);
+		}
 		PlaySfxAt(SFX_MONSTER_DIE, m_pos, 0.8f);
 
 		if (killer == nullptr || killer->m_team != TEAM_PLAYER)
@@ -1236,6 +1255,30 @@ namespace
 			flash = std::min(m_flash / 0.12f, 1.f);
 		}
 
+		// 그림자 괴물 - 실루엣을 네 방향으로 한 도트 밀어 보랏빛 테를 깔고, 그 위에 어둡게 물든 몸.
+		// 몸을 실루엣으로만 그리면 검은 덩어리가 돼 칼을 드는 동작( 패링 신호 )이 안 읽힌다
+		if (m_data->is_shadow)
+		{
+			float rim_r = 0.95f;
+			float rim_g = 0.35f;
+			float rim_b = 1.7f;
+			if (m_grade == GRADE_ELITE || m_is_elite)
+			{
+				rim_r = 1.8f;
+				rim_g = 0.25f;
+				rim_b = 0.85f;
+			}
+
+			for (const std::array<float, 2>& offset : SHADOW_RIM_OFFSETS)
+			{
+				DrawSheetFrame(renderer, m_sheet, m_frame, body_x + offset[0] * unit, foot.y + offset[1] * unit, rim_r, rim_g, rim_b, 0.8f * alpha, 2.f);
+			}
+
+			r = 0.24f * glow;
+			g = 0.17f * glow;
+			b = 0.34f * glow;
+		}
+
 		DrawSheetFrame(renderer, m_sheet, m_frame, body_x, foot.y, r, g, b, alpha, flash);
 
 		if (IsDead())
@@ -1740,25 +1783,30 @@ void ForgetMonsterTargetNpc(int32 npc_index)
 
 const wchar_t* GetMonsterKindName(int32 kind)
 {
-	switch (kind)
+	// 데이터가 들고 있는 이름이라 종류가 늘어도 여기를 안 고친다
+	const MonsterData& data = GetMonsterData(kind + 1);
+	if (data.monster_type == MONSTER_TYPE_NONE)
 	{
-		case MONSTER_HOUND:
-		{
-			return L"재늑대";
-		}
-		case MONSTER_DEVOURER:
-		{
-			return L"소거식귀";
-		}
-		case MONSTER_GATEBREAKER:
-		{
-			return L"성문파쇄자";
-		}
-		default:
-		{
-			return L"타락자";
-		}
+		return L"몬스터";
 	}
+
+	return data.name.c_str();
+}
+
+int32 GetMonsterBaseKind(int32 kind)
+{
+	const MonsterData& data = GetMonsterData(kind + 1);
+	if (data.base_type > MONSTER_TYPE_NONE)
+	{
+		return data.base_type - 1;
+	}
+
+	return kind;
+}
+
+bool IsShadowMonsterKind(int32 kind)
+{
+	return GetMonsterData(kind + 1).is_shadow;
 }
 
 void ForEachLiveMonster(void (*visit)(const WorldPos& pos, int32 kind, bool is_elite, void* context), void* context)

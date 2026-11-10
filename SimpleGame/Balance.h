@@ -15,6 +15,7 @@ namespace Balance
 	constexpr float ELITE_EXP_RATE = 2.5f;
 	constexpr float ELITE_CHANCE_FIELD = 0.10f;
 	constexpr float ELITE_CHANCE_OUTER = 0.18f;
+	constexpr float SHADOW_PACK_CHANCE_OUTER = 0.4f;	// 깊은 곳 무리 중 그림자. 재에 물든 땅 무리는 늘 그림자
 
 	// 띠마다 몬스터 수치에 곱한다. 멀리 갈수록 세고 많이 준다
 	constexpr float BAND_POWER_INTRO = 0.6f;

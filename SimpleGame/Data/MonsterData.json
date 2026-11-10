@@ -228,6 +228,324 @@
           }
         ]
       }
+    },
+    {
+      "monster_type": 5,
+      "name": "그림자 병사",
+      "grade": "NORMAL",
+      "level": 5,
+      "sprite": "BLIGHTED",
+      "weapon": "CLEAVER",
+      "shadow": true,
+      "base": 1,
+      "body_radius": 40,
+      "hit_radius": 30,
+      "move_speed": 420,
+      "patrol_speed": 160,
+      "standoff_speed": 250,
+      "search_range": 1200,
+      "patrol_radius": 450,
+      "patrol_policy": "SPAWN",
+      "target_policy": "NEAREST",
+      "skill_policy": "RANDOM",
+      "stat": {
+        "max_hp": 420,
+        "attack": 20,
+        "defence": 8,
+        "crit_rate": 5,
+        "crit_damage": 150,
+        "penetration": 0,
+        "toughness": 10
+      },
+      "attack_cooldown_sec": 1.8,
+      "respawn_sec": 30.0,
+      "keep_distance": 300,
+      "skill_ids": [
+        1,
+        2,
+        4
+      ],
+      "weak_point_rate": 1.0,
+      "reward": {
+        "exp": 60,
+        "gold": [
+          12,
+          24
+        ],
+        "drops": [
+          {
+            "item_id": 31,
+            "rate": 60.0,
+            "min_count": 1,
+            "max_count": 2
+          },
+          {
+            "item_id": 2,
+            "rate": 50.0,
+            "min_count": 1,
+            "max_count": 2
+          }
+        ]
+      },
+      "desc": "죽은 경비병의 그림자가 일어선 것. 칼질이 쉬지 않지만 하나하나는 정직하다"
+    },
+    {
+      "monster_type": 6,
+      "name": "그림자 사냥개",
+      "grade": "NORMAL",
+      "level": 6,
+      "sprite": "HOUND",
+      "weapon": "NONE",
+      "shadow": true,
+      "base": 2,
+      "body_radius": 40,
+      "hit_radius": 30,
+      "move_speed": 560,
+      "patrol_speed": 200,
+      "standoff_speed": 320,
+      "search_range": 1300,
+      "patrol_radius": 450,
+      "patrol_policy": "SPAWN",
+      "target_policy": "NEAREST",
+      "skill_policy": "RANDOM",
+      "stat": {
+        "max_hp": 300,
+        "attack": 18,
+        "defence": 4,
+        "crit_rate": 5,
+        "crit_damage": 150,
+        "penetration": 0,
+        "toughness": 0
+      },
+      "attack_cooldown_sec": 1.6,
+      "respawn_sec": 25.0,
+      "keep_distance": 250,
+      "skill_ids": [
+        11,
+        12
+      ],
+      "weak_point_rate": 1.0,
+      "reward": {
+        "exp": 55,
+        "gold": [
+          8,
+          16
+        ],
+        "drops": [
+          {
+            "item_id": 31,
+            "rate": 45.0,
+            "min_count": 1,
+            "max_count": 1
+          },
+          {
+            "item_id": 2,
+            "rate": 40.0,
+            "min_count": 1,
+            "max_count": 1
+          }
+        ]
+      },
+      "desc": "발소리가 없다. 무리 지어 옆구리를 문다"
+    },
+    {
+      "monster_type": 7,
+      "name": "그림자 포식자",
+      "grade": "ELITE",
+      "level": 10,
+      "sprite": "DEVOURER",
+      "weapon": "NONE",
+      "shadow": true,
+      "base": 3,
+      "body_radius": 75,
+      "hit_radius": 70,
+      "move_speed": 320,
+      "patrol_speed": 110,
+      "standoff_speed": 190,
+      "search_range": 1300,
+      "patrol_radius": 450,
+      "patrol_policy": "SPAWN",
+      "target_policy": "NEAREST",
+      "skill_policy": "RANDOM",
+      "stat": {
+        "max_hp": 1600,
+        "attack": 30,
+        "defence": 16,
+        "crit_rate": 5,
+        "crit_damage": 150,
+        "penetration": 0,
+        "toughness": 35
+      },
+      "attack_cooldown_sec": 2.6,
+      "respawn_sec": 50.0,
+      "keep_distance": 420,
+      "skill_ids": [
+        21,
+        22,
+        23
+      ],
+      "weak_point_rate": 2.5,
+      "reward": {
+        "exp": 320,
+        "gold": [
+          60,
+          110
+        ],
+        "drops": [
+          {
+            "item_id": 31,
+            "rate": 100.0,
+            "min_count": 2,
+            "max_count": 4
+          },
+          {
+            "item_id": 32,
+            "rate": 25.0,
+            "min_count": 1,
+            "max_count": 1
+          },
+          {
+            "item_id": 2,
+            "rate": 100.0,
+            "min_count": 3,
+            "max_count": 5
+          }
+        ]
+      },
+      "desc": "배 속에 삼킨 그림자들이 꿈틀댄다. 등이 급소, 붙잡기는 못 막는다"
+    },
+    {
+      "monster_type": 8,
+      "name": "그림자 기사",
+      "grade": "ELITE",
+      "level": 9,
+      "sprite": "BLIGHTED",
+      "weapon": "CLEAVER",
+      "shadow": true,
+      "base": 1,
+      "body_radius": 45,
+      "hit_radius": 35,
+      "move_speed": 440,
+      "patrol_speed": 170,
+      "standoff_speed": 260,
+      "search_range": 1300,
+      "patrol_radius": 450,
+      "patrol_policy": "SPAWN",
+      "target_policy": "NEAREST",
+      "skill_policy": "RANDOM",
+      "stat": {
+        "max_hp": 1200,
+        "attack": 26,
+        "defence": 20,
+        "crit_rate": 5,
+        "crit_damage": 150,
+        "penetration": 0,
+        "toughness": 30
+      },
+      "attack_cooldown_sec": 1.2,
+      "respawn_sec": 45.0,
+      "keep_distance": 300,
+      "skill_ids": [
+        4,
+        1,
+        3,
+        2
+      ],
+      "weak_point_rate": 1.0,
+      "reward": {
+        "exp": 280,
+        "gold": [
+          50,
+          90
+        ],
+        "drops": [
+          {
+            "item_id": 31,
+            "rate": 100.0,
+            "min_count": 2,
+            "max_count": 3
+          },
+          {
+            "item_id": 32,
+            "rate": 20.0,
+            "min_count": 1,
+            "max_count": 1
+          },
+          {
+            "item_id": 2,
+            "rate": 80.0,
+            "min_count": 2,
+            "max_count": 4
+          }
+        ]
+      },
+      "desc": "쉬지 않고 연속 베기를 퍼붓는다. 하나하나가 정직해 패링하기 쉽다"
+    },
+    {
+      "monster_type": 9,
+      "name": "그림자 거인",
+      "grade": "ELITE",
+      "level": 12,
+      "sprite": "GATEBREAKER",
+      "weapon": "NONE",
+      "shadow": true,
+      "base": 4,
+      "body_radius": 115,
+      "hit_radius": 110,
+      "move_speed": 280,
+      "patrol_speed": 100,
+      "standoff_speed": 170,
+      "search_range": 1400,
+      "patrol_radius": 450,
+      "patrol_policy": "SPAWN",
+      "target_policy": "NEAREST",
+      "skill_policy": "RANDOM",
+      "stat": {
+        "max_hp": 2600,
+        "attack": 34,
+        "defence": 22,
+        "crit_rate": 5,
+        "crit_damage": 150,
+        "penetration": 0,
+        "toughness": 40
+      },
+      "attack_cooldown_sec": 2.8,
+      "respawn_sec": 90.0,
+      "keep_distance": 520,
+      "skill_ids": [
+        31,
+        32,
+        33
+      ],
+      "weak_point_rate": 1.0,
+      "reward": {
+        "exp": 600,
+        "gold": [
+          120,
+          220
+        ],
+        "drops": [
+          {
+            "item_id": 31,
+            "rate": 100.0,
+            "min_count": 3,
+            "max_count": 5
+          },
+          {
+            "item_id": 32,
+            "rate": 60.0,
+            "min_count": 1,
+            "max_count": 2
+          },
+          {
+            "item_id": 2,
+            "rate": 100.0,
+            "min_count": 6,
+            "max_count": 9
+          }
+        ]
+      },
+      "desc": "성문파쇄자의 그림자. 지면 강타는 못 막는다"
     }
   ]
 }

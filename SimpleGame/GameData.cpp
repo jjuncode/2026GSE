@@ -628,6 +628,9 @@ namespace
 			monster.level = ReadInt(entry, "level", 1);
 			monster.sprite = ParseMonsterSprite(ReadString(entry, "sprite"));
 			monster.has_blade = ReadString(entry, "weapon") == "CLEAVER";
+			monster.is_shadow = entry.value("shadow", false);
+			monster.base_type = ReadInt(entry, "base", MONSTER_TYPE_NONE);
+			monster.desc = Utf8ToWide(ReadString(entry, "desc"));
 			monster.body_radius = CmToTile(ReadFloat(entry, "body_radius", 40.f));
 			monster.hit_radius = CmToTile(ReadFloat(entry, "hit_radius", 30.f));
 			monster.move_speed = CmToTile(ReadFloat(entry, "move_speed", 0.f));

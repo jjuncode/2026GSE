@@ -12,6 +12,14 @@ constexpr int32 MONSTER_HOUND = 1;	// 재늑대 - 빠르고 약하다
 constexpr int32 MONSTER_DEVOURER = 2;	// 소거식귀 - 정예. 등이 급소, 붙잡기는 못 막는다
 constexpr int32 MONSTER_GATEBREAKER = 3;	// 성문파쇄자 - 보스
 
+// 그림자 괴물. 본뜬 몬스터의 그림과 기술을 빌리고 어둡게 물든 몸에 보랏빛 테를 두른다
+constexpr int32 MONSTER_SHADOW_SOLDIER = 4;
+constexpr int32 MONSTER_SHADOW_HOUND = 5;
+constexpr int32 MONSTER_SHADOW_DEVOURER = 6;	// 정예
+constexpr int32 MONSTER_SHADOW_KNIGHT = 7;	// 정예. 연속 베기
+constexpr int32 MONSTER_SHADOW_COLOSSUS = 8;	// 정예. 성문파쇄자의 그림자
+constexpr int32 MONSTER_KIND_COUNT = 9;
+
 // NPC 가 잡았을 때 받는 것
 struct MonsterReward
 {
@@ -62,6 +70,8 @@ int32 FindNearestMonster(const WorldPos& pos, float range, float* distance);	// 
 bool DamageMonsterFromNpc(int32 index, int32 damage, int32 npc_index, const WorldPos& attacker_pos, MonsterReward* reward);	// 죽였으면 true
 void ForgetMonsterTargetNpc(int32 npc_index);
 const wchar_t* GetMonsterKindName(int32 kind);
+int32 GetMonsterBaseKind(int32 kind);	// 그림자면 본뜬 몬스터. NPC 가 얼마나 겁내는지는 이걸로 본다
+bool IsShadowMonsterKind(int32 kind);
 
 // 지도에 찍을 산 몬스터 위치
 void ForEachLiveMonster(void (*visit)(const WorldPos& pos, int32 kind, bool is_elite, void* context), void* context);

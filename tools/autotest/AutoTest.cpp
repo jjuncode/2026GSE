@@ -1166,6 +1166,49 @@ void UpdateAutoTest(float real_seconds)
 		return;
 	}
 
+	if (g_mode == "shadow")
+	{
+		// 그림자 다섯과 견줄 타락자 하나를 세운다. 마을 안이라 덤비지 않고 서 있는다
+		if (g_spawn_stage == 0 && g_time >= 1.f)
+		{
+			g_spawn_stage = 1;
+			SpawnNear(MONSTER_SHADOW_SOLDIER, 2.2f, -1.6f);
+			SpawnNear(MONSTER_SHADOW_HOUND, 3.0f, 0.6f);
+			SpawnNear(MONSTER_SHADOW_DEVOURER, -3.2f, -1.2f);
+			SpawnNear(MONSTER_SHADOW_KNIGHT, -1.6f, 2.6f);
+			SpawnNear(MONSTER_SHADOW_COLOSSUS, 1.0f, 3.6f);
+			SpawnNear(MONSTER_BLIGHTED, -2.6f, 0.8f);
+
+			std::array<int32, MONSTER_KIND_COUNT> counts = {};
+			for (int32 index = 0; index < GetMonsterCount(); ++index)
+			{
+				MonsterReport report;
+				if (GetMonsterReport(index, &report))
+				{
+					counts[static_cast<size_t>(report.kind)] += 1;
+				}
+			}
+
+			std::cout << "[ AutoTest ] : zone monsters";
+			for (size_t kind = 0; kind < counts.size(); ++kind)
+			{
+				std::cout << " " << kind << ":" << counts[kind];
+			}
+
+			std::cout << "\n";
+		}
+
+		g_gallery_timer -= real_seconds;
+		if (g_time > 2.f && g_gallery_timer <= 0.f)
+		{
+			g_gallery_timer = 1.1f;
+			Capture("shadow_" + std::to_string(g_gallery_count));
+			g_gallery_count += 1;
+		}
+
+		return;
+	}
+
 	if (g_mode == "gallery")
 	{
 		if (g_spawn_stage == 0 && g_time >= 1.f)

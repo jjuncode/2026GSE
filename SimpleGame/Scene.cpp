@@ -817,6 +817,61 @@ namespace
 		return MONSTER_BLIGHTED;
 	}
 
+	// 그림자 무리. 재에 물든 땅에 선 무리와 깊은 곳 무리 일부가 그림자다
+	bool IsShadowPack(const ZonePack& pack, float shadow_roll)
+	{
+		if (pack.band == BAND_INTRO)
+		{
+			return false;
+		}
+
+		if (GetZoneTile(g_zone, pack.tile.x, pack.tile.y) == TILE_BLIGHT)
+		{
+			return true;
+		}
+
+		return pack.band == BAND_OUTER && shadow_roll < Balance::SHADOW_PACK_CHANCE_OUTER;
+	}
+
+	// 들판 그림자는 병사와 사냥개뿐. 정예 그림자( 포식자 · 기사 · 거인 )는 깊은 곳에서만 우두머리로 선다
+	int32 PickShadowKind(int32 band, float kind_roll, int32 member)
+	{
+		if (band == BAND_FIELD)
+		{
+			if (member % 2 == 1)
+			{
+				return MONSTER_SHADOW_HOUND;
+			}
+
+			return MONSTER_SHADOW_SOLDIER;
+		}
+
+		if (member == 0)
+		{
+			if (kind_roll < 0.2f)
+			{
+				return MONSTER_SHADOW_COLOSSUS;
+			}
+
+			if (kind_roll < 0.5f)
+			{
+				return MONSTER_SHADOW_KNIGHT;
+			}
+
+			if (kind_roll < 0.75f)
+			{
+				return MONSTER_SHADOW_DEVOURER;
+			}
+		}
+
+		if (member % 3 == 2)
+		{
+			return MONSTER_SHADOW_HOUND;
+		}
+
+		return MONSTER_SHADOW_SOLDIER;
+	}
+
 	int32 GetPackSize(int32 band, float kind_roll, float size_roll)
 	{
 		if (band == BAND_OUTER && kind_roll < 0.35f)
@@ -862,7 +917,14 @@ namespace
 			const ZoneTile& center = pack.tile;
 			const float kind_roll = HashToUnit(HashZoneTile(g_zone.seed + 31u, center.x, center.y));
 			const float size_roll = HashToUnit(HashZoneTile(g_zone.seed + 37u, center.x, center.y));
-			const int32 count = GetPackSize(pack.band, kind_roll, size_roll);
+			const float shadow_roll = HashToUnit(HashZoneTile(g_zone.seed + 61u, center.x, center.y));
+			const bool shadow = IsShadowPack(pack, shadow_roll);
+
+			int32 count = GetPackSize(pack.band, kind_roll, size_roll);
+			if (shadow)
+			{
+				count = 3;
+			}
 
 			for (int32 member = 0; member < count; ++member)
 			{
@@ -872,7 +934,12 @@ namespace
 					continue;
 				}
 
-				const int32 kind = PickMemberKind(pack.band, kind_roll, member, count);
+				int32 kind = PickMemberKind(pack.band, kind_roll, member, count);
+				if (shadow)
+				{
+					kind = PickShadowKind(pack.band, kind_roll, member);
+				}
+
 				const float elite_roll = HashToUnit(HashZoneTile(g_zone.seed + 53u + static_cast<uint32>(member), center.x, center.y));
 				const bool is_elite = elite_roll < GetEliteChance(pack.band);
 

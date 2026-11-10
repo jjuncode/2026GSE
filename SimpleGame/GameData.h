@@ -145,6 +145,9 @@ struct MonsterData
 	int32 level = 1;
 	int32 sprite = -1;
 	bool has_blade = false;	// 손에 든 칼을 따로 돌려 그린다
+	bool is_shadow = false;	// 그림자 괴물. 본뜬 몬스터 그림을 어둡게 물들여 그린다
+	int32 base_type = MONSTER_TYPE_NONE;	// 본뜬 몬스터
+	std::wstring desc;
 
 	float body_radius = 0.3f;	// 칸
 	float hit_radius = 0.2f;

@@ -863,7 +863,7 @@ namespace
 
 		for (int32 index = 0; index < GetMonsterCount(); ++index)
 		{
-			if (IsMonsterAlive(index) == false || GetMonsterKind(index) == MONSTER_GATEBREAKER)
+			if (IsMonsterAlive(index) == false || GetMonsterBaseKind(GetMonsterKind(index)) == MONSTER_GATEBREAKER)
 			{
 				continue;
 			}
@@ -2453,7 +2453,7 @@ namespace
 			}
 
 			// 거인은 누구에게나 무섭다
-			const int32 kind = GetMonsterKind(enemy_index);
+			const int32 kind = GetMonsterBaseKind(GetMonsterKind(enemy_index));
 			if (kind == MONSTER_DEVOURER)
 			{
 				job *= 0.35f;
@@ -2526,7 +2526,7 @@ namespace
 
 		if (enemy_kind == NPC_TARGET_MONSTER)
 		{
-			const int32 kind = GetMonsterKind(enemy_index);
+			const int32 kind = GetMonsterBaseKind(GetMonsterKind(enemy_index));
 			if (kind == MONSTER_DEVOURER || kind == MONSTER_GATEBREAKER)
 			{
 				job *= 2.f;

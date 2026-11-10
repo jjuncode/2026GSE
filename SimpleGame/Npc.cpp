@@ -905,7 +905,7 @@ namespace
 		bool devoured = false;
 		if (attacker_kind == NPC_TARGET_MONSTER && npc.hp > 0)
 		{
-			const int32 kind = GetMonsterKind(attacker_index);
+			const int32 kind = GetMonsterBaseKind(GetMonsterKind(attacker_index));
 			const bool is_giant = kind == MONSTER_DEVOURER || kind == MONSTER_GATEBREAKER;
 			const float ratio = static_cast<float>(npc.hp) / static_cast<float>(npc.max_hp);
 
@@ -923,7 +923,7 @@ namespace
 
 		if (attacker_kind == NPC_TARGET_MONSTER)
 		{
-			const int32 kind = GetMonsterKind(attacker_index);
+			const int32 kind = GetMonsterBaseKind(GetMonsterKind(attacker_index));
 			if (kind == MONSTER_DEVOURER || kind == MONSTER_GATEBREAKER)
 			{
 				devoured = true;
@@ -1731,10 +1731,11 @@ namespace
 		NpcGainExp(npc, reward.exp);
 
 		const int32 kind = GetMonsterKind(monster_index);
-		if (kind == MONSTER_DEVOURER)
+		if (GetMonsterBaseKind(kind) == MONSTER_DEVOURER)
 		{
-			PushNpcEvent(WithSubject(GetNpcTitle(*npc)) + L" 소거식귀를 쓰러뜨렸다", 0.95f, 0.85f, 0.45f);
-			PostNewsAt(npc->body.m_pos, NEWS_HUNT, WithSubject(GetNpcNewsTitle(*npc)) + L" 소거식귀를 쓰러뜨렸다");
+			const std::wstring name = WithObject(GetMonsterKindName(kind));
+			PushNpcEvent(WithSubject(GetNpcTitle(*npc)) + L" " + name + L" 쓰러뜨렸다", 0.95f, 0.85f, 0.45f);
+			PostNewsAt(npc->body.m_pos, NEWS_HUNT, WithSubject(GetNpcNewsTitle(*npc)) + L" " + name + L" 쓰러뜨렸다");
 		}
 	}
 

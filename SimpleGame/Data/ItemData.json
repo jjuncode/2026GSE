@@ -145,6 +145,26 @@
       "icon": "ext:icon_armor_plate",
       "price": 2600,
       "desc": "통판을 두드려 만든 갑옷. 경직을 조금 버틴다"
+    },
+    {
+      "item_id": 31,
+      "name": "그림자 정수",
+      "category": "ETC",
+      "equip_area": "NONE",
+      "max_stack": 99,
+      "icon": "ext:icon_shadow_essence",
+      "price": 60,
+      "desc": "그림자 괴물이 흩어질 때 남는 검은 기운. 연금술 공방이 비싸게 산다"
+    },
+    {
+      "item_id": 32,
+      "name": "그림자 결정",
+      "category": "ETC",
+      "equip_area": "NONE",
+      "max_stack": 99,
+      "icon": "ext:icon_shadow_crystal",
+      "price": 300,
+      "desc": "정예 그림자의 심장에서 굳은 결정. 빛을 빨아들인다"
     }
   ]
 }

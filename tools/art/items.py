@@ -3,8 +3,10 @@
 # 이름은 ItemData.json 의 "icon": "ext:이름" 과 맞춘다
 import numpy as np
 
-from pixel3d import Material, basis_from_axis, normalize, pitch_matrix, roll_matrix
-from props import MATS, pouch
+import math
+
+from pixel3d import Convex, Material, basis_from_axis, normalize, pitch_matrix, roll_matrix
+from props import MATS, plane_through, pouch
 from rig import Builder
 
 I3 = np.eye(3)
@@ -16,6 +18,9 @@ ITEM_MATS.update({
     'plate': Material([(70, 76, 90), (120, 128, 146), (174, 182, 200), (226, 232, 244)], outline=(30, 32, 40), metal=True),
     'royal_blue': Material([(20, 30, 70), (34, 52, 112), (58, 84, 160), (96, 126, 200)], outline=(10, 14, 34)),
     'glass_big': Material([(90, 14, 20), (150, 24, 32), (210, 48, 52), (250, 120, 110)], outline=(40, 6, 8)),
+    'shadow': Material([(14, 8, 22), (34, 18, 52), (62, 34, 92), (98, 60, 140)], outline=(6, 2, 10)),
+    'shadow_core': Material([(150, 90, 230), (210, 160, 255)], outline=(40, 10, 60), emissive=True),
+    'shadow_gem': Material([(24, 10, 40), (56, 24, 92), (104, 54, 168), (176, 120, 240)], outline=(10, 4, 18), metal=True),
 })
 
 
@@ -63,6 +68,36 @@ def big_potion():
     return b
 
 
+def shadow_essence():
+    # 검은 연기 덩어리 셋 가운데 보랏빛 심지
+    b = Builder(0.0)
+    b.ellipsoid((0.0, 0.0, 0.2), (0.17, 0.17, 0.16), I3, 'shadow', 1)
+    b.ellipsoid((0.06, -0.08, 0.34), (0.1, 0.1, 0.1), I3, 'shadow', 1)
+    b.ellipsoid((-0.07, 0.07, 0.36), (0.07, 0.07, 0.08), I3, 'shadow', 1)
+    b.ellipsoid((0.1, 0.0, 0.22), (0.07, 0.07, 0.07), I3, 'shadow_core', 2)
+    return b
+
+
+def shadow_crystal():
+    # 육각 기둥 결정 둘. 소품 crystal 과 같은 짜임에 그림자 재질
+    b = Builder(25.0)
+
+    def gem(center, height, radius, tilt):
+        rot = pitch_matrix(tilt[0]) @ roll_matrix(tilt[1])
+        planes = []
+        for k in range(6):
+            a = math.radians(k * 60)
+            planes.append(plane_through((math.cos(a), math.sin(a), 0.0), (math.cos(a) * radius, math.sin(a) * radius, 0.0)))
+            planes.append(plane_through((math.cos(a), math.sin(a), 0.9), (0.0, 0.0, height * 0.5)))
+            planes.append(plane_through((math.cos(a), math.sin(a), -1.6), (0.0, 0.0, -height * 0.5)))
+        b.prims.append(Convex(b.at(center), b.rot @ rot, planes, height, 'shadow_gem'))
+
+    gem((0.0, 0.0, 0.3), 0.62, 0.13, (0.0, 0.0))
+    gem((0.11, 0.12, 0.16), 0.32, 0.07, (0.0, 25.0))
+    b.decal((0.1, 0.0, 0.38), (220, 180, 255))
+    return b
+
+
 ICON_SWORD_DIR = (0.55, -0.55, 0.62)
 
 # 이름 -> ( 만드는 함수, 배율 ). 아이콘은 전부 16 x 16 칸에 맞춘다
@@ -75,6 +110,8 @@ ICONS = [
     ('icon_armor_plate', armor('plate', 'plate', 'gold', 'royal_blue'), 1.55),
     ('icon_potion_big', big_potion, 1.5),
     ('icon_pouch', pouch, 2.6),
+    ('icon_shadow_essence', shadow_essence, 1.6),
+    ('icon_shadow_crystal', shadow_crystal, 1.45),
 ]
 
 

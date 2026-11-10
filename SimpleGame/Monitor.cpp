@@ -47,7 +47,7 @@ namespace
 	constexpr size_t PENDING_MAX_COUNT = 16;
 	constexpr size_t STREAM_MAX_COUNT = 8;	// select 상한 64 안에서
 	constexpr size_t SITE_KIND_COUNT = static_cast<size_t>(SITE_LAIR) + 1;
-	constexpr size_t MONSTER_KIND_COUNT = static_cast<size_t>(MONSTER_GATEBREAKER) + 1;
+	constexpr size_t MONSTER_TALLY_COUNT = static_cast<size_t>(MONSTER_KIND_COUNT);
 	const char* PAGE_PATH = "./Monitor/index.html";
 
 	struct TilePoint
@@ -127,7 +127,7 @@ namespace
 		int32 monster_fighting = 0;
 		int32 monster_near = 0;	// 거점 둘레 THREAT_RADIUS 안
 		int32 monster_respawning = 0;
-		std::array<int32, MONSTER_KIND_COUNT> monster_kinds = {};
+		std::array<int32, MONSTER_TALLY_COUNT> monster_kinds = {};
 	};
 
 	struct EventRow
