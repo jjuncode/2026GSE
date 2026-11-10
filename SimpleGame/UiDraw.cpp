@@ -9,7 +9,9 @@
 #include "Text.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <utility>
 
 namespace
 {
@@ -292,21 +294,44 @@ void BuildItemTooltip(const ItemSlot& slot, std::vector<TooltipLine>* lines)
 
 	if (item.category == ITEM_CATEGORY_EQUIPMENT)
 	{
-		TooltipLine attack;
 		const int32 bonus = GetEnhanceAttackBonus(slot.enhance);
-		attack.text = L"공격력 +" + std::to_wstring(item.stat.attack + bonus);
-		if (bonus > 0)
+		if (item.equip_area == EQUIP_AREA_WEAPON || item.stat.attack + bonus > 0)
 		{
-			attack.text += L"  ( 강화 +" + std::to_wstring(bonus) + L" )";
+			TooltipLine attack;
+			attack.text = L"공격력 +" + std::to_wstring(item.stat.attack + bonus);
+			if (bonus > 0)
+			{
+				attack.text += L"  ( 강화 +" + std::to_wstring(bonus) + L" )";
+			}
+
+			lines->push_back(attack);
 		}
 
-		lines->push_back(attack);
-
-		if (item.stat.crit_rate > 0)
+		// 갑옷은 공격력이 없어서 나머지 수치를 다 보여야 고를 수 있다
+		const std::array<std::pair<const wchar_t*, int32>, 5> extras =
 		{
-			TooltipLine crit;
-			crit.text = L"치명타 +" + std::to_wstring(item.stat.crit_rate) + L"%";
-			lines->push_back(crit);
+			std::make_pair(L"방어력 +", item.stat.defence),
+			std::make_pair(L"최대 체력 +", item.stat.max_hp),
+			std::make_pair(L"치명타 +", item.stat.crit_rate),
+			std::make_pair(L"관통 +", item.stat.penetration),
+			std::make_pair(L"경직 저항 +", item.stat.toughness),
+		};
+
+		for (size_t index = 0; index < extras.size(); ++index)
+		{
+			if (extras[index].second <= 0)
+			{
+				continue;
+			}
+
+			TooltipLine line;
+			line.text = extras[index].first + std::to_wstring(extras[index].second);
+			if (index == 2 || index == 4)
+			{
+				line.text += L"%";
+			}
+
+			lines->push_back(line);
 		}
 	}
 

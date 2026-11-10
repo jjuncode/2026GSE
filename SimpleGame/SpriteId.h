@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include <string>
+
 // 그림 번호. GL 헤더 없이 게임 로직이 참조할 수 있게 따로 둔다.
 // 그림은 tools/art/bake_props.py 가 이 번호 순서대로 Art/props.png 에 굽는다. 번호를 고치면 다시 굽는다
 constexpr int32 SPRITE_NONE = -1;
@@ -80,3 +82,6 @@ constexpr int32 SKILL_ICON_LEAP = 7;
 constexpr int32 SKILL_ICON_COUNTER = 8;
 constexpr int32 SKILL_ICON_DODGE = 9;
 constexpr int32 SKILL_ICON_ROLL = 10;
+
+// 이름으로 찾는 그림 ( tools/art/bake_items.py 가 굽는 Art/items.png ). 번호는 소품 그림판 뒤에 붙는다. 없으면 SPRITE_NONE
+int32 FindSpriteByName(const std::string& name);

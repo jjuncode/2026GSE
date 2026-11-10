@@ -6,9 +6,14 @@
       "category": "EQUIPMENT",
       "equip_area": "EQUIP_WEAPON",
       "max_stack": 1,
-      "stat": { "attack": 10, "crit_rate": 0, "penetration": 0 },
+      "stat": {
+        "attack": 10,
+        "crit_rate": 0,
+        "penetration": 0
+      },
       "icon": "Beginner_Sword.png",
-      "desc": "개척대가 신병에게 쥐여 주는 검. 주문의 흔적으로 벼릴 수 있다"
+      "desc": "개척대가 신병에게 쥐여 주는 검. 주문의 흔적으로 벼릴 수 있다",
+      "price": 120
     },
     {
       "item_id": 2,
@@ -17,7 +22,8 @@
       "equip_area": "NONE",
       "max_stack": 99,
       "icon": "주문의_흔적.jpg",
-      "desc": "재에 물든 것들이 남기는 희미한 주문 조각. 무기 강화 재료"
+      "desc": "재에 물든 것들이 남기는 희미한 주문 조각. 무기 강화 재료",
+      "price": 40
     },
     {
       "item_id": 3,
@@ -28,9 +34,117 @@
       "icon": "체력_물약.jpg",
       "cooldown_sec": 5.0,
       "effects": [
-        { "type": "HEAL_HP", "value": 50 }
+        {
+          "type": "HEAL_HP",
+          "value": 50
+        }
       ],
-      "desc": "마시면 체력을 50 회복한다"
+      "desc": "마시면 체력을 50 회복한다",
+      "price": 30
+    },
+    {
+      "item_id": 4,
+      "name": "큰 체력 물약",
+      "category": "CONSUMABLE",
+      "equip_area": "NONE",
+      "max_stack": 99,
+      "icon": "ext:icon_potion_big",
+      "cooldown_sec": 5.0,
+      "effects": [
+        {
+          "type": "HEAL_HP",
+          "value": 150
+        }
+      ],
+      "price": 90,
+      "desc": "약제상이 졸여 만든 진한 물약. 체력을 150 회복한다"
+    },
+    {
+      "item_id": 11,
+      "name": "강철 검",
+      "category": "EQUIPMENT",
+      "equip_area": "EQUIP_WEAPON",
+      "max_stack": 1,
+      "stat": {
+        "attack": 18,
+        "crit_rate": 2
+      },
+      "icon": "ext:icon_sword_steel",
+      "price": 450,
+      "desc": "하르벤 대장간의 기본 검. 날이 곧고 무겁다"
+    },
+    {
+      "item_id": 12,
+      "name": "기사의 장검",
+      "category": "EQUIPMENT",
+      "equip_area": "EQUIP_WEAPON",
+      "max_stack": 1,
+      "stat": {
+        "attack": 28,
+        "crit_rate": 5,
+        "penetration": 5
+      },
+      "icon": "ext:icon_sword_knight",
+      "price": 1300,
+      "desc": "성벽 수비대 기사가 차는 긴 검. 금박 손잡이"
+    },
+    {
+      "item_id": 13,
+      "name": "하르벤 근위 검",
+      "category": "EQUIPMENT",
+      "equip_area": "EQUIP_WEAPON",
+      "max_stack": 1,
+      "stat": {
+        "attack": 40,
+        "crit_rate": 8,
+        "penetration": 12
+      },
+      "icon": "ext:icon_sword_royal",
+      "price": 3200,
+      "desc": "왕궁 근위대에만 내리는 검. 자루 끝에 푸른 돌이 박혀 있다"
+    },
+    {
+      "item_id": 21,
+      "name": "누빔 갑옷",
+      "category": "EQUIPMENT",
+      "equip_area": "EQUIP_ARMOR",
+      "max_stack": 1,
+      "stat": {
+        "defence": 6,
+        "max_hp": 20
+      },
+      "icon": "ext:icon_armor_quilt",
+      "price": 300,
+      "desc": "천을 겹겹이 누빈 옷. 가볍고 흔하다"
+    },
+    {
+      "item_id": 22,
+      "name": "사슬 갑옷",
+      "category": "EQUIPMENT",
+      "equip_area": "EQUIP_ARMOR",
+      "max_stack": 1,
+      "stat": {
+        "defence": 14,
+        "max_hp": 45
+      },
+      "icon": "ext:icon_armor_chain",
+      "price": 950,
+      "desc": "쇠고리를 엮은 갑옷. 베는 칼을 잘 받아 낸다"
+    },
+    {
+      "item_id": 23,
+      "name": "판금 갑옷",
+      "category": "EQUIPMENT",
+      "equip_area": "EQUIP_ARMOR",
+      "max_stack": 1,
+      "stat": {
+        "defence": 24,
+        "max_hp": 80,
+        "toughness": 10
+      },
+      "icon": "ext:icon_armor_plate",
+      "price": 2600,
+      "desc": "통판을 두드려 만든 갑옷. 경직을 조금 버틴다"
     }
   ]
 }

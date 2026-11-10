@@ -13,6 +13,7 @@ void ToggleSkillWindow();
 void ToggleEnhanceWindow();	// 모루 근처에서만 열린다
 void OpenEnhanceWindow();
 void ToggleBoardWindow(int32 village);	// 그 마을 게시판 앞에서
+void ToggleShopWindow(int32 shop_kind, int32 spot);	// 노점 앞에서. 가방도 같이 연다
 bool CloseTopWindow();	// 닫은 게 있으면 true
 bool IsAnyWindowOpen();
 

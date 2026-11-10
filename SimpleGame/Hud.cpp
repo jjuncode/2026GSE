@@ -195,15 +195,21 @@ namespace
 
 			if (slot.skill_id == SKILL_ID_NONE)
 			{
-				// 물약 칸
-				const int32 count = player.m_inventory.CountItem(ITEM_ID_HP_POTION);
+				// 물약 칸. 단축키가 다음에 마실 물약을 보여 준다
+				int32 potion_id = ITEM_ID_HP_POTION;
+				if (player.m_inventory.CountItem(ITEM_ID_HP_POTION) <= 0 && player.m_inventory.CountItem(ITEM_ID_BIG_HP_POTION) > 0)
+				{
+					potion_id = ITEM_ID_BIG_HP_POTION;
+				}
+
+				const int32 count = player.m_inventory.CountItem(potion_id);
 				float shade = 1.f;
 				if (count <= 0)
 				{
 					shade = 0.3f;
 				}
 
-				DrawSprite(renderer, SPRITE_ICON_POTION, 0, x, ACTION_Y - 16.f, UI_SPRITE_SCALE, false, shade, shade, shade, 1.f);
+				DrawSprite(renderer, GetItemData(potion_id).icon_sprite, 0, x, ACTION_Y - 16.f, UI_SPRITE_SCALE, false, shade, shade, shade, 1.f);
 				DrawStringShadow(renderer, std::to_wstring(count), x + UI_SLOT * 0.5f - 2.f, ACTION_Y - 2.f, TEXT_ALIGN_RIGHT, 1.f, 1.f, 0.95f, 1.f);
 
 				const float cooldown = player.m_potion_cooldown;

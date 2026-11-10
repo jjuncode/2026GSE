@@ -1,0 +1,48 @@
+{
+  "shops": [
+    {
+      "kind": "WEAPON",
+      "name": "무기상",
+      "greeting": "벼린 날은 배신하지 않소",
+      "sign": "sign_weapon",
+      "goods": [
+        1,
+        11,
+        12,
+        13
+      ]
+    },
+    {
+      "kind": "ARMOR",
+      "name": "방어구상",
+      "greeting": "한 대 덜 맞는 게 남는 장사요",
+      "sign": "sign_armor",
+      "goods": [
+        21,
+        22,
+        23
+      ]
+    },
+    {
+      "kind": "APOTHECARY",
+      "name": "약제상",
+      "greeting": "쓴 게 몸에 좋다오",
+      "sign": "sign_potion",
+      "goods": [
+        3,
+        4
+      ]
+    },
+    {
+      "kind": "GENERAL",
+      "name": "잡화상",
+      "greeting": "개척촌엔 이것뿐이지만 필요한 건 다 있소",
+      "sign": "sign_general",
+      "goods": [
+        3,
+        1,
+        21
+      ]
+    }
+  ]
+}

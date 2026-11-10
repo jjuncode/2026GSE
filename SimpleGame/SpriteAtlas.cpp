@@ -20,15 +20,22 @@ namespace
 	const char* ATLAS_IMAGE = "./Art/props.png";
 	const char* ATLAS_TABLE = "./Art/props.json";
 
+	// 이름으로 찾는 새 그림. 소품 번호를 안 건드리려고 따로 굽는다
+	const char* EXTRA_IMAGE = "./Art/items.png";
+	const char* EXTRA_TABLE = "./Art/items.json";
+
 	struct SpriteEntry
 	{
 		int32 width = 0;
 		int32 height = 0;
 		std::vector<TexRegion> frames;
+		GLuint texture = 0;
+		std::string name;
 	};
 
 	std::vector<SpriteEntry> g_entries;
 	GLuint g_texture = 0;
+	GLuint g_extra_texture = 0;
 
 	bool IsValidSprite(int32 sprite)
 	{
@@ -40,10 +47,11 @@ namespace
 		return sprite < static_cast<int32>(g_entries.size());
 	}
 
-	void UploadAtlasTexture(const std::vector<uint8>& pixels, int32 width, int32 height)
+	GLuint UploadAtlasTexture(const std::vector<uint8>& pixels, int32 width, int32 height)
 	{
-		glGenTextures(1, &g_texture);
-		glBindTexture(GL_TEXTURE_2D, g_texture);
+		GLuint texture = 0;
+		glGenTextures(1, &texture);
+		glBindTexture(GL_TEXTURE_2D, texture);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
 
 		// 선형으로 읽으면 도트 경계가 번진다
@@ -51,12 +59,14 @@ namespace
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+		return texture;
 	}
 
-	// PNG 는 윗줄이 텍스처 v 0 쪽이라 아래변 v 가 더 크다
-	bool ReadAtlasTable(int32 atlas_width, int32 atlas_height)
+	// PNG 는 윗줄이 텍스처 v 0 쪽이라 아래변 v 가 더 크다. 읽은 그림은 g_entries 뒤에 붙인다
+	bool ReadAtlasTable(const char* path, int32 atlas_width, int32 atlas_height, bool check_count)
 	{
-		std::ifstream file(ATLAS_TABLE, std::ios::binary);
+		std::ifstream file(path, std::ios::binary);
 		if (file.is_open() == false)
 		{
 			std::cout << "[ SpriteAtlas - ReadAtlasTable ] : table missing\n";
@@ -71,7 +81,7 @@ namespace
 		}
 
 		const Json& sprites = root["sprites"];
-		if (static_cast<int32>(sprites.size()) != SPRITE_COUNT)
+		if (check_count && static_cast<int32>(sprites.size()) != SPRITE_COUNT)
 		{
 			// 번호가 어긋나면 엉뚱한 그림이 나온다. SpriteId.h 를 고쳤으면 다시 굽는다
 			std::cout << "[ SpriteAtlas - ReadAtlasTable ] : sprite count " << sprites.size() << " != " << SPRITE_COUNT << "\n";
@@ -81,14 +91,15 @@ namespace
 		const float texture_width = static_cast<float>(atlas_width);
 		const float texture_height = static_cast<float>(atlas_height);
 
-		g_entries.assign(sprites.size(), SpriteEntry());
-
 		for (size_t index = 0; index < sprites.size(); ++index)
 		{
 			const Json& sprite = sprites[index];
-			SpriteEntry& entry = g_entries[index];
+			g_entries.push_back(SpriteEntry());
+
+			SpriteEntry& entry = g_entries.back();
 			entry.width = sprite.value("w", 0);
 			entry.height = sprite.value("h", 0);
+			entry.name = sprite.value("name", std::string());
 
 			for (const Json& frame : sprite["frames"])
 			{
@@ -107,6 +118,35 @@ namespace
 
 		return true;
 	}
+
+	// 없어도 된다. 그 그림을 쓰는 아이템은 종류별 옛 아이콘으로 남는다
+	void LoadExtraAtlas()
+	{
+		std::vector<uint8> pixels;
+		int32 width = 0;
+		int32 height = 0;
+
+		if (LoadPngImage(EXTRA_IMAGE, &pixels, &width, &height) == false)
+		{
+			std::cout << "[ SpriteAtlas - LoadExtraAtlas ] : image missing. run tools/art/bake_items.py\n";
+			return;
+		}
+
+		const size_t first = g_entries.size();
+		if (ReadAtlasTable(EXTRA_TABLE, width, height, false) == false)
+		{
+			g_entries.resize(first);
+			return;
+		}
+
+		g_extra_texture = UploadAtlasTexture(pixels, width, height);
+		for (size_t index = first; index < g_entries.size(); ++index)
+		{
+			g_entries[index].texture = g_extra_texture;
+		}
+
+		std::cout << "[ SpriteAtlas - LoadExtraAtlas ] : " << g_entries.size() - first << " sprites\n";
+	}
 }
 
 bool InitSpriteAtlas()
@@ -123,13 +163,20 @@ bool InitSpriteAtlas()
 		return false;
 	}
 
-	if (ReadAtlasTable(width, height) == false)
+	g_entries.clear();
+	if (ReadAtlasTable(ATLAS_TABLE, width, height, true) == false)
 	{
 		g_entries.clear();
 		return false;
 	}
 
-	UploadAtlasTexture(pixels, width, height);
+	g_texture = UploadAtlasTexture(pixels, width, height);
+	for (SpriteEntry& entry : g_entries)
+	{
+		entry.texture = g_texture;
+	}
+
+	LoadExtraAtlas();
 
 	const std::chrono::duration<float> elapsed = std::chrono::steady_clock::now() - begin;
 	std::cout << "[ SpriteAtlas - InitSpriteAtlas ] : " << width << " x " << height << " " << elapsed.count() * 1000.f << " ms\n";
@@ -145,7 +192,27 @@ void ShutdownSpriteAtlas()
 		g_texture = 0;
 	}
 
+	if (g_extra_texture != 0)
+	{
+		glDeleteTextures(1, &g_extra_texture);
+		g_extra_texture = 0;
+	}
+
 	g_entries.clear();
+}
+
+int32 FindSpriteByName(const std::string& name)
+{
+	// 소품 그림판 이름은 SPRITE_ 상수로 부르니 뒤쪽 그림판만 본다
+	for (size_t index = static_cast<size_t>(SPRITE_COUNT); index < g_entries.size(); ++index)
+	{
+		if (g_entries[index].name == name)
+		{
+			return static_cast<int32>(index);
+		}
+	}
+
+	return SPRITE_NONE;
 }
 
 int32 GetSpriteWidth(int32 sprite)
@@ -219,5 +286,5 @@ void DrawSpriteQuadFlash(Renderer* renderer, int32 sprite, int32 frame, const Af
 		std::swap(region.u0, region.u1);
 	}
 
-	renderer->DrawAffineFlash(g_texture, region, quad, r, g, b, a, flash);
+	renderer->DrawAffineFlash(entry.texture, region, quad, r, g, b, a, flash);
 }

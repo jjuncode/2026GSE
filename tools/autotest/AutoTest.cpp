@@ -694,6 +694,122 @@ void UpdateAutoTest(float real_seconds)
 		return;
 	}
 
+	if (g_mode == "shop")
+	{
+		// 성채 무기상 -> 방어구상에서 사고, 갑옷을 끼고, 가방에서 판다
+		const auto crossed = [](float mark)
+		{
+			return g_time - FIXED_STEP_SECONDS < mark && g_time >= mark;
+		};
+
+		Player& player = MutablePlayer();
+		WorldPos town;
+		for (const ZoneSite& site : GetNpcSites())
+		{
+			if (site.kind == SITE_TOWN && site.village == ZONE_CITADEL)
+			{
+				town = ZoneTileToWorld(site.tile.x, site.tile.y, 0.5f, 0.5f);
+			}
+		}
+
+		const auto log_state = [&player](const char* tag)
+		{
+			std::cout << "[ AutoTest ] : " << tag << " gold " << player.m_gold << " atk " << player.m_stat.attack << " def " << player.m_stat.defence
+				<< " hp_max " << player.m_stat.max_hp << " weapon " << player.m_inventory.GetEquip(EQUIP_AREA_WEAPON).item_id
+				<< " armor " << player.m_inventory.GetEquip(EQUIP_AREA_ARMOR).item_id << "\n";
+		};
+
+		if (crossed(0.5f))
+		{
+			AddPlayerGold(6000);
+			WorldPos spot = town;
+			MoveWorldPos(&spot, -1.9f, -0.5f);
+			PlacePlayer(spot);
+			log_state("start");
+		}
+
+		if (crossed(1.0f))
+		{
+			Interact();
+		}
+
+		if (crossed(1.2f))
+		{
+			UiMouseMove(-158.f, 72.f);
+		}
+
+		if (crossed(1.4f))
+		{
+			Capture("shop_weapon");
+		}
+
+		if (crossed(1.6f))
+		{
+			UiMouseDown(UI_MOUSE_LEFT, 186.f, 72.f);
+			UiMouseUp(UI_MOUSE_LEFT, 186.f, 72.f);
+			log_state("bought steel sword");
+		}
+
+		if (crossed(2.0f))
+		{
+			Capture("shop_bought");
+		}
+
+		if (crossed(2.4f))
+		{
+			CloseTopWindow();
+			CloseTopWindow();
+			WorldPos spot = town;
+			MoveWorldPos(&spot, 2.1f, -2.1f);
+			PlacePlayer(spot);
+		}
+
+		if (crossed(2.8f))
+		{
+			Interact();
+		}
+
+		if (crossed(3.0f))
+		{
+			UiMouseDown(UI_MOUSE_LEFT, 186.f, 72.f);
+			UiMouseUp(UI_MOUSE_LEFT, 186.f, 72.f);
+			UseBagItem(player.m_inventory.FindFirst(22));
+			UseBagItem(player.m_inventory.FindFirst(11));
+			log_state("bought chain, equipped");
+		}
+
+		if (crossed(3.3f))
+		{
+			UiMouseMove(372.f, 172.f);
+		}
+
+		if (crossed(3.5f))
+		{
+			Capture("shop_armor");
+		}
+
+		if (crossed(3.8f))
+		{
+			// 가방 첫 칸 ( 갈아 낀 초보자의 검 ) 을 우클릭으로 판다
+			UiMouseMove(324.f, 38.f);
+		}
+
+		if (crossed(4.0f))
+		{
+			Capture("shop_sell_hover");
+			UiMouseDown(UI_MOUSE_RIGHT, 324.f, 38.f);
+			UiMouseUp(UI_MOUSE_RIGHT, 324.f, 38.f);
+			log_state("sold slot 0");
+		}
+
+		if (crossed(4.3f))
+		{
+			Capture("shop_sold");
+		}
+
+		return;
+	}
+
 	if (g_mode == "tour")
 	{
 		// 거점마다 옮겨 가며 찍는다 - 성 밖 소품 확인용

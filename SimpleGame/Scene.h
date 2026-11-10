@@ -16,10 +16,11 @@ void DrawSceneOverlay(Renderer* renderer);
 
 WorldPos GetCameraPos();
 WorldPos GetCursorWorldPos();
-void Interact();	// F. 가까운 아이템을 줍거나 모루 · 게시판을 연다
+void Interact();	// F. 가까운 아이템을 줍거나 모루 · 상점 · 게시판을 연다
 void SetInteractHeld(bool held);	// 누르고 있으면 계속 줍는다
 bool IsPlayerNearAnvil();
 bool IsPlayerNearBoard(int32 village, float range);
+bool IsPlayerNearShop(int32 spot, float range);
 void SelectNpcAtCursor();	// 커서 아래 NPC 를 관찰창에. 없으면 닫는다
 void ToggleChunkGrid();
 void ToggleLighting();

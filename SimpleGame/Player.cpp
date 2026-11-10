@@ -1321,7 +1321,14 @@ void PressPlayerDodge(int32 skill_id)
 
 bool UsePlayerPotion()
 {
-	const int32 slot_idx = g_player.m_inventory.FindFirst(ITEM_ID_HP_POTION);
+	int32 slot_idx = g_player.m_inventory.FindFirst(ITEM_ID_HP_POTION);
+
+	// 작은 물약이 떨어지면 큰 물약을 쓴다. 단축키 하나로 둘 다 마신다
+	if (slot_idx < 0)
+	{
+		slot_idx = g_player.m_inventory.FindFirst(ITEM_ID_BIG_HP_POTION);
+	}
+
 	if (slot_idx < 0)
 	{
 		ShowNotice(L"체력 물약이 없다");

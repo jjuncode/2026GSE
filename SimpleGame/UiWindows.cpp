@@ -10,9 +10,11 @@
 #include "Player.h"
 #include "Renderer.h"
 #include "Scene.h"
+#include "Shop.h"
 #include "SpriteAtlas.h"
 #include "Text.h"
 #include "UiDraw.h"
+#include "UiShop.h"
 #include "Village.h"
 
 #include <algorithm>
@@ -86,7 +88,11 @@ namespace
 	constexpr int32 WINDOW_SKILL = 2;
 	constexpr int32 WINDOW_ENHANCE = 3;
 	constexpr int32 WINDOW_BOARD = 4;
-	constexpr int32 WINDOW_COUNT = 5;
+	constexpr int32 WINDOW_SHOP = 5;
+	constexpr int32 WINDOW_COUNT = 6;
+
+	const float SHOP_CLOSE_RANGE = 4.f;
+	const float EQUIP_STEP = 56.f;
 
 	struct SkillNode
 	{
@@ -137,6 +143,9 @@ namespace
 
 	int32 g_enhance_result = ENHANCE_RESULT_NONE;
 	float g_enhance_result_timer = 0.f;
+
+	int32 g_shop_kind = SHOP_GENERAL;
+	int32 g_shop_spot = -1;	// 연 노점. 멀어지면 닫는다
 
 	int32 g_board_village = -1;
 	int32 g_board_tab = BOARD_TAB_NEWS;
@@ -220,6 +229,10 @@ namespace
 			case WINDOW_BOARD:
 			{
 				return IsInsideBox(x, y, BOARD_X, BOARD_Y, BOARD_WIDTH + 8.f, BOARD_HEIGHT + 8.f);
+			}
+			case WINDOW_SHOP:
+			{
+				return IsInsideShopWindow(x, y);
 			}
 			default:
 			{
@@ -311,9 +324,9 @@ namespace
 		*y = GetGridTop() - static_cast<float>(row) * SLOT_STEP;
 	}
 
-	void GetEquipCenter(float* x, float* y)
+	void GetEquipCenter(int32 area, float* x, float* y)
 	{
-		*x = INVENTORY_X - 82.f;
+		*x = INVENTORY_X - 104.f + static_cast<float>(area) * EQUIP_STEP;
 		*y = GetTop(INVENTORY_Y, INVENTORY_HEIGHT) - 88.f;
 	}
 
@@ -342,13 +355,26 @@ namespace
 		return -1;
 	}
 
-	bool IsOverEquipSlot(float x, float y)
+	int32 FindEquipSlotAt(float x, float y)
 	{
-		float equip_x = 0.f;
-		float equip_y = 0.f;
-		GetEquipCenter(&equip_x, &equip_y);
+		for (int32 area = 0; area < EQUIP_AREA_COUNT; ++area)
+		{
+			float equip_x = 0.f;
+			float equip_y = 0.f;
+			GetEquipCenter(area, &equip_x, &equip_y);
 
-		return IsInsideBox(x, y, equip_x, equip_y, UI_SLOT + 4.f, UI_SLOT + 4.f);
+			if (IsInsideBox(x, y, equip_x, equip_y, UI_SLOT + 4.f, UI_SLOT + 4.f))
+			{
+				return area;
+			}
+		}
+
+		return EQUIP_AREA_NONE;
+	}
+
+	bool IsShopOpen()
+	{
+		return g_open[static_cast<size_t>(WINDOW_SHOP)];
 	}
 
 	const ItemSlot& GetDraggedSlot()
@@ -357,7 +383,7 @@ namespace
 
 		if (g_drag_kind == DRAG_EQUIP)
 		{
-			return inventory.GetEquip(EQUIP_AREA_WEAPON);
+			return inventory.GetEquip(g_drag_index);
 		}
 
 		return inventory.GetBag(g_drag_index);
@@ -400,21 +426,22 @@ namespace
 
 		const Inventory& inventory = GetPlayer().m_inventory;
 
-		if (IsOverEquipSlot(x, y))
+		const int32 area = FindEquipSlotAt(x, y);
+		if (area != EQUIP_AREA_NONE)
 		{
-			if (inventory.IsEmptySlot(inventory.GetEquip(EQUIP_AREA_WEAPON)))
+			if (inventory.IsEmptySlot(inventory.GetEquip(area)))
 			{
 				return true;
 			}
 
-			if (button == UI_MOUSE_RIGHT || IsDoubleClick(1000))
+			if (button == UI_MOUSE_RIGHT || IsDoubleClick(1000 + area))
 			{
-				UnequipPlayerItem(EQUIP_AREA_WEAPON, -1);
+				UnequipPlayerItem(area, -1);
 				return true;
 			}
 
 			g_drag_kind = DRAG_EQUIP;
-			g_drag_index = EQUIP_AREA_WEAPON;
+			g_drag_index = area;
 			g_drag_started = false;
 			g_drag_from_x = x;
 			g_drag_from_y = y;
@@ -424,6 +451,14 @@ namespace
 		const int32 slot_idx = FindBagSlotAt(x, y);
 		if (slot_idx < 0 || inventory.IsEmptySlot(inventory.GetBag(slot_idx)))
 		{
+			return true;
+		}
+
+		// 상점이 열려 있으면 우클릭은 판매다. 더블클릭은 그대로 사용 · 장착
+		if (button == UI_MOUSE_RIGHT && IsShopOpen())
+		{
+			const int32 price = GetShopSellPrice(inventory.GetBag(slot_idx));
+			NotifyShopSold(SellBagItem(slot_idx), price);
 			return true;
 		}
 
@@ -471,13 +506,14 @@ namespace
 				return;
 			}
 
-			UnequipPlayerItem(EQUIP_AREA_WEAPON, target_slot);
+			UnequipPlayerItem(from, target_slot);
 			return;
 		}
 
-		if (IsOverEquipSlot(x, y))
+		const int32 area = FindEquipSlotAt(x, y);
+		if (area != EQUIP_AREA_NONE)
 		{
-			if (kind == DRAG_BAG && GetItemData(player.m_inventory.GetBag(from).item_id).equip_area == EQUIP_AREA_WEAPON)
+			if (kind == DRAG_BAG && GetItemData(player.m_inventory.GetBag(from).item_id).equip_area == area)
 			{
 				UseBagItem(from);
 			}
@@ -504,29 +540,36 @@ namespace
 		DrawPanel(renderer, INVENTORY_X, INVENTORY_Y, INVENTORY_WIDTH, INVENTORY_HEIGHT, L"가방  ( I )");
 
 		// 장비칸과 요약
+		const std::array<const wchar_t*, EQUIP_AREA_COUNT> equip_names = { L"무기", L"갑옷" };
+		const int32 hovered_area = FindEquipSlotAt(g_mouse_x, g_mouse_y);
 		float equip_x = 0.f;
 		float equip_y = 0.f;
-		GetEquipCenter(&equip_x, &equip_y);
 
-		const ItemSlot& weapon = inventory.GetEquip(EQUIP_AREA_WEAPON);
-		const bool weapon_empty = inventory.IsEmptySlot(weapon);
-		const bool equip_hovered = IsOverEquipSlot(g_mouse_x, g_mouse_y);
-
-		// 빈 무기칸은 숨 쉬듯 깜빡인다. 처음 받은 검을 여기 끼우라는 뜻
-		DrawSlotBox(renderer, equip_x, equip_y, UI_SLOT, equip_hovered, weapon_empty);
-		DrawStringShadow(renderer, L"무기", equip_x, equip_y + UI_SLOT * 0.5f + 26.f, TEXT_ALIGN_CENTER, 0.75f, 0.7f, 0.6f, 1.f);
-
-		if (weapon_empty == false && (g_drag_kind != DRAG_EQUIP || g_drag_started == false))
+		for (int32 area = 0; area < EQUIP_AREA_COUNT; ++area)
 		{
-			DrawItemInSlot(renderer, weapon, equip_x, equip_y, 1.f);
+			GetEquipCenter(area, &equip_x, &equip_y);
+
+			const ItemSlot& equip = inventory.GetEquip(area);
+			const bool empty = inventory.IsEmptySlot(equip);
+			const bool hovered = hovered_area == area;
+
+			// 빈 무기칸은 숨 쉬듯 깜빡인다. 처음 받은 검을 여기 끼우라는 뜻
+			DrawSlotBox(renderer, equip_x, equip_y, UI_SLOT, hovered, empty && area == EQUIP_AREA_WEAPON);
+			DrawStringShadow(renderer, equip_names[static_cast<size_t>(area)], equip_x, equip_y + UI_SLOT * 0.5f + 26.f, TEXT_ALIGN_CENTER, 0.75f, 0.7f, 0.6f, 1.f);
+
+			const bool dragged_away = g_drag_kind == DRAG_EQUIP && g_drag_started && g_drag_index == area;
+			if (empty == false && dragged_away == false)
+			{
+				DrawItemInSlot(renderer, equip, equip_x, equip_y, 1.f);
+			}
+
+			if (hovered && empty == false && g_drag_kind == DRAG_NONE)
+			{
+				BuildItemTooltip(equip, tooltip);
+			}
 		}
 
-		if (equip_hovered && weapon_empty == false && g_drag_kind == DRAG_NONE)
-		{
-			BuildItemTooltip(weapon, tooltip);
-		}
-
-		const float summary_x = equip_x + 52.f;
+		const float summary_x = equip_x + 30.f;
 		DrawStringShadow(renderer, L"공격력  " + std::to_wstring(player.m_stat.attack), summary_x, equip_y + 30.f, TEXT_ALIGN_LEFT, 0.95f, 0.65f, 0.3f, 1.f);
 		DrawStringShadow(renderer, L"방어력  " + std::to_wstring(player.m_stat.defence), summary_x, equip_y + 6.f, TEXT_ALIGN_LEFT, 0.5f, 0.68f, 0.95f, 1.f);
 		DrawStringShadow(renderer, L"치명타  " + std::to_wstring(player.m_stat.crit_rate) + L"%", summary_x, equip_y - 18.f, TEXT_ALIGN_LEFT, 0.85f, 0.82f, 0.75f, 1.f);
@@ -577,6 +620,17 @@ namespace
 			if (hovered && g_drag_kind == DRAG_NONE)
 			{
 				BuildItemTooltip(inventory.GetBag(slot_idx), tooltip);
+
+				const int32 price = GetShopSellPrice(inventory.GetBag(slot_idx));
+				if (IsShopOpen() && price > 0 && tooltip->empty() == false)
+				{
+					TooltipLine sell;
+					sell.text = L"우클릭: " + std::to_wstring(price) + L" 골드에 판매";
+					sell.r = 1.f;
+					sell.g = 0.84f;
+					sell.b = 0.35f;
+					tooltip->push_back(sell);
+				}
 			}
 		}
 
@@ -1668,11 +1722,34 @@ namespace
 			{
 				return HandleBoardDown(x, y);
 			}
+			case WINDOW_SHOP:
+			{
+				return HandleShopDown(g_shop_kind, x, y);
+			}
 			default:
 			{
 				return false;
 			}
 		}
+	}
+}
+
+void ToggleShopWindow(int32 shop_kind, int32 spot)
+{
+	if (IsShopOpen() && g_shop_spot == spot)
+	{
+		CloseWindow(WINDOW_SHOP);
+		return;
+	}
+
+	g_shop_kind = shop_kind;
+	g_shop_spot = spot;
+	OpenWindow(WINDOW_SHOP);
+
+	// 팔려면 가방을 같이 봐야 한다
+	if (g_open[static_cast<size_t>(WINDOW_INVENTORY)] == false)
+	{
+		OpenWindow(WINDOW_INVENTORY);
 	}
 }
 
@@ -1882,6 +1959,11 @@ void UpdateUiWindows(float real_seconds)
 		CloseWindow(WINDOW_BOARD);
 	}
 
+	if (IsShopOpen() && IsPlayerNearShop(g_shop_spot, SHOP_CLOSE_RANGE) == false)
+	{
+		CloseWindow(WINDOW_SHOP);
+	}
+
 	// 죽으면 끌던 것을 놓는다
 	if (IsPlayerDead())
 	{
@@ -1895,7 +1977,7 @@ void DrawUiWindows(Renderer* renderer)
 	std::vector<TooltipLine> tooltip;
 
 	// 늦게 연 창이 위
-	std::array<int32, WINDOW_COUNT> order = { WINDOW_INVENTORY, WINDOW_STAT, WINDOW_SKILL, WINDOW_ENHANCE, WINDOW_BOARD };
+	std::array<int32, WINDOW_COUNT> order = { WINDOW_INVENTORY, WINDOW_STAT, WINDOW_SKILL, WINDOW_ENHANCE, WINDOW_BOARD, WINDOW_SHOP };
 	std::sort(order.begin(), order.end(),
 		[](int32 left, int32 right)
 		{
@@ -1939,6 +2021,11 @@ void DrawUiWindows(Renderer* renderer)
 			case WINDOW_BOARD:
 			{
 				DrawBoardWindow(renderer);
+				break;
+			}
+			case WINDOW_SHOP:
+			{
+				DrawShopWindow(renderer, g_shop_kind, g_mouse_x, g_mouse_y, &window_tooltip);
 				break;
 			}
 			default:

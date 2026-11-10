@@ -32,6 +32,9 @@
         "master_volume": 0.3,
         "volume_step": 0.1
     },
+    "shop": {
+        "sell_rate": 0.4
+    },
     "item": {
         "drop_lifetime_sec": 60.0,
         "pickup_range": 160,

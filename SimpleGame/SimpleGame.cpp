@@ -599,6 +599,9 @@ int main()
 		std::cout << "[ SimpleGame - main ] : sprite atlas disabled\n";
 	}
 
+	// 그림판을 읽은 뒤라야 새 아이템 아이콘을 이름으로 찾는다
+	BindItemArt();
+
 	if (InitSpriteSheets() == false)
 	{
 		std::cout << "[ SimpleGame - main ] : sprite sheets missing. run tools/art/bake.py and vfx.py\n";

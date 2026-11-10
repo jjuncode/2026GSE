@@ -55,6 +55,8 @@ namespace
 
 	const float ANVIL_RANGE = 2.4f;	// 이 안에서 F 나 U 로 강화 창이 열린다
 	const float BOARD_RANGE = 2.4f;	// 이 안에서 F 로 게시판이 열린다
+	const float SHOP_RANGE = 2.2f;	// 이 안에서 F 로 상점이 열린다
+	const float SHOP_LABEL_LIFT = 92.f;	// 간판 34 도트 위
 	const float BOARD_LABEL_LIFT = 100.f;	// 게시판 그림 28 도트 x 3 위
 	const float PICKUP_REPEAT_SEC = 0.14f;
 	const float VILLAGE_BANNER_SEC = 3.2f;
@@ -99,6 +101,15 @@ namespace
 
 	WorldPos g_anvil_pos;
 	bool g_has_anvil = false;
+
+	// 광장 노점마다 상점 하나. 성채는 넷, 개척촌은 둘
+	struct ShopSpot
+	{
+		int32 kind = SHOP_GENERAL;
+		WorldPos pos;
+	};
+
+	std::vector<ShopSpot> g_shop_spots;
 	bool g_interact_held = false;
 	float g_interact_timer = 0.f;
 
@@ -563,14 +574,32 @@ namespace
 		return ZoneTileToWorld(tile.x, tile.y, 0.5f + offset_x, 0.5f + offset_y);
 	}
 
+	// 노점 하나에 상점 하나. 간판은 노점 오른쪽 뒤에 세워 무엇을 파는지 멀리서도 보이게 한다
+	void AddShopStall(const ZoneSite& town, float offset_x, float offset_y, float shade, int32 kind)
+	{
+		const WorldPos pos = TileOffset(town.tile, offset_x, offset_y);
+		AddDecorAt(pos, SPRITE_STALL, 0, shade, true);
+
+		ShopSpot spot;
+		spot.kind = kind;
+		spot.pos = pos;
+		g_shop_spots.push_back(spot);
+
+		const int32 sign = FindSpriteByName(GetShopData(kind).sign);
+		if (sign != SPRITE_NONE)
+		{
+			AddDecorAt(TileOffset(town.tile, offset_x + 0.75f, offset_y - 0.75f), sign, 0, shade, true);
+		}
+	}
+
 	void BuildTownDecor(const ZoneSite& town)
 	{
 		// 광장 한가운데 큰 화로. 성채의 심장
 		AddLightAt(TileOffset(town.tile, 0.f, 0.f), 9.f, 1.00f, 0.72f, 0.36f, 0.95f, SPRITE_BRAZIER);
 
-		AddDecorAt(TileOffset(town.tile, -2.6f, -1.2f), SPRITE_STALL, 0, 1.f, true);
-		AddDecorAt(TileOffset(town.tile, 1.4f, -2.8f), SPRITE_STALL, 0, 0.95f, true);
-		AddDecorAt(TileOffset(town.tile, -1.2f, 2.6f), SPRITE_STALL, 0, 0.9f, true);
+		AddShopStall(town, -2.6f, -1.2f, 1.f, SHOP_WEAPON);
+		AddShopStall(town, 1.4f, -2.8f, 0.95f, SHOP_ARMOR);
+		AddShopStall(town, -1.2f, 2.6f, 0.9f, SHOP_APOTHECARY);
 
 		// 광장 모루. 강화는 여기서만 된다 - 사냥을 나갔다 돌아올 이유
 		g_anvil_pos = TileOffset(town.tile, 2.4f, 1.6f);
@@ -584,8 +613,8 @@ namespace
 	{
 		AddLightAt(TileOffset(town.tile, 0.f, 0.f), 8.f, 1.00f, 0.70f, 0.34f, 0.85f, SPRITE_BRAZIER);
 
-		AddDecorAt(TileOffset(town.tile, -2.6f, -1.2f), SPRITE_STALL, 0, 0.95f, true);
-		AddDecorAt(TileOffset(town.tile, -1.2f, 2.6f), SPRITE_STALL, 0, 0.9f, true);
+		AddShopStall(town, -2.6f, -1.2f, 0.95f, SHOP_GENERAL);
+		AddShopStall(town, -1.2f, 2.6f, 0.9f, SHOP_APOTHECARY);
 	}
 
 	// 게시판은 집 그림판에 함께 굽는다. 그림판이 없으면 깃대로 자리만 표시한다
@@ -863,6 +892,7 @@ namespace
 		ClearFloatingTexts();
 		ClearFeel();
 		g_has_anvil = false;
+		g_shop_spots.clear();
 		g_decor.clear();
 		g_house_pieces.clear();
 		g_light_indices.clear();
@@ -1247,6 +1277,55 @@ namespace
 		}
 	}
 
+	int32 FindShopSpotInRange(float range)
+	{
+		const WorldPos& player = GetPlayer().m_pos;
+		int32 best = -1;
+		float best_distance = range * range;
+
+		for (size_t index = 0; index < g_shop_spots.size(); ++index)
+		{
+			const float distance = GetDistanceSq(player, g_shop_spots[index].pos);
+			if (distance <= best_distance)
+			{
+				best = static_cast<int32>(index);
+				best_distance = distance;
+			}
+		}
+
+		return best;
+	}
+
+	void DrawShopPrompts(Renderer* renderer, const WorldPos& camera)
+	{
+		if (IsPlayerDead())
+		{
+			return;
+		}
+
+		const int32 near_spot = FindShopSpotInRange(SHOP_RANGE);
+
+		for (size_t index = 0; index < g_shop_spots.size(); ++index)
+		{
+			const ShopSpot& spot = g_shop_spots[index];
+			if (GetDistanceSq(GetPlayer().m_pos, spot.pos) > 100.f)
+			{
+				continue;
+			}
+
+			const ScreenPos screen = WorldToScreen(spot.pos, camera);
+			const std::wstring& name = GetShopData(spot.kind).name;
+
+			if (static_cast<int32>(index) == near_spot)
+			{
+				DrawStringShadow(renderer, L"F  " + name, screen.x, screen.y + SHOP_LABEL_LIFT, TEXT_ALIGN_CENTER, 1.f, 0.85f, 0.45f, 1.f);
+				continue;
+			}
+
+			DrawStringShadow(renderer, name, screen.x, screen.y + SHOP_LABEL_LIFT, TEXT_ALIGN_CENTER, 0.75f, 0.65f, 0.5f, 0.8f);
+		}
+	}
+
 	int32 FindBoardInRange(float range)
 	{
 		const WorldPos& player = GetPlayer().m_pos;
@@ -1449,6 +1528,7 @@ void DrawSceneOverlay(Renderer* renderer)
 	DrawDropLabels(renderer, camera);
 	DrawAnvilPrompt(renderer, camera);
 	DrawBoardPrompt(renderer, camera);
+	DrawShopPrompts(renderer, camera);
 	DrawBossMarker(renderer, camera);
 	DrawFloatingTexts(renderer, camera);
 	DrawVillageBanner(renderer);
@@ -1495,6 +1575,13 @@ void Interact()
 		return;
 	}
 
+	const int32 spot = FindShopSpotInRange(SHOP_RANGE);
+	if (spot >= 0)
+	{
+		ToggleShopWindow(g_shop_spots[static_cast<size_t>(spot)].kind, spot);
+		return;
+	}
+
 	const int32 board = FindBoardInRange(BOARD_RANGE);
 	if (board >= 0)
 	{
@@ -1529,6 +1616,16 @@ void SetInteractHeld(bool held)
 bool IsPlayerNearAnvil()
 {
 	return DistanceToAnvil() <= ANVIL_RANGE;
+}
+
+bool IsPlayerNearShop(int32 spot, float range)
+{
+	if (spot < 0 || spot >= static_cast<int32>(g_shop_spots.size()))
+	{
+		return false;
+	}
+
+	return GetDistanceSq(GetPlayer().m_pos, g_shop_spots[static_cast<size_t>(spot)].pos) <= range * range;
 }
 
 void SelectNpcAtCursor()

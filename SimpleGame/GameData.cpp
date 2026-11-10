@@ -34,6 +34,7 @@ namespace
 	std::vector<std::array<int32, 2>> g_skill_edges;
 	std::vector<int32> g_combo_skill_ids;
 	PlayerPreset g_preset;
+	std::array<ShopData, SHOP_KIND_COUNT> g_shops;
 
 	const std::vector<int32> EMPTY_LINKS;
 
@@ -264,6 +265,11 @@ namespace
 			return EQUIP_AREA_WEAPON;
 		}
 
+		if (text == "EQUIP_ARMOR")
+		{
+			return EQUIP_AREA_ARMOR;
+		}
+
 		return EQUIP_AREA_NONE;
 	}
 
@@ -290,6 +296,27 @@ namespace
 	// 서버 아이콘 파일 이름을 그대로 두고 여기서 도트 그림으로 잇는다. 데이터 에디터와 같은 파일을 쓰려고
 	void ResolveItemSprites(ItemData* item, const std::string& icon)
 	{
+		// 새 그림판 아이콘. 바닥 그림은 종류로 고른다
+		if (icon.rfind("ext:", 0) == 0)
+		{
+			item->icon_name = icon.substr(4);
+			item->icon_sprite = SPRITE_ICON_TRACE;
+			item->drop_sprite = SPRITE_POUCH;
+
+			if (item->equip_area == EQUIP_AREA_WEAPON)
+			{
+				item->icon_sprite = SPRITE_ICON_SWORD;
+				item->drop_sprite = SPRITE_DROP_SWORD;
+			}
+			else if (item->category == ITEM_CATEGORY_CONSUMABLE)
+			{
+				item->icon_sprite = SPRITE_ICON_POTION;
+				item->drop_sprite = SPRITE_DROP_POTION;
+			}
+
+			return;
+		}
+
 		if (icon.find("Sword") != std::string::npos)
 		{
 			item->icon_sprite = SPRITE_ICON_SWORD;
@@ -375,6 +402,9 @@ namespace
 
 		const Json& item = root["item"];
 		config.drop_lifetime_sec = ReadFloat(item, "drop_lifetime_sec", config.drop_lifetime_sec);
+
+		const Json& shop = root["shop"];
+		config.shop_sell_rate = ReadFloat(shop, "sell_rate", config.shop_sell_rate);
 		config.pickup_range = CmToTile(ReadFloat(item, "pickup_range", 160.f));
 		config.gold_magnet_range = CmToTile(ReadFloat(item, "gold_magnet_range", 330.f));
 
@@ -673,6 +703,7 @@ namespace
 			item.equip_area = ParseEquipArea(ReadString(entry, "equip_area"));
 			item.max_stack = std::max(1, ReadInt(entry, "max_stack", 1));
 			item.cooldown_sec = ReadFloat(entry, "cooldown_sec", 0.f);
+			item.price = ReadInt(entry, "price", 0);
 
 			// 장비칸이 있으면 분류를 안 적어도 장비다 ( 클라 인벤토리와 같은 규칙 )
 			if (item.equip_area != EQUIP_AREA_NONE)
@@ -777,6 +808,55 @@ namespace
 		}
 	}
 
+	int32 ParseShopKind(const std::string& text)
+	{
+		if (text == "WEAPON")
+		{
+			return SHOP_WEAPON;
+		}
+
+		if (text == "ARMOR")
+		{
+			return SHOP_ARMOR;
+		}
+
+		if (text == "APOTHECARY")
+		{
+			return SHOP_APOTHECARY;
+		}
+
+		return SHOP_GENERAL;
+	}
+
+	void LoadShops()
+	{
+		Json root;
+		if (ReadJson("ShopData.json", &root) == false || root.contains("shops") == false)
+		{
+			return;
+		}
+
+		for (const Json& entry : root["shops"])
+		{
+			ShopData shop;
+			shop.kind = ParseShopKind(ReadString(entry, "kind"));
+			shop.name = Utf8ToWide(ReadString(entry, "name"));
+			shop.greeting = Utf8ToWide(ReadString(entry, "greeting"));
+			shop.sign = ReadString(entry, "sign");
+			shop.goods = ReadIntArray(entry, "goods");
+
+			for (int32 item_id : shop.goods)
+			{
+				if (GetItemData(item_id).price <= 0)
+				{
+					std::cout << "[ GameData - LoadShops ] : item " << item_id << " has no price\n";
+				}
+			}
+
+			g_shops[static_cast<size_t>(shop.kind)] = shop;
+		}
+	}
+
 	// 좌클릭 연타 순서. 입력 이름에서 뽑아야 데이터만 고쳐도 콤보가 바뀐다
 	void BuildComboChain()
 	{
@@ -814,6 +894,7 @@ bool LoadGameData()
 	LoadLevels();
 	LoadSkillTree();
 	LoadPreset();
+	LoadShops();
 	BuildComboChain();
 
 	if (g_skills.empty() || g_items.empty() || g_monsters.empty())
@@ -872,6 +953,37 @@ const ItemData& GetItemData(int32 item_id)
 const PlayerPreset& GetPlayerPreset()
 {
 	return g_preset;
+}
+
+const ShopData& GetShopData(int32 kind)
+{
+	if (kind < 0 || kind >= SHOP_KIND_COUNT)
+	{
+		return g_shops[static_cast<size_t>(SHOP_GENERAL)];
+	}
+
+	return g_shops[static_cast<size_t>(kind)];
+}
+
+void BindItemArt()
+{
+	for (ItemData& item : g_items)
+	{
+		if (item.icon_name.empty())
+		{
+			continue;
+		}
+
+		const int32 sprite = FindSpriteByName(item.icon_name);
+		if (sprite == SPRITE_NONE)
+		{
+			// 그림판이 없으면 종류별 옛 아이콘이 그대로 남는다
+			std::cout << "[ GameData - BindItemArt ] : no art " << item.icon_name << "\n";
+			continue;
+		}
+
+		item.icon_sprite = sprite;
+	}
 }
 
 int32 GetNeedExp(int32 level)

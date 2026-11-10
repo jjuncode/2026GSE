@@ -32,7 +32,8 @@ constexpr int32 ITEM_CATEGORY_CONSUMABLE = 2;
 
 constexpr int32 EQUIP_AREA_NONE = -1;
 constexpr int32 EQUIP_AREA_WEAPON = 0;
-constexpr int32 EQUIP_AREA_COUNT = 1;
+constexpr int32 EQUIP_AREA_ARMOR = 1;
+constexpr int32 EQUIP_AREA_COUNT = 2;
 
 constexpr int32 ITEM_EFFECT_HEAL_HP = 0;
 constexpr int32 ITEM_EFFECT_COUNT = 1;
@@ -45,6 +46,13 @@ constexpr int32 STAT_COUNT = 3;
 constexpr int32 ITEM_ID_SWORD = 1;
 constexpr int32 ITEM_ID_SPELL_TRACE = 2;	// 주문의 흔적
 constexpr int32 ITEM_ID_HP_POTION = 3;
+constexpr int32 ITEM_ID_BIG_HP_POTION = 4;
+
+constexpr int32 SHOP_WEAPON = 0;
+constexpr int32 SHOP_ARMOR = 1;
+constexpr int32 SHOP_APOTHECARY = 2;
+constexpr int32 SHOP_GENERAL = 3;
+constexpr int32 SHOP_KIND_COUNT = 4;
 
 struct MoveSegment
 {
@@ -178,6 +186,17 @@ struct ItemData
 	std::vector<ItemEffect> effects;
 	int32 icon_sprite = -1;
 	int32 drop_sprite = -1;
+	std::string icon_name;	// "ext:" 그림판 이름. 그림판을 읽은 뒤 icon_sprite 로 바꾼다
+	int32 price = 0;	// 상점에서 살 때. 팔 땐 sell_rate 를 곱한다
+};
+
+struct ShopData
+{
+	int32 kind = SHOP_GENERAL;
+	std::wstring name;
+	std::wstring greeting;
+	std::string sign;	// 간판 그림 ( items.png 이름 )
+	std::vector<int32> goods;	// 파는 아이템. 값은 ItemData::price
 };
 
 struct PresetItem
@@ -226,6 +245,8 @@ struct GameConfig
 
 	float audio_master_volume = 0.3f;
 	float audio_volume_step = 0.1f;
+
+	float shop_sell_rate = 0.4f;
 
 	float drop_lifetime_sec = 60.f;
 	float pickup_range = 1.f;
@@ -278,6 +299,10 @@ const SkillData& GetSkillData(int32 skill_id);	// 없으면 빈 스킬 ( skill_i
 const MonsterData& GetMonsterData(int32 monster_type);
 const ItemData& GetItemData(int32 item_id);
 const PlayerPreset& GetPlayerPreset();
+const ShopData& GetShopData(int32 kind);
+
+// 아이템 그림판을 읽은 뒤 부른다. "ext:" 아이콘을 그림 번호로 잇는다
+void BindItemArt();
 
 int32 GetNeedExp(int32 level);	// 0 이면 만렙
 int32 GetMaxLevel();
