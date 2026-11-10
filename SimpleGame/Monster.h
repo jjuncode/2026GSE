@@ -20,7 +20,8 @@ constexpr int32 MONSTER_SHADOW_KNIGHT = 7;	// 정예. 연속 베기
 constexpr int32 MONSTER_SHADOW_COLOSSUS = 8;	// 정예. 성문파쇄자의 그림자
 constexpr int32 MONSTER_SHADOW_COMMANDER = 9;	// 엘리트 보스. 그림자 기사단장 - 페이즈 패턴 · 슈퍼아머 게이지
 constexpr int32 MONSTER_SHADOW_WARDEN = 10;	// 던전 보스. 그림자 감시자 - 페이즈 셋
-constexpr int32 MONSTER_KIND_COUNT = 11;
+constexpr int32 MONSTER_LEGION_KING = 11;	// 레이드 보스. 제1군단장 망국의 왕 - 세 배 그림, 페이즈 셋
+constexpr int32 MONSTER_KIND_COUNT = 12;
 
 // NPC 가 잡았을 때 받는 것
 struct MonsterReward

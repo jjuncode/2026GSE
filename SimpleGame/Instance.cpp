@@ -21,6 +21,7 @@
 #include <cmath>
 #include <iostream>
 #include <random>
+#include <set>
 #include <vector>
 
 namespace
@@ -55,6 +56,7 @@ namespace
 		int32 width = 0;
 		int32 height = 0;
 		std::vector<Room> rooms;
+		bool revealed = true;
 		WorldPos entrance;
 		WorldPos start;	// 들어가면 서는 자리
 		WorldPos exit;	// 다 비우면 열리는 출구
@@ -64,6 +66,7 @@ namespace
 	};
 
 	std::vector<Instance> g_instances;
+	std::set<std::string> g_revealed;	// 구역을 다시 만들어도 남는다
 	float g_time = 0.f;
 	float g_spark_timer = 0.f;
 
@@ -86,7 +89,23 @@ namespace
 	}
 
 	// 마을 · 보스 둥지 · 거점에서 가장 먼 구석. 사람 사는 곳 옆에 낭떠러지 상자가 서면 안 된다
-	bool PickCorner(const ZoneLayout& layout, int32 width, int32 height, const std::vector<std::array<int32, 2>>& used, int32* out_x, int32* out_y)
+	// 이미 판 상자와 겹치면 못 쓴다. 크기가 다르면 같은 구석이라도 모서리 좌표가 달라 좌표 비교로는 못 거른다
+	bool IsCornerTaken(int32 x0, int32 y0, int32 width, int32 height, const std::vector<std::array<int32, 4>>& used)
+	{
+		for (const std::array<int32, 4>& other : used)
+		{
+			const bool apart_x = x0 + width + CORNER_MARGIN <= other[0] || other[0] + other[2] + CORNER_MARGIN <= x0;
+			const bool apart_y = y0 + height + CORNER_MARGIN <= other[1] || other[1] + other[3] + CORNER_MARGIN <= y0;
+			if (apart_x == false && apart_y == false)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool PickCorner(const ZoneLayout& layout, int32 width, int32 height, const std::vector<std::array<int32, 4>>& used, int32* out_x, int32* out_y)
 	{
 		const std::array<std::array<int32, 2>, 4> corners =
 		{
@@ -101,16 +120,7 @@ namespace
 
 		for (const std::array<int32, 2>& corner : corners)
 		{
-			bool taken = false;
-			for (const std::array<int32, 2>& other : used)
-			{
-				if (other[0] == corner[0] && other[1] == corner[1])
-				{
-					taken = true;
-				}
-			}
-
-			if (taken)
+			if (IsCornerTaken(corner[0], corner[1], width, height, used))
 			{
 				continue;
 			}
@@ -305,6 +315,17 @@ namespace
 	{
 		instance->room = room_index;
 
+		// 레이드는 주전부리 없이 군단장 하나. 들어서는 순간 이름과 함께 크게 깨어난다
+		if (instance->data->kind == INSTANCE_KIND_RAID && instance->rooms[static_cast<size_t>(room_index)].monsters.empty() == false)
+		{
+			const int32 boss = instance->rooms[static_cast<size_t>(room_index)].monsters.front();
+			AddDamageText(GetPlayer().m_pos, 190.f, GetMonsterKindName(GetMonsterKind(boss)), DAMAGE_STYLE_BANNER_BAD);
+			AddSlowMotion(1.2f, 0.3f);
+			AddShake(0.6f);
+			AddScreenFlash(0.5f, 0.05f, 0.1f, 0.4f);
+			PlaySfx(SFX_DANGER, 1.f);
+		}
+
 		for (int32 monster : instance->rooms[static_cast<size_t>(room_index)].monsters)
 		{
 			SetMonsterInstanced(monster, true);
@@ -488,7 +509,7 @@ void CarveInstances(ZoneLayout* layout)
 {
 	g_instances.clear();
 
-	std::vector<std::array<int32, 2>> used;
+	std::vector<std::array<int32, 4>> used;
 	for (const InstanceData& data : GetInstanceDatas())
 	{
 		Instance instance;
@@ -502,7 +523,8 @@ void CarveInstances(ZoneLayout* layout)
 			continue;
 		}
 
-		used.push_back({ instance.x0, instance.y0 });
+		used.push_back({ instance.x0, instance.y0, instance.width, instance.height });
+		instance.revealed = data.hidden == false || g_revealed.count(data.id) > 0;
 		Carve(layout, &instance);
 		instance.entrance = PickEntrance(*layout, data.entrance_site);
 		g_instances.push_back(instance);
@@ -592,7 +614,7 @@ bool InteractInstance()
 			return true;
 		}
 
-		if (GetDistance(player.m_pos, instance.entrance) > ENTRANCE_RANGE)
+		if (instance.revealed == false || GetDistance(player.m_pos, instance.entrance) > ENTRANCE_RANGE)
 		{
 			continue;
 		}
@@ -671,16 +693,50 @@ bool GetInstanceEntrance(int32 index, WorldPos* pos, std::wstring* name)
 		return false;
 	}
 
+	if (g_instances[static_cast<size_t>(index)].revealed == false)
+	{
+		return false;
+	}
+
 	*pos = g_instances[static_cast<size_t>(index)].entrance;
 	*name = g_instances[static_cast<size_t>(index)].data->name;
 	return true;
+}
+
+void RevealInstance(const std::string& id)
+{
+	g_revealed.insert(id);
+
+	for (Instance& instance : g_instances)
+	{
+		if (instance.data->id != id || instance.revealed)
+		{
+			continue;
+		}
+
+		instance.revealed = true;
+
+		// 지도가 바뀌는 순간. 어디에 무엇이 열렸는지 알린다
+		AddDamageText(GetPlayer().m_pos, 170.f, instance.data->name + L" 이(가) 열렸다  ( M 대륙지도 )", DAMAGE_STYLE_BANNER_BAD);
+		AddShake(0.4f);
+		PlaySfx(SFX_DANGER, 0.9f);
+		std::cout << "[ Instance - RevealInstance ] : " << id << "\n";
+	}
 }
 
 void DrawInstanceGround(Renderer* renderer, const WorldPos& camera)
 {
 	for (const Instance& instance : g_instances)
 	{
-		DrawRift(renderer, camera, instance.entrance, 0.75f, 0.3f, 1.4f, 1.5f);
+		// 레이드 입구는 핏빛. 던전과 한눈에 갈린다
+		if (instance.revealed && instance.data->kind == INSTANCE_KIND_RAID)
+		{
+			DrawRift(renderer, camera, instance.entrance, 1.5f, 0.15f, 0.25f, 2.f);
+		}
+		else if (instance.revealed)
+		{
+			DrawRift(renderer, camera, instance.entrance, 0.75f, 0.3f, 1.4f, 1.5f);
+		}
 
 		if (instance.state == STATE_CLEARED)
 		{
@@ -726,7 +782,10 @@ void DrawInstanceOverlay(Renderer* renderer, const WorldPos& camera)
 			rank_note = L"  ( " + GetRankName(data.min_rank) + L"부터 )";
 		}
 
-		DrawPrompt(renderer, camera, instance.entrance, L"F  " + data.name + L" 들어가기" + rank_note, data.name);
+		if (instance.revealed)
+		{
+			DrawPrompt(renderer, camera, instance.entrance, L"F  " + data.name + L" 들어가기" + rank_note, data.name);
+		}
 
 		if (instance.state == STATE_CLEARED)
 		{

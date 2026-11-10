@@ -15,6 +15,7 @@ void UpdateInstances(float real_seconds);
 
 bool InteractInstance();	// F. 입구 · 출구 앞이면 true
 bool IsPlayerInInstance();
+void RevealInstance(const std::string& id);	// 숨은 입구를 드러낸다. 구역을 새로 만들어도 드러난 채로 남는다
 bool GetInstanceGuide(WorldPos* pos);	// 안에 있을 때 다음에 갈 곳 ( 열린 문 · 출구 ). 싸우는 중이면 false
 int32 GetInstanceCount();
 bool GetInstanceEntrance(int32 index, WorldPos* pos, std::wstring* name);

@@ -306,6 +306,7 @@ struct InstanceData
 	std::wstring desc;
 	int32 kind = INSTANCE_KIND_DUNGEON;
 	int32 min_rank = 0;
+	bool hidden = false;	// 이야기가 드러내기 전엔 입구가 없다
 	int32 entrance_site = 2;	// SITE_ 번호. 가장 가까운 그 거점 곁에 입구
 	int32 room_width = 16;	// 칸
 	int32 room_height = 18;
@@ -356,6 +357,7 @@ struct StoryStep
 	std::vector<std::wstring> intro;
 	std::vector<std::wstring> outro;
 	std::string cinematic;
+	std::string reveal;	// 넘긴 뒤 드러나는 인스턴스 ( 레이드 입구 )
 };
 
 struct StoryConfig

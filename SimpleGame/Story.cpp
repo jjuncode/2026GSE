@@ -4,6 +4,7 @@
 #include "Cinematic.h"
 #include "Feel.h"
 #include "FloatingText.h"
+#include "Instance.h"
 #include "GameConfig.h"
 #include "GameData.h"
 #include "Inventory.h"
@@ -37,6 +38,7 @@ namespace
 	std::vector<int32> g_tutorial_monsters;
 	float g_fall_timer = 0.f;
 	int32 g_next_step = 0;	// 컷신이 끝나면 줄 메인 퀘스트
+	std::string g_reveal;	// 컷신이 끝나면 드러낼 입구
 
 	int32 CountAlive()
 	{
@@ -206,6 +208,12 @@ void UpdateStory(float real_seconds)
 			if (finished.empty() == false)
 			{
 				g_state = STATE_PRESENT;
+				if (g_reveal.empty() == false)
+				{
+					RevealInstance(g_reveal);
+					g_reveal.clear();
+				}
+
 				StartStoryQuest(g_next_step);
 			}
 
@@ -228,6 +236,7 @@ void OnStoryStepReported(int32 step)
 
 	QueueNarration(steps[static_cast<size_t>(step)].outro);
 	g_next_step = step + 1;
+	g_reveal = steps[static_cast<size_t>(step)].reveal;
 
 	// 컷신이 있으면 다 본 뒤 다음 단계를 준다
 	if (steps[static_cast<size_t>(step)].cinematic.empty() == false)
@@ -236,6 +245,12 @@ void OnStoryStepReported(int32 step)
 		SetCinematicAnchor("player", GetPlayer().m_pos);
 		StartCinematic(steps[static_cast<size_t>(step)].cinematic);
 		return;
+	}
+
+	if (g_reveal.empty() == false)
+	{
+		RevealInstance(g_reveal);
+		g_reveal.clear();
 	}
 
 	StartStoryQuest(g_next_step);

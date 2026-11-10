@@ -811,6 +811,149 @@
         ]
       },
       "desc": "그림자 균열의 가장 안쪽을 지키는 거인. 페이즈 셋, 마지막엔 쉬지 않고 내려친다"
+    },
+    {
+      "monster_type": 12,
+      "name": "제1군단장 망국의 왕",
+      "grade": "ELITE",
+      "level": 18,
+      "sprite": "BLIGHTED",
+      "weapon": "CLEAVER",
+      "shadow": true,
+      "base": 4,
+      "body_radius": 100,
+      "hit_radius": 90,
+      "move_speed": 460,
+      "patrol_speed": 0,
+      "standoff_speed": 260,
+      "search_range": 2000,
+      "patrol_radius": 100,
+      "patrol_policy": "NONE",
+      "target_policy": "NEAREST",
+      "skill_policy": "RANDOM",
+      "stat": {
+        "max_hp": 18000,
+        "attack": 36,
+        "defence": 30,
+        "crit_rate": 5,
+        "crit_damage": 150,
+        "penetration": 0,
+        "toughness": 60
+      },
+      "attack_cooldown_sec": 2.0,
+      "respawn_sec": 0.0,
+      "keep_distance": 340,
+      "skill_ids": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "weak_point_rate": 1.2,
+      "boss": {
+        "art_scale": 3,
+        "stagger_max": 160,
+        "stagger_per_hit": 2,
+        "stagger_per_parry": 20,
+        "stagger_regen_per_sec": 6,
+        "stagger_regen_delay": 3.0,
+        "groggy_sec": 5.0,
+        "groggy_damage_rate": 1.6,
+        "pattern_chain_sec": 0.2,
+        "phases": [
+          {
+            "hp": 1.0,
+            "name": "",
+            "attack_cooldown_rate": 1.0,
+            "patterns": [
+              [
+                4
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                3,
+                4
+              ],
+              [
+                2,
+                1,
+                2
+              ]
+            ]
+          },
+          {
+            "hp": 0.65,
+            "name": "왕관이 그림자에 잠긴다",
+            "attack_cooldown_rate": 0.6,
+            "patterns": [
+              [
+                4,
+                4
+              ],
+              [
+                1,
+                2,
+                1,
+                4
+              ],
+              [
+                3,
+                1,
+                2
+              ]
+            ]
+          },
+          {
+            "hp": 0.3,
+            "name": "인류여, 이것이 너희의 탐욕이다",
+            "attack_cooldown_rate": 0.35,
+            "patterns": [
+              [
+                4,
+                4,
+                4
+              ],
+              [
+                1,
+                2,
+                1,
+                2,
+                4
+              ],
+              [
+                3,
+                4,
+                3
+              ]
+            ]
+          }
+        ]
+      },
+      "reward": {
+        "exp": 6000,
+        "gold": [
+          800,
+          1200
+        ],
+        "drops": [
+          {
+            "item_id": 32,
+            "rate": 100.0,
+            "min_count": 4,
+            "max_count": 6
+          },
+          {
+            "item_id": 31,
+            "rate": 100.0,
+            "min_count": 8,
+            "max_count": 12
+          }
+        ]
+      },
+      "desc": "그림자 왕과 계약한 망국의 왕. 연속 베기가 끝없이 이어지지만 하나하나가 정직해 패링으로 받아 낼수록 무너진다"
     }
   ]
 }

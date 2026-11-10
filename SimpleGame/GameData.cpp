@@ -1096,6 +1096,7 @@ namespace
 			instance.name = Utf8ToWide(ReadString(entry, "name"));
 			instance.desc = Utf8ToWide(ReadString(entry, "desc"));
 			instance.min_rank = ReadInt(entry, "min_rank", 0);
+			instance.hidden = entry.value("hidden", false);
 			instance.entrance_site = ParseSiteKind(ReadString(entry, "entrance"));
 			instance.room_width = ReadInt(entry, "room_width", instance.room_width);
 			instance.room_height = ReadInt(entry, "room_height", instance.room_height);
@@ -1248,6 +1249,7 @@ namespace
 			step.intro = ReadWideArray(entry, "intro");
 			step.outro = ReadWideArray(entry, "outro");
 			step.cinematic = ReadString(entry, "cinematic");
+			step.reveal = ReadString(entry, "reveal");
 			g_story_steps.push_back(step);
 		}
 	}

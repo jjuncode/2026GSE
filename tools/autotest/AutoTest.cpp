@@ -1174,6 +1174,97 @@ void UpdateAutoTest(float real_seconds)
 		return;
 	}
 
+	if (g_mode == "raid")
+	{
+		// 골드로 올리고 망국의 옥좌를 드러내 들어가, 자동 패링 + 평타로 군단장 페이즈 셋과 그로기를 본다
+		Player& player = MutablePlayer();
+		static bool s_groggy_seen = false;
+		static int32 s_phase_captures = 0;
+		static std::wstring s_last_phase;
+
+		if (g_spawn_stage == 0 && g_time >= 0.5f)
+		{
+			g_spawn_stage = 1;
+			UseBagItem(0);
+			player.AddExp(20000);
+			PromotePlayerRank();
+			PromotePlayerRank();
+
+			WorldPos hidden;
+			std::wstring name;
+			std::cout << "[ AutoTest ] : raid visible before reveal " << GetInstanceEntrance(1, &hidden, &name) << "\n";
+			RevealInstance("legion_throne");
+
+			if (GetInstanceEntrance(1, &hidden, &name))
+			{
+				PlacePlayer(hidden);
+			}
+		}
+
+		if (g_spawn_stage >= 1)
+		{
+			player.m_stat.max_hp = 99999;
+			player.m_hp = 99999;
+			player.m_stat.attack = 160;
+		}
+
+		if (g_spawn_stage == 1 && g_time >= 1.f)
+		{
+			g_spawn_stage = 2;
+			InteractInstance();
+			std::cout << "[ AutoTest ] : raid entered " << IsPlayerInInstance() << "\n";
+		}
+
+		if (g_spawn_stage == 2 && g_time >= 1.6f)
+		{
+			g_spawn_stage = 3;
+			Capture("raid_wake");
+		}
+
+		if (g_spawn_stage >= 2 && g_time < 100.f)
+		{
+			UpdateCombat(real_seconds);
+
+			float distance = 0.f;
+			Creature* target = FindNearestMonster(&distance);
+			if (target != nullptr && distance > 2.2f && distance < 30.f && player.m_action == ACTION_NORMAL)
+			{
+				const float delta_x = GetTileDistanceX(player.m_pos, target->m_pos);
+				const float delta_y = GetTileDistanceY(player.m_pos, target->m_pos);
+				SetPlayerMoveInput(delta_x - delta_y, -(delta_x + delta_y) * 0.5f);
+			}
+			else if (target != nullptr && distance <= 2.8f && target->IsAttacking() == false && player.m_action == ACTION_NORMAL)
+			{
+				PressPlayerAttack();
+			}
+		}
+
+		BossBarInfo bar;
+		const bool has_bar = GetBossBar(&bar);
+		if (has_bar && bar.phase_name != s_last_phase && bar.phase_name.empty() == false && s_phase_captures < 2)
+		{
+			s_last_phase = bar.phase_name;
+			s_phase_captures += 1;
+			Capture("raid_phase_" + std::to_string(s_phase_captures));
+		}
+
+		if (has_bar && bar.is_groggy && bar.stagger_ratio > 0.5f && s_groggy_seen == false)
+		{
+			s_groggy_seen = true;
+			Capture("raid_groggy");
+		}
+
+		g_log_timer -= real_seconds;
+		if (g_log_timer <= 0.f)
+		{
+			g_log_timer = 3.f;
+			std::cout << "[ AutoTest ] : t " << g_time << " inside " << IsPlayerInInstance() << " bar " << has_bar << " hp " << bar.hp_ratio << " stagger " << bar.stagger_ratio
+				<< " parry " << g_parry_count << " rank " << GetPlayerRank() << " points " << GetRankPoints() << "\n";
+		}
+
+		return;
+	}
+
 	if (g_mode == "story")
 	{
 		// 시작 컷신을 그대로 보고, 튜토리얼은 자동 전투로 넘기고, 최강자의 죽음과 메인 퀘스트까지

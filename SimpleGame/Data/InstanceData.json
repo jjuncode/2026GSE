@@ -85,6 +85,55 @@
         ]
       },
       "rank_points": 80
+    },
+    {
+      "id": "legion_throne",
+      "name": "망국의 옥좌",
+      "kind": "RAID",
+      "min_rank": 2,
+      "entrance": "LAIR",
+      "hidden": true,
+      "desc": "군단장이 앉은 무너진 왕좌. 주전부리 없이 군단장 하나뿐이다",
+      "room_width": 30,
+      "room_height": 24,
+      "rooms": [
+        {
+          "spawns": [
+            {
+              "monster": 12,
+              "count": 1
+            }
+          ]
+        }
+      ],
+      "reward": {
+        "exp": 4000,
+        "gold": [
+          2500,
+          3500
+        ],
+        "drops": [
+          {
+            "item_id": 32,
+            "rate": 100.0,
+            "min_count": 6,
+            "max_count": 9
+          },
+          {
+            "item_id": 13,
+            "rate": 100.0,
+            "min_count": 1,
+            "max_count": 1
+          },
+          {
+            "item_id": 23,
+            "rate": 50.0,
+            "min_count": 1,
+            "max_count": 1
+          }
+        ]
+      },
+      "rank_points": 300
     }
   ]
 }
