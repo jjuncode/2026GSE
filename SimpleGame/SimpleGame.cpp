@@ -359,7 +359,7 @@ void KeyInput(GLFWwindow* window, uint8 key)
 		case 'm':
 		case 'M':
 		{
-			ToggleMinimap();
+			ToggleWorldMap();
 			break;
 		}
 		case KEY_TAB:
@@ -668,7 +668,7 @@ int main()
 	std::cout << "F           : pick up / anvil\n";
 	std::cout << "I C K U H   : bag / stats / skill tree / enhance / help\n";
 	std::cout << "MMB Tab O   : inspect npc / next / follow\n";
-	std::cout << "V J M       : npc labels / journal / map\n";
+	std::cout << "V J M       : npc labels / journal / world map\n";
 	std::cout << "N G L P     : new zone / blocked overlay / lighting / profiler\n";
 	std::cout << "B           : monitor page in browser\n";
 	std::cout << "T           : next quest guide ( board quests )\n";

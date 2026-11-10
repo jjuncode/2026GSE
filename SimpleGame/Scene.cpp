@@ -1649,6 +1649,11 @@ void ToggleChunkGrid()
 	g_show_chunk_grid = !g_show_chunk_grid;
 }
 
+bool IsChunkGridShown()
+{
+	return g_show_chunk_grid;
+}
+
 void ToggleLighting()
 {
 	g_use_lighting = !g_use_lighting;

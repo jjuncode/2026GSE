@@ -527,8 +527,10 @@ void DrawHud(Renderer* renderer)
 	DrawPointBadges(renderer);
 	DrawIntroHint(renderer);
 
-	DrawQuestTracker(renderer, GetSelectedNpc() >= 0);
-	DrawMinimap(renderer, IsAnyWindowOpen() || GetSelectedNpc() >= 0);
+	// 관찰창이 오른쪽을 덮으면 구석 지도와 의뢰 목록이 그 밑에 깔린다
+	DrawMinimap(renderer, GetSelectedNpc() >= 0);
+	DrawQuestTracker(renderer, GetSelectedNpc() >= 0 || IsWorldMapOpen());
+	DrawWorldMap(renderer);
 	DrawNpcPanels(renderer, IsAnyWindowOpen());
 
 	DrawKeyHelp(renderer);

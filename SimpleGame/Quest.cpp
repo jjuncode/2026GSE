@@ -5,6 +5,7 @@
 #include "FloatingText.h"
 #include "GameConfig.h"
 #include "Inventory.h"
+#include "Minimap.h"
 #include "Monster.h"
 #include "NavGrid.h"
 #include "Player.h"
@@ -1117,7 +1118,7 @@ void DrawQuestTracker(Renderer* renderer, bool hidden)
 
 	const float right = static_cast<float>(WINDOW_SIZE_X) * 0.5f - 16.f;
 	const float left = right - TRACKER_WIDTH;
-	float y = static_cast<float>(WINDOW_SIZE_Y) * 0.5f - 20.f;
+	float y = GetMinimapBottom() - 40.f;
 	const int32 tracked = GetTrackedQuest();
 
 	const float height = 34.f + TRACKER_ROW * static_cast<float>(g_active.size());

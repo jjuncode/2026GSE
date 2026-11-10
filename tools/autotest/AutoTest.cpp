@@ -896,7 +896,7 @@ void UpdateAutoTest(float real_seconds)
 
 		if (crossed(4.3f))
 		{
-			ToggleMinimap();
+			ToggleWorldMap();
 		}
 
 		if (crossed(4.6f))
@@ -906,7 +906,7 @@ void UpdateAutoTest(float real_seconds)
 
 		if (crossed(4.8f))
 		{
-			ToggleMinimap();
+			ToggleWorldMap();
 		}
 
 		// 사냥 목표는 처치 알림을 그대로 흘려 채운다. 처치 경로 자체는 Monster::OnDeath 가 부른다
@@ -1096,7 +1096,7 @@ void UpdateAutoTest(float real_seconds)
 
 		if (crossed(4.f))
 		{
-			ToggleMinimap();
+			ToggleWorldMap();
 		}
 
 		if (crossed(4.6f))
@@ -1106,7 +1106,7 @@ void UpdateAutoTest(float real_seconds)
 
 		if (crossed(5.2f))
 		{
-			ToggleMinimap();
+			ToggleWorldMap();
 		}
 
 		const float start = 90.f;
