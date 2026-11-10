@@ -1,6 +1,7 @@
 ﻿#include "stdafx.h"
 #include "Player.h"
 #include "Audio.h"
+#include "Card.h"
 #include "CombatDraw.h"
 #include "Feel.h"
 #include "FloatingText.h"
@@ -751,6 +752,7 @@ void Player::RecalcStat()
 	stat.toughness = config.base_toughness;
 
 	m_inventory.AddEquipStat(&stat);
+	AddCardStat(&stat);
 	m_stat = stat;
 
 	if (m_hp > m_stat.max_hp)

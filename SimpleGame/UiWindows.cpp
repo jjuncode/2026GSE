@@ -13,6 +13,7 @@
 #include "Shop.h"
 #include "SpriteAtlas.h"
 #include "Text.h"
+#include "UiCard.h"
 #include "UiDraw.h"
 #include "UiQuestBoard.h"
 #include "UiShop.h"
@@ -92,7 +93,8 @@ namespace
 	constexpr int32 WINDOW_ENHANCE = 3;
 	constexpr int32 WINDOW_BOARD = 4;
 	constexpr int32 WINDOW_SHOP = 5;
-	constexpr int32 WINDOW_COUNT = 6;
+	constexpr int32 WINDOW_CARD = 6;
+	constexpr int32 WINDOW_COUNT = 7;
 
 	const float SHOP_CLOSE_RANGE = 4.f;
 	const float EQUIP_STEP = 56.f;
@@ -236,6 +238,10 @@ namespace
 			case WINDOW_SHOP:
 			{
 				return IsInsideShopWindow(x, y);
+			}
+			case WINDOW_CARD:
+			{
+				return IsInsideCardWindow(x, y);
 			}
 			default:
 			{
@@ -1751,12 +1757,21 @@ namespace
 			{
 				return HandleShopDown(g_shop_kind, x, y);
 			}
+			case WINDOW_CARD:
+			{
+				return true;
+			}
 			default:
 			{
 				return false;
 			}
 		}
 	}
+}
+
+void ToggleCardWindow()
+{
+	ToggleWindow(WINDOW_CARD);
 }
 
 void ToggleShopWindow(int32 shop_kind, int32 spot)
@@ -2003,7 +2018,7 @@ void DrawUiWindows(Renderer* renderer)
 	std::vector<TooltipLine> tooltip;
 
 	// 늦게 연 창이 위
-	std::array<int32, WINDOW_COUNT> order = { WINDOW_INVENTORY, WINDOW_STAT, WINDOW_SKILL, WINDOW_ENHANCE, WINDOW_BOARD, WINDOW_SHOP };
+	std::array<int32, WINDOW_COUNT> order = { WINDOW_INVENTORY, WINDOW_STAT, WINDOW_SKILL, WINDOW_ENHANCE, WINDOW_BOARD, WINDOW_SHOP, WINDOW_CARD };
 	std::sort(order.begin(), order.end(),
 		[](int32 left, int32 right)
 		{
@@ -2052,6 +2067,11 @@ void DrawUiWindows(Renderer* renderer)
 			case WINDOW_SHOP:
 			{
 				DrawShopWindow(renderer, g_shop_kind, g_mouse_x, g_mouse_y, &window_tooltip);
+				break;
+			}
+			case WINDOW_CARD:
+			{
+				DrawCardWindow(renderer, g_mouse_x, g_mouse_y, &window_tooltip);
 				break;
 			}
 			default:

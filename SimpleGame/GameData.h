@@ -368,6 +368,23 @@ struct StoryConfig
 	int32 tutorial_hp_rate = 4;
 };
 
+constexpr int32 CARD_STAT_ATTACK = 0;
+constexpr int32 CARD_STAT_DEFENCE = 1;
+constexpr int32 CARD_STAT_MAX_HP = 2;
+constexpr int32 CARD_STAT_CRIT_RATE = 3;
+constexpr int32 CARD_STAT_CRIT_DAMAGE = 4;
+constexpr int32 CARD_STAT_PENETRATION = 5;
+constexpr int32 CARD_STAT_TOUGHNESS = 6;
+
+// 몬스터 카드 한 장. 붙은 능력치는 카드 레벨만큼 곱해진다
+struct CardData
+{
+	int32 monster_type = MONSTER_TYPE_NONE;
+	float rate = 0.f;	// 처치 한 번에 나올 확률 %
+	int32 stat = CARD_STAT_ATTACK;
+	int32 value = 0;
+};
+
 struct ShopData
 {
 	int32 kind = SHOP_GENERAL;
@@ -486,6 +503,8 @@ const std::vector<InstanceData>& GetInstanceDatas();
 const CinematicData* FindCinematic(const std::string& id);	// 없으면 nullptr
 const std::vector<StoryStep>& GetStorySteps();
 const StoryConfig& GetStoryConfig();
+const std::vector<CardData>& GetCardDatas();
+const std::vector<int32>& GetCardLevelCopies();	// 레벨마다 필요한 누적 장 수
 
 // 아이템 그림판을 읽은 뒤 부른다. "ext:" 아이콘을 그림 번호로 잇는다
 void BindItemArt();

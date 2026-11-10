@@ -42,6 +42,8 @@ namespace
 	std::vector<CinematicData> g_cinematics;
 	std::vector<StoryStep> g_story_steps;
 	StoryConfig g_story_config;
+	std::vector<CardData> g_cards;
+	std::vector<int32> g_card_level_copies = { 1, 3, 6 };
 
 	const std::vector<int32> EMPTY_LINKS;
 
@@ -1255,6 +1257,46 @@ namespace
 		}
 	}
 
+	int32 ParseCardStat(const std::string& text)
+	{
+		const std::array<const char*, 7> names = { "attack", "defence", "max_hp", "crit_rate", "crit_damage", "penetration", "toughness" };
+
+		for (size_t index = 0; index < names.size(); ++index)
+		{
+			if (text == names[index])
+			{
+				return static_cast<int32>(index);
+			}
+		}
+
+		return CARD_STAT_ATTACK;
+	}
+
+	void LoadCards()
+	{
+		Json root;
+		if (ReadJson("CardData.json", &root) == false || root.contains("cards") == false)
+		{
+			return;
+		}
+
+		const std::vector<int32> copies = ReadIntArray(root, "level_copies");
+		if (copies.empty() == false)
+		{
+			g_card_level_copies = copies;
+		}
+
+		for (const Json& entry : root["cards"])
+		{
+			CardData card;
+			card.monster_type = ReadInt(entry, "monster", MONSTER_TYPE_NONE);
+			card.rate = ReadFloat(entry, "rate", 0.f);
+			card.stat = ParseCardStat(ReadString(entry, "stat"));
+			card.value = ReadInt(entry, "value", 0);
+			g_cards.push_back(card);
+		}
+	}
+
 	void LoadRanks()
 	{
 		Json root;
@@ -1353,6 +1395,7 @@ bool LoadGameData()
 	LoadInstances();
 	LoadCinematics();
 	LoadStory();
+	LoadCards();
 	BuildComboChain();
 
 	if (g_skills.empty() || g_items.empty() || g_monsters.empty())
@@ -1464,6 +1507,16 @@ const std::vector<StoryStep>& GetStorySteps()
 const StoryConfig& GetStoryConfig()
 {
 	return g_story_config;
+}
+
+const std::vector<CardData>& GetCardDatas()
+{
+	return g_cards;
+}
+
+const std::vector<int32>& GetCardLevelCopies()
+{
+	return g_card_level_copies;
 }
 
 void BindItemArt()

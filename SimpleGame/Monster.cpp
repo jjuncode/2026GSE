@@ -3,6 +3,7 @@
 #include "Audio.h"
 #include "Balance.h"
 #include "Board.h"
+#include "Card.h"
 #include "CombatDraw.h"
 #include "Drop.h"
 #include "Feel.h"
@@ -734,6 +735,7 @@ namespace
 		m_killed_by_player = true;
 
 		GrantKillReward(m_exp, m_level);
+		RollCardDrop(m_data->monster_type, m_pos);
 		NotifyQuestKill(m_kind, m_is_elite || m_grade == GRADE_ELITE, m_grade == GRADE_BOSS, m_level);
 
 		const int32 rolls = static_cast<int32>(m_drop_rolls);

@@ -1,5 +1,6 @@
 ﻿#include "stdafx.h"
 #include "AutoTest.h"
+#include "Card.h"
 #include "Combat.h"
 #include "GameConfig.h"
 #include "GameTime.h"
@@ -1169,6 +1170,54 @@ void UpdateAutoTest(float real_seconds)
 			{
 				CloseTopWindow();
 			}
+		}
+
+		return;
+	}
+
+	if (g_mode == "card")
+	{
+		// 몬스터 몇 종을 여러 번 잡은 것처럼 흘려 카드를 모으고 도감을 연다
+		Player& player = MutablePlayer();
+		const auto crossed = [](float mark)
+		{
+			return g_time - FIXED_STEP_SECONDS < mark && g_time >= mark;
+		};
+
+		if (crossed(0.5f))
+		{
+			const int32 attack_before = player.m_stat.attack;
+			const std::array<std::array<int32, 2>, 6> kills = { std::array<int32, 2>{ 1, 300 }, std::array<int32, 2>{ 2, 120 }, std::array<int32, 2>{ 3, 40 },
+				std::array<int32, 2>{ 5, 100 }, std::array<int32, 2>{ 8, 30 }, std::array<int32, 2>{ 12, 2 } };
+
+			for (const std::array<int32, 2>& kill : kills)
+			{
+				for (int32 count = 0; count < kill[1]; ++count)
+				{
+					RollCardDrop(kill[0], player.m_pos);
+				}
+			}
+
+			std::cout << "[ AutoTest ] : cards attack " << attack_before << " -> " << player.m_stat.attack << " max_hp " << player.m_stat.max_hp << " crit " << player.m_stat.crit_rate << "\n";
+			for (int32 index = 0; index < GetCardCount(); ++index)
+			{
+				std::cout << "[ AutoTest ] : card " << index << " copies " << GetCardCopies(index) << " level " << GetCardLevel(index) << "\n";
+			}
+		}
+
+		if (crossed(1.0f))
+		{
+			ToggleCardWindow();
+		}
+
+		if (crossed(1.3f))
+		{
+			UiMouseMove(-204.f, 120.f);
+		}
+
+		if (crossed(1.6f))
+		{
+			Capture("card");
 		}
 
 		return;

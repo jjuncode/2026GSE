@@ -356,6 +356,12 @@ void KeyInput(GLFWwindow* window, uint8 key)
 			CycleTrackedQuest();
 			break;
 		}
+		case 'y':
+		case 'Y':
+		{
+			ToggleCardWindow();
+			break;
+		}
 		case 'v':
 		case 'V':
 		{
@@ -684,6 +690,7 @@ int main()
 	std::cout << "N G L P     : new zone / blocked overlay / lighting / profiler\n";
 	std::cout << "B           : monitor page in browser\n";
 	std::cout << "T           : next quest guide ( board quests )\n";
+	std::cout << "Y           : card collection\n";
 	std::cout << "ESC         : close window, twice to quit\n";
 
 	// 포커스를 잃으면 glfw 가 눌린 키 · 버튼마다 뗌을 보내 준다. 창 밖에서 떼도 눌린 채로 안 남는다
