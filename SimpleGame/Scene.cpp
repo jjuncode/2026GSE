@@ -948,6 +948,25 @@ namespace
 		}
 
 		SetBossSpawnPoint(ZoneTileToWorld(g_zone.boss.x, g_zone.boss.y, 0.5f, 0.5f));
+
+		// 엘리트 보스는 성채에서 가장 먼 폐촌 하나를 차지한다. 옛 원정대가 무너진 자리
+		const ZoneSite* ruin = nullptr;
+		for (const ZoneSite& site : g_zone.sites)
+		{
+			if (site.kind == SITE_VILLAGE && (ruin == nullptr || site.walk_distance > ruin->walk_distance))
+			{
+				ruin = &site;
+			}
+		}
+
+		if (ruin != nullptr)
+		{
+			ZoneTile tile;
+			if (FindOpenNear(ruin->tile, 271u, &tile))
+			{
+				AddMonster(MONSTER_SHADOW_COMMANDER, ZoneTileToWorld(tile.x, tile.y, 0.5f, 0.5f), BAND_FIELD, false);
+			}
+		}
 	}
 
 	void BuildZone(uint32 seed)

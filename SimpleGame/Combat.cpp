@@ -183,6 +183,11 @@ bool Creature::IsParryable() const
 	return false;
 }
 
+float Creature::GetTakenDamageRate() const
+{
+	return 1.f;
+}
+
 void Creature::ApplyHitReact(const HitInfo& hit)
 {
 }
@@ -973,7 +978,7 @@ int32 CalcTakenDamage(const Creature& victim, int32 damage, int32 penetration)
 	// 감소율이 방어력 / ( 상수 + 방어력 ) 이라 남는 비율은 상수 / ( 상수 + 방어력 )
 	const float constant = GetConfig().defence_constant;
 	const float remain_rate = constant / (constant + static_cast<float>(defence));
-	const int32 taken = static_cast<int32>(std::lround(static_cast<float>(damage) * remain_rate));
+	const int32 taken = static_cast<int32>(std::lround(static_cast<float>(damage) * remain_rate * victim.GetTakenDamageRate()));
 
 	if (taken < 1)
 	{

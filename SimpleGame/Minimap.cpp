@@ -456,6 +456,19 @@ void DrawWorldMap(Renderer* renderer)
 		ForEachLiveNpc(DrawNpcDot, &context);
 	}
 
+	// 엘리트 보스 자리. 몬스터는 숨기지만 이름 붙은 적은 찾아갈 목적지다
+	WorldPos boss_home;
+	std::wstring boss_name;
+	if (GetEliteBossHome(&boss_home, &boss_name))
+	{
+		float boss_x = 0.f;
+		float boss_y = 0.f;
+		ProjectWorld(view, boss_home, &boss_x, &boss_y);
+		renderer->DrawSolidCircle(boss_x, boss_y, 7.f, 0.02f, 0.02f, 0.02f, 1.f);
+		renderer->DrawSolidCircle(boss_x, boss_y, 5.f, 1.f, 0.2f, 0.35f, 1.f);
+		DrawStringShadow(renderer, boss_name, boss_x, boss_y + 26.f, TEXT_ALIGN_CENTER, 1.f, 0.45f, 0.5f, 0.95f);
+	}
+
 	DrawQuestMarks(renderer, view, false);
 	DrawPlayerMark(renderer, view);
 

@@ -602,6 +602,53 @@ namespace
 		}
 	}
 
+	BossRuleData ReadBossRule(const Json& node)
+	{
+		BossRuleData rule;
+		rule.enabled = true;
+		rule.art_scale = std::max(1, ReadInt(node, "art_scale", 1));
+		rule.stagger_max = ReadFloat(node, "stagger_max", rule.stagger_max);
+		rule.stagger_per_hit = ReadFloat(node, "stagger_per_hit", rule.stagger_per_hit);
+		rule.stagger_per_parry = ReadFloat(node, "stagger_per_parry", rule.stagger_per_parry);
+		rule.stagger_regen_per_sec = ReadFloat(node, "stagger_regen_per_sec", rule.stagger_regen_per_sec);
+		rule.stagger_regen_delay = ReadFloat(node, "stagger_regen_delay", rule.stagger_regen_delay);
+		rule.groggy_sec = ReadFloat(node, "groggy_sec", rule.groggy_sec);
+		rule.groggy_damage_rate = ReadFloat(node, "groggy_damage_rate", rule.groggy_damage_rate);
+		rule.pattern_chain_sec = ReadFloat(node, "pattern_chain_sec", rule.pattern_chain_sec);
+
+		if (node.contains("phases") && node["phases"].is_array())
+		{
+			for (const Json& phase_node : node["phases"])
+			{
+				BossPhase phase;
+				phase.hp_ratio = ReadFloat(phase_node, "hp", 1.f);
+				phase.name = Utf8ToWide(ReadString(phase_node, "name"));
+				phase.attack_cooldown_rate = ReadFloat(phase_node, "attack_cooldown_rate", 1.f);
+
+				if (phase_node.contains("patterns") && phase_node["patterns"].is_array())
+				{
+					for (const Json& pattern_node : phase_node["patterns"])
+					{
+						std::vector<int32> pattern;
+						for (const Json& skill : pattern_node)
+						{
+							pattern.push_back(skill.get<int32>());
+						}
+
+						if (pattern.empty() == false)
+						{
+							phase.patterns.push_back(pattern);
+						}
+					}
+				}
+
+				rule.phases.push_back(phase);
+			}
+		}
+
+		return rule;
+	}
+
 	void LoadMonsters()
 	{
 		Json root;
@@ -650,6 +697,11 @@ namespace
 			if (entry.contains("stat"))
 			{
 				monster.stat = ReadStat(entry["stat"]);
+			}
+
+			if (entry.contains("boss"))
+			{
+				monster.boss = ReadBossRule(entry["boss"]);
 			}
 
 			if (entry.contains("reward"))

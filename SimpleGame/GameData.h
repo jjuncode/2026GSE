@@ -137,6 +137,31 @@ struct MonsterRewardData
 	std::vector<DropInfo> drops;	// 줄마다 따로 굴림
 };
 
+// 엘리트 보스 페이즈. 체력 비율이 hp_ratio 아래로 내려가면 넘어간다
+struct BossPhase
+{
+	float hp_ratio = 1.f;
+	std::wstring name;	// 넘어갈 때 띄우는 이름. 비면 조용히 넘어간다
+	float attack_cooldown_rate = 1.f;	// 패턴이 끝난 뒤 쉬는 시간 배율
+	std::vector<std::vector<int32>> patterns;	// 기술 순서 묶음. 하나를 골라 끝까지 잇는다
+};
+
+// 엘리트 보스 피격 규칙 - 슈퍼아머 게이지. 맞고 패링당할수록 차고, 다 차면 그로기
+struct BossRuleData
+{
+	bool enabled = false;
+	int32 art_scale = 1;	// 정수 배율. 도트 칸 크기를 안 흐트린다
+	float stagger_max = 100.f;
+	float stagger_per_hit = 3.f;
+	float stagger_per_parry = 20.f;
+	float stagger_regen_per_sec = 5.f;
+	float stagger_regen_delay = 3.f;	// 마지막으로 찬 뒤 이만큼 지나야 줄기 시작
+	float groggy_sec = 4.f;
+	float groggy_damage_rate = 1.5f;
+	float pattern_chain_sec = 0.3f;	// 패턴 안 기술 사이 쉼. 짧아야 연속 공격으로 읽힌다
+	std::vector<BossPhase> phases;
+};
+
 struct MonsterData
 {
 	int32 monster_type = MONSTER_TYPE_NONE;
@@ -146,6 +171,7 @@ struct MonsterData
 	int32 sprite = -1;
 	bool has_blade = false;	// 손에 든 칼을 따로 돌려 그린다
 	bool is_shadow = false;	// 그림자 괴물. 본뜬 몬스터 그림을 어둡게 물들여 그린다
+	BossRuleData boss;
 	int32 base_type = MONSTER_TYPE_NONE;	// 본뜬 몬스터
 	std::wstring desc;
 

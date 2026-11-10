@@ -354,15 +354,47 @@ namespace
 
 	void DrawFocus(Renderer* renderer)
 	{
-		float boss_ratio = 0.f;
-		if (GetBossHpRatio(&boss_ratio))
+		BossBarInfo boss;
+		if (GetBossBar(&boss))
 		{
 			const float width = 520.f;
 			const float y = GetTopEdge() - 44.f;
 
-			DrawStringOutline(renderer, GetBossName(), 0.f, y + 30.f, TEXT_ALIGN_CENTER, 1, 1.f, 0.55f, 0.4f, 1.f);
+			std::wstring title = boss.name + L"  Lv " + std::to_wstring(boss.level);
+			if (boss.phase_name.empty() == false)
+			{
+				title += L"  ·  " + boss.phase_name;
+			}
+
+			DrawStringOutline(renderer, title, 0.f, y + 30.f, TEXT_ALIGN_CENTER, 1, 1.f, 0.55f, 0.4f, 1.f);
 			renderer->DrawSolidBox(0.f, y, width + 6.f, 16.f, 0.03f, 0.02f, 0.02f, 0.95f);
-			renderer->DrawSolidBox(-width * 0.5f + width * boss_ratio * 0.5f, y, width * boss_ratio, 10.f, 0.75f, 0.12f, 0.08f, 1.f);
+			renderer->DrawSolidBox(-width * 0.5f + width * boss.hp_ratio * 0.5f, y, width * boss.hp_ratio, 10.f, 0.75f, 0.12f, 0.08f, 1.f);
+
+			// 슈퍼아머 게이지. 차오르면 그로기, 그로기 동안은 남은 시간으로 줄어든다
+			if (boss.has_stagger)
+			{
+				const float gauge_y = y - 14.f;
+				float gauge_r = 1.f;
+				float gauge_g = 0.78f;
+				float gauge_b = 0.3f;
+				if (boss.is_groggy)
+				{
+					const float pulse = GetUiPulse();
+					gauge_r = pulse;
+					gauge_g = pulse;
+					gauge_b = 0.9f * pulse;
+				}
+
+				renderer->DrawSolidBox(0.f, gauge_y, width * 0.6f + 4.f, 8.f, 0.03f, 0.02f, 0.02f, 0.95f);
+				renderer->DrawSolidBox(-width * 0.3f + width * 0.6f * boss.stagger_ratio * 0.5f, gauge_y, width * 0.6f * boss.stagger_ratio, 4.f, gauge_r, gauge_g, gauge_b, 1.f);
+			}
+
+			if (boss.is_groggy)
+			{
+				const float pulse = GetUiPulse();
+				DrawStringOutline(renderer, L"그로기", 0.f, y - 22.f, TEXT_ALIGN_CENTER, 1, 1.f, 0.9f * pulse, 0.3f, 1.f);
+			}
+
 			return;
 		}
 

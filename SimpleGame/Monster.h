@@ -18,7 +18,8 @@ constexpr int32 MONSTER_SHADOW_HOUND = 5;
 constexpr int32 MONSTER_SHADOW_DEVOURER = 6;	// 정예
 constexpr int32 MONSTER_SHADOW_KNIGHT = 7;	// 정예. 연속 베기
 constexpr int32 MONSTER_SHADOW_COLOSSUS = 8;	// 정예. 성문파쇄자의 그림자
-constexpr int32 MONSTER_KIND_COUNT = 9;
+constexpr int32 MONSTER_SHADOW_COMMANDER = 9;	// 엘리트 보스. 그림자 기사단장 - 페이즈 패턴 · 슈퍼아머 게이지
+constexpr int32 MONSTER_KIND_COUNT = 10;
 
 // NPC 가 잡았을 때 받는 것
 struct MonsterReward
@@ -59,6 +60,21 @@ bool IsBossDead();
 const wchar_t* GetBossName();
 
 bool GetFocusMonster(MonsterFocus* focus);	// 최근에 때린 몬스터
+
+// 화면 위 큰 체력 막대. 보스와 엘리트 보스가 나와 싸우는 중일 때만
+struct BossBarInfo
+{
+	std::wstring name;
+	int32 level = 1;
+	float hp_ratio = 0.f;
+	bool has_stagger = false;	// 엘리트 보스만 슈퍼아머 게이지가 있다
+	float stagger_ratio = 0.f;
+	bool is_groggy = false;
+	std::wstring phase_name;
+};
+
+bool GetBossBar(BossBarInfo* info);
+bool GetEliteBossHome(WorldPos* pos, std::wstring* name);	// 지도 표식. 없으면 false
 
 // NPC 쪽 창구. 번호는 구역을 다시 만들 때까지 안 바뀐다
 int32 GetMonsterCount();

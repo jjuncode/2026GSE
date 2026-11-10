@@ -34,7 +34,7 @@ float Actor::GetArtWidth() const
 {
 	if (m_sheet != SHEET_NONE)
 	{
-		return GetSheetBodyWidth(m_sheet);
+		return GetSheetBodyWidth(m_sheet) * m_art_scale;
 	}
 
 	return static_cast<float>(GetSpriteWidth(m_sprite));
@@ -44,7 +44,7 @@ float Actor::GetArtHeight() const
 {
 	if (m_sheet != SHEET_NONE)
 	{
-		return GetSheetBodyHeight(m_sheet);
+		return GetSheetBodyHeight(m_sheet) * m_art_scale;
 	}
 
 	return static_cast<float>(GetSpriteHeight(m_sprite));

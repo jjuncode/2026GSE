@@ -566,6 +566,32 @@ void DrawSheetFrame(Renderer* renderer, int32 sheet, int32 frame, float foot_x, 
 	renderer->DrawAffineFlash(data.texture, info.region, quad, r, g, b, a, flash);
 }
 
+// 도트 한 칸을 배율만큼 키운다. 정수가 아니면 칸 크기가 들쭉날쭉해져서 반올림한다
+void DrawSheetFrameScaled(Renderer* renderer, int32 sheet, int32 frame, float foot_x, float foot_y, float scale, float r, float g, float b, float a, float flash)
+{
+	if (IsValidSheet(sheet) == false)
+	{
+		return;
+	}
+
+	const Sheet& data = g_sheets[static_cast<size_t>(sheet)];
+	if (IsValidFrame(data, frame) == false)
+	{
+		return;
+	}
+
+	const SheetFrame& info = data.frames[static_cast<size_t>(frame)];
+	const float unit = static_cast<float>(PIXEL_SCALE) * std::max(1.f, std::floor(scale + 0.5f));
+
+	AffineQuad quad;
+	quad.origin_x = foot_x - static_cast<float>(info.anchor_x) * unit;
+	quad.origin_y = foot_y - static_cast<float>(info.height - info.anchor_y) * unit;
+	quad.axis_x_x = static_cast<float>(info.width) * unit;
+	quad.axis_y_y = static_cast<float>(info.height) * unit;
+
+	renderer->DrawAffineFlash(data.texture, info.region, quad, r, g, b, a, flash);
+}
+
 void DrawSheetShadow(Renderer* renderer, int32 sheet, int32 frame, float foot_x, float foot_y, float lean_x, float lean_y, float alpha)
 {
 	if (IsValidSheet(sheet) == false)

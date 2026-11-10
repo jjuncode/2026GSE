@@ -68,6 +68,7 @@ int32 PickSheetFrame(int32 sheet, int32 anim, int32 dir, float ratio, float seco
 
 void DrawSheetFrame(Renderer* renderer, int32 sheet, int32 frame, float foot_x, float foot_y, float r, float g, float b, float a, float flash);
 void DrawSheetShadow(Renderer* renderer, int32 sheet, int32 frame, float foot_x, float foot_y, float lean_x, float lean_y, float alpha);
+void DrawSheetFrameScaled(Renderer* renderer, int32 sheet, int32 frame, float foot_x, float foot_y, float scale, float r, float g, float b, float a, float flash);	// 엘리트 보스. 정수 배율
 
 int32 GetVfxFrameCount(int32 vfx);
 float GetVfxFrameSec(int32 vfx);

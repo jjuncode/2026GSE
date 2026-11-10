@@ -62,6 +62,7 @@ public:
 
 	// 맞는 쪽
 	virtual bool IsParryable() const;
+	virtual float GetTakenDamageRate() const;	// 그로기처럼 더 아프게 맞는 때
 	virtual void ApplyHitReact(const HitInfo& hit);	// 경직 · 스턴 · 넉백
 	virtual void OnDamaged(const HitInfo& hit, int32 taken);
 	virtual void OnGuarded(const HitInfo& hit, int32 taken, bool is_break);

@@ -30,6 +30,7 @@ public:
 	bool m_flip = false;	// 그림은 오른쪽을 본다. 켜면 왼쪽
 	float m_shade = 1.f;	// 같은 그림을 조금씩 다른 밝기로
 	float m_foot_offset_y = 0.f;	// 그림 발밑을 위치에서 이만큼 띄운다 ( 픽셀 )
+	float m_art_scale = 1.f;	// 시트 그림을 키워 그린다. 머리 위 막대 · 벽 투시 상자가 이걸 따라간다
 
 	// 0 보다 크면 바닥을 밝히고 빛무리를 낸다
 	float m_light_radius = 0.f;

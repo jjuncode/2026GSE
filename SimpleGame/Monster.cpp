@@ -218,6 +218,8 @@ namespace
 		void OnDeath(Creature* killer) override;
 		void OnParried(const HitInfo& hit) override;
 		void OnWindowCheck(const HitInfo& hit) override;
+		float GetTakenDamageRate() const override;
+		bool IsEliteBoss() const;
 
 		void Setup(int32 kind, const WorldPos& pos, int32 band, bool is_elite);
 		void Revive();
@@ -243,6 +245,11 @@ namespace
 		bool IsOverLeash() const;
 		float GetHitReactCool() const;
 		void AlertPack(Creature* attacker);
+
+		void UpdateBossRule(float delta_seconds);
+		void AddStagger(float amount);
+		void EnterGroggy();
+		bool SelectPatternSkill();
 
 	public:
 		const MonsterData* m_data = nullptr;
@@ -281,6 +288,14 @@ namespace
 		float m_walk_distance = 0.f;
 		float m_idle_timer = 0.f;
 		bool m_killed_by_player = false;
+
+		// 엘리트 보스
+		int32 m_phase = 0;
+		std::vector<int32> m_pattern;	// 지금 잇고 있는 기술 순서
+		size_t m_pattern_step = 0;
+		float m_stagger = 0.f;	// 슈퍼아머 게이지. 다 차면 그로기
+		float m_stagger_regen_delay = 0.f;
+		float m_groggy_timer = 0.f;
 	};
 
 	Monster* GetMonsterAt(int32 index)
@@ -307,6 +322,7 @@ namespace
 
 		m_sprite = data.sprite;
 		m_sheet = GetMonsterSheet(kind);
+		m_art_scale = static_cast<float>(std::max(1, data.boss.art_scale));
 		m_grade = data.grade;
 		m_body_radius = std::min(data.body_radius, MAX_COLLISION_RADIUS);
 		m_hit_radius = data.hit_radius;
@@ -350,6 +366,12 @@ namespace
 	{
 		m_pos = m_home;
 		m_hp = m_stat.max_hp;
+		m_phase = 0;
+		m_pattern.clear();
+		m_pattern_step = 0;
+		m_stagger = 0.f;
+		m_stagger_regen_delay = 0.f;
+		m_groggy_timer = 0.f;
 		m_action = ACTION_NORMAL;
 		m_action_time = 0.f;
 		m_state_timer = 0.f;
@@ -382,7 +404,157 @@ namespace
 
 	float Monster::GetChestLift() const
 	{
-		return GetSheetBodyHeight(m_sheet) * static_cast<float>(PIXEL_SCALE) * 0.55f;
+		return GetSheetBodyHeight(m_sheet) * m_art_scale * static_cast<float>(PIXEL_SCALE) * 0.55f;
+	}
+
+	bool Monster::IsEliteBoss() const
+	{
+		return m_data != nullptr && m_data->boss.enabled;
+	}
+
+	float Monster::GetTakenDamageRate() const
+	{
+		if (m_groggy_timer > 0.f && IsEliteBoss())
+		{
+			return m_data->boss.groggy_damage_rate;
+		}
+
+		return 1.f;
+	}
+
+	void Monster::AddStagger(float amount)
+	{
+		if (IsEliteBoss() == false || m_groggy_timer > 0.f || IsDead())
+		{
+			return;
+		}
+
+		const BossRuleData& rule = m_data->boss;
+		m_stagger = std::min(m_stagger + amount, rule.stagger_max);
+		m_stagger_regen_delay = rule.stagger_regen_delay;
+
+		if (m_stagger >= rule.stagger_max)
+		{
+			EnterGroggy();
+		}
+	}
+
+	// 슈퍼아머가 깨지는 순간. 연타와 패링을 쌓은 보상이라 크게 알린다
+	void Monster::EnterGroggy()
+	{
+		const BossRuleData& rule = m_data->boss;
+
+		m_groggy_timer = rule.groggy_sec;
+		m_stagger = 0.f;
+		m_super_armor_timer = 0.f;
+		m_pattern.clear();
+		m_combo_next_skill = SKILL_ID_NONE;
+		m_selected_skill = nullptr;
+
+		CancelCast();
+		StopMotion();
+		m_stun_timer = std::max(m_stun_timer, rule.groggy_sec);
+		SetAction(ACTION_DAMAGED, rule.groggy_sec);
+
+		const float lift = GetChestLift();
+		AddDamageText(m_pos, lift + 46.f, L"그로기", DAMAGE_STYLE_BANNER_GOOD);
+		AddSlowMotion(0.45f, 0.3f);
+		AddShake(0.4f);
+		AddScreenFlash(1.f, 0.85f, 0.4f, 0.3f);
+		SpawnRing(m_pos, 2.6f, 1.8f, 1.3f, 0.5f, 0.7f);
+		PlaySfxAt(SFX_GUARD_BREAK, m_pos, 1.f);
+
+		std::cout << "[ Monster - EnterGroggy ] : kind " << m_kind << " hp " << m_hp << "\n";
+	}
+
+	// 게이지 줄이기와 페이즈 넘기기. 페이즈는 체력으로만 앞으로 간다 ( 리쉬로 차도 안 돌아간다 )
+	void Monster::UpdateBossRule(float delta_seconds)
+	{
+		if (IsEliteBoss() == false)
+		{
+			return;
+		}
+
+		const BossRuleData& rule = m_data->boss;
+
+		if (m_groggy_timer > 0.f)
+		{
+			m_groggy_timer = CountDown(m_groggy_timer, delta_seconds);
+		}
+		else if (m_stagger_regen_delay > 0.f)
+		{
+			m_stagger_regen_delay = CountDown(m_stagger_regen_delay, delta_seconds);
+		}
+		else
+		{
+			m_stagger = std::max(0.f, m_stagger - rule.stagger_regen_per_sec * delta_seconds);
+		}
+
+		const float hp_ratio = GetHpRatio();
+		int32 phase = m_phase;
+		for (size_t index = static_cast<size_t>(m_phase) + 1; index < rule.phases.size(); ++index)
+		{
+			if (hp_ratio <= rule.phases[index].hp_ratio)
+			{
+				phase = static_cast<int32>(index);
+			}
+		}
+
+		if (phase == m_phase)
+		{
+			return;
+		}
+
+		m_phase = phase;
+		m_pattern.clear();
+
+		const BossPhase& next = rule.phases[static_cast<size_t>(phase)];
+		if (next.name.empty() == false)
+		{
+			// 포효. 잠깐 슈퍼아머로 서서 다음 패턴이 바뀐다는 걸 알린다
+			const float lift = GetChestLift();
+			AddDamageText(m_pos, lift + 56.f, next.name, DAMAGE_STYLE_BANNER_BAD);
+			AddShake(0.45f);
+			AddScreenFlash(0.6f, 0.05f, 0.1f, 0.3f);
+			SpawnRing(m_pos, 3.4f, 1.6f, 0.2f, 0.4f, 0.8f);
+			PlaySfxAt(SFX_DANGER, m_pos, 1.f);
+			m_super_armor_timer = std::max(m_super_armor_timer, 1.2f);
+		}
+
+		std::cout << "[ Monster - UpdateBossRule ] : kind " << m_kind << " phase " << phase << "\n";
+	}
+
+	// 페이즈 패턴에서 다음 기술. 패턴 안의 기술은 쿨을 안 본다 - 같은 기술을 두 번 잇는 패턴도 있다
+	bool Monster::SelectPatternSkill()
+	{
+		const std::vector<BossPhase>& phases = m_data->boss.phases;
+		if (phases.empty())
+		{
+			return false;
+		}
+
+		const BossPhase& phase = phases[static_cast<size_t>(std::min(m_phase, static_cast<int32>(phases.size()) - 1))];
+		if (phase.patterns.empty())
+		{
+			return false;
+		}
+
+		if (m_pattern_step >= m_pattern.size())
+		{
+			m_pattern = phase.patterns[static_cast<size_t>(RollInt(0, static_cast<int32>(phase.patterns.size()) - 1))];
+			m_pattern_step = 0;
+		}
+
+		const SkillData& skill = GetSkillData(m_pattern[m_pattern_step]);
+		m_pattern_step += 1;
+
+		if (skill.skill_id == SKILL_ID_NONE)
+		{
+			return false;
+		}
+
+		m_selected_skill = &skill;
+		return true;
 	}
 
 	float Monster::GetHitReactCool() const
@@ -456,6 +628,13 @@ namespace
 	{
 		const GameConfig& config = GetConfig();
 		const SkillData& skill = *hit.skill;
+
+		// 엘리트 보스는 맞아도 안 끊긴다. 대신 게이지가 차고, 다 차면 그로기로 크게 끊긴다
+		if (IsEliteBoss() && m_groggy_timer <= 0.f)
+		{
+			AddStagger(m_data->boss.stagger_per_hit);
+			return;
+		}
 
 		const bool stunned = m_stun_timer > 0.f;
 		const bool cooling = m_hit_react_cool > 0.f && GetHitReactCool() > 0.f;
@@ -586,6 +765,10 @@ namespace
 		m_ai = AI_CHASE;
 
 		m_hurt_shake = 0.25f;
+
+		// 패링은 게이지를 크게 채운다. 패턴은 끊기고 다음에 새로 고른다
+		m_pattern.clear();
+		AddStagger(m_data->boss.stagger_per_parry);
 	}
 
 	void Monster::OnWindowCheck(const HitInfo& hit)
@@ -704,6 +887,11 @@ namespace
 			return;
 		}
 
+		if (IsEliteBoss() && SelectPatternSkill())
+		{
+			return;
+		}
+
 		// 쿨이 돈 것 중 무작위 ( 서버 RANDOM 정책 )
 		std::vector<int32> ready;
 		for (const OwnedSkill& owned : m_skills)
@@ -773,13 +961,25 @@ namespace
 		m_ai = AI_ATTACK;
 
 		// 보스는 휘두르는 동안 맞아도 안 끊긴다. 패링만 끊는다
-		if (m_grade == GRADE_BOSS)
+		if (m_grade == GRADE_BOSS || IsEliteBoss())
 		{
 			m_super_armor_timer = skill.anim.length;
 		}
 
 		// 콤보면 쿨 없이 바로 이어 친다
 		float rest = m_data->attack_cooldown_sec * RollRange(0.8f, 1.2f);
+		if (IsEliteBoss() && m_data->boss.phases.empty() == false)
+		{
+			const BossPhase& phase = m_data->boss.phases[static_cast<size_t>(m_phase)];
+			rest *= phase.attack_cooldown_rate;
+
+			// 패턴 안에서는 거의 쉬지 않고 잇는다. 연속 공격을 패링으로 받아 내는 맛이 여기서 난다
+			if (m_pattern_step < m_pattern.size())
+			{
+				rest = m_data->boss.pattern_chain_sec;
+			}
+		}
+
 		m_combo_next_skill = skill.combo_next_skill_id;
 		if (m_combo_next_skill != SKILL_ID_NONE)
 		{
@@ -984,6 +1184,11 @@ namespace
 		{
 			m_hp = m_stat.max_hp;
 			m_super_armor_timer = 0.f;
+
+			// 다 차서 돌아왔으면 엘리트 보스도 처음 페이즈부터
+			m_phase = 0;
+			m_pattern.clear();
+			m_stagger = 0.f;
 			m_ai = AI_PATROL;
 			m_has_patrol_dest = false;
 			return;
@@ -1158,6 +1363,7 @@ namespace
 		m_next_attack_timer = CountDown(m_next_attack_timer, delta_seconds);
 
 		TickCombat(delta_seconds);
+		UpdateBossRule(delta_seconds);
 
 		if (IsDead())
 		{
@@ -1269,9 +1475,11 @@ namespace
 				rim_b = 0.85f;
 			}
 
+			// 테도 그림 도트 하나 두께. 키운 그림이면 그만큼 두껍다
+			const float rim = unit * m_art_scale;
 			for (const std::array<float, 2>& offset : SHADOW_RIM_OFFSETS)
 			{
-				DrawSheetFrame(renderer, m_sheet, m_frame, body_x + offset[0] * unit, foot.y + offset[1] * unit, rim_r, rim_g, rim_b, 0.8f * alpha, 2.f);
+				DrawSheetFrameScaled(renderer, m_sheet, m_frame, body_x + offset[0] * rim, foot.y + offset[1] * rim, m_art_scale, rim_r, rim_g, rim_b, 0.8f * alpha, 2.f);
 			}
 
 			r = 0.24f * glow;
@@ -1279,7 +1487,7 @@ namespace
 			b = 0.34f * glow;
 		}
 
-		DrawSheetFrame(renderer, m_sheet, m_frame, body_x, foot.y, r, g, b, alpha, flash);
+		DrawSheetFrameScaled(renderer, m_sheet, m_frame, body_x, foot.y, m_art_scale, r, g, b, alpha, flash);
 
 		if (IsDead())
 		{
@@ -1631,7 +1839,7 @@ bool GetFocusMonster(MonsterFocus* focus)
 	}
 
 	Monster* monster = GetMonsterAt(g_focus_index);
-	if (monster == nullptr || monster->m_grade == GRADE_BOSS)
+	if (monster == nullptr || monster->m_grade == GRADE_BOSS || monster->IsEliteBoss())
 	{
 		return false;
 	}
@@ -1649,6 +1857,84 @@ bool GetFocusMonster(MonsterFocus* focus)
 	focus->is_groggy = monster->m_action == ACTION_ATTACK_INTERRUPTED || monster->m_stun_timer > 0.f;
 
 	return true;
+}
+
+bool GetBossBar(BossBarInfo* info)
+{
+	const WorldPos player = GetPlayerPos();
+	const Monster* best = nullptr;
+	float best_distance = 18.f;
+
+	for (const std::unique_ptr<Monster>& monster : g_monsters)
+	{
+		if (monster->IsDead() || monster->m_in_world == false)
+		{
+			continue;
+		}
+
+		if (monster->m_grade != GRADE_BOSS && monster->IsEliteBoss() == false)
+		{
+			continue;
+		}
+
+		// 싸우는 중일 때만 막대를 띄운다
+		if (monster->m_ai == AI_PATROL || monster->m_target != TARGET_PLAYER)
+		{
+			continue;
+		}
+
+		const float distance = DistanceBetween(player, monster->m_pos);
+		if (distance < best_distance)
+		{
+			best = monster.get();
+			best_distance = distance;
+		}
+	}
+
+	if (best == nullptr)
+	{
+		return false;
+	}
+
+	info->name = best->m_data->name;
+	info->level = best->m_level;
+	info->hp_ratio = best->GetHpRatio();
+	info->has_stagger = best->IsEliteBoss();
+	info->is_groggy = best->m_groggy_timer > 0.f || best->m_action == ACTION_ATTACK_INTERRUPTED;
+	info->phase_name.clear();
+
+	if (best->IsEliteBoss())
+	{
+		const BossRuleData& rule = best->m_data->boss;
+		info->stagger_ratio = best->m_stagger / std::max(rule.stagger_max, 1.f);
+
+		if (best->m_phase > 0 && best->m_phase < static_cast<int32>(rule.phases.size()))
+		{
+			info->phase_name = rule.phases[static_cast<size_t>(best->m_phase)].name;
+		}
+
+		if (best->m_groggy_timer > 0.f)
+		{
+			info->stagger_ratio = best->m_groggy_timer / std::max(rule.groggy_sec, 0.1f);
+		}
+	}
+
+	return true;
+}
+
+bool GetEliteBossHome(WorldPos* pos, std::wstring* name)
+{
+	for (const std::unique_ptr<Monster>& monster : g_monsters)
+	{
+		if (monster->IsEliteBoss())
+		{
+			*pos = monster->m_home;
+			*name = monster->m_data->name;
+			return true;
+		}
+	}
+
+	return false;
 }
 
 int32 GetMonsterCount()

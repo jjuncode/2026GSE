@@ -1166,6 +1166,85 @@ void UpdateAutoTest(float real_seconds)
 		return;
 	}
 
+	if (g_mode == "boss")
+	{
+		// 기사단장 앞에서 패링 · 평타로 게이지를 채워 그로기, 체력 반에서 분노 페이즈를 본다
+		Player& player = MutablePlayer();
+		static bool s_groggy_seen = false;
+		static std::wstring s_phase_seen;
+
+		if (g_spawn_stage == 0 && g_time >= 0.5f)
+		{
+			g_spawn_stage = 1;
+			UseBagItem(0);
+			player.AddExp(5000);
+			for (int32 skill_id : { 106, 107, 108, 109 })
+			{
+				player.TryUnlockSkill(skill_id);
+			}
+
+			WorldPos home;
+			std::wstring name;
+			if (GetEliteBossHome(&home, &name))
+			{
+				MoveWorldPos(&home, 3.f, 0.f);
+				PlacePlayer(home);
+			}
+		}
+
+		if (g_spawn_stage == 1 && g_time >= 0.8f)
+		{
+			// 시험이 죽음으로 끊기지 않게 버틴다. 때리는 힘은 페이즈를 보려고 키운다
+			player.m_stat.max_hp = 99999;
+			player.m_hp = 99999;
+			player.m_stat.attack = 70;
+		}
+
+		if (g_time >= 1.f && g_time < 40.f)
+		{
+			UpdateCombat(real_seconds);
+
+			float distance = 0.f;
+			Creature* boss = FindNearestMonster(&distance);
+			if (boss != nullptr && distance < 2.6f && boss->IsAttacking() == false && player.m_action == ACTION_NORMAL)
+			{
+				PressPlayerAttack();
+			}
+		}
+
+		BossBarInfo bar;
+		const bool has_bar = GetBossBar(&bar);
+		if (has_bar && bar.is_groggy && s_groggy_seen == false)
+		{
+			s_groggy_seen = true;
+			Capture("boss_groggy");
+		}
+
+		if (has_bar && bar.phase_name.empty() == false && s_phase_seen.empty())
+		{
+			s_phase_seen = bar.phase_name;
+			Capture("boss_phase");
+		}
+
+		g_log_timer -= real_seconds;
+		if (g_log_timer <= 0.f)
+		{
+			g_log_timer = 1.f;
+			std::cout << "[ AutoTest ] : t " << g_time << " bar " << has_bar << " hp " << bar.hp_ratio << " stagger " << bar.stagger_ratio
+				<< " groggy " << bar.is_groggy << " phase " << (bar.phase_name.empty() ? 0 : 1) << " parry " << g_parry_count << "\n";
+		}
+
+		g_gallery_timer -= real_seconds;
+		if (g_time > 2.f && g_gallery_timer <= 0.f)
+		{
+			g_gallery_timer = 3.f;
+			Capture("boss_" + std::to_string(g_gallery_count));
+			g_gallery_count += 1;
+		}
+
+		return;
+	}
+
 	if (g_mode == "shadow")
 	{
 		// 그림자 다섯과 견줄 타락자 하나를 세운다. 마을 안이라 덤비지 않고 서 있는다
