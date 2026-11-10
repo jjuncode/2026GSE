@@ -1174,6 +1174,35 @@ void UpdateAutoTest(float real_seconds)
 		return;
 	}
 
+	if (g_mode == "death")
+	{
+		// 경험치를 조금 쌓고 죽어 본다. 그 레벨에서 쌓은 만큼 잃어야 한다
+		Player& player = MutablePlayer();
+		const auto crossed = [](float mark)
+		{
+			return g_time - FIXED_STEP_SECONDS < mark && g_time >= mark;
+		};
+
+		if (crossed(0.5f))
+		{
+			player.AddExp(180);
+			std::cout << "[ AutoTest ] : before death lv " << player.m_level << " exp " << player.m_exp << "\n";
+		}
+
+		if (crossed(1.0f))
+		{
+			DamagePlayer(99999);
+		}
+
+		if (crossed(1.6f))
+		{
+			Capture("death");
+			std::cout << "[ AutoTest ] : after death lv " << player.m_level << " exp " << player.m_exp << " dead " << IsPlayerDead() << "\n";
+		}
+
+		return;
+	}
+
 	if (g_mode == "raid")
 	{
 		// 골드로 올리고 망국의 옥좌를 드러내 들어가, 자동 패링 + 평타로 군단장 페이즈 셋과 그로기를 본다

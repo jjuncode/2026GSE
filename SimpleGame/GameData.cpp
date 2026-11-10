@@ -397,6 +397,7 @@ namespace
 		config.player_interrupted_sec = ReadFloat(player, "interrupted_sec", config.player_interrupted_sec);
 		config.player_move_speed = CmToTile(ReadFloat(player, "move_speed", 600.f));
 		config.player_respawn_sec = ReadFloat(player, "respawn_sec", config.player_respawn_sec);
+		config.player_death_exp_loss_rate = ReadFloat(player, "death_exp_loss_rate", config.player_death_exp_loss_rate);
 		config.level_up_stat_point = ReadInt(player, "level_up_stat_point", config.level_up_stat_point);
 		config.level_up_skill_point = ReadInt(player, "level_up_skill_point", config.level_up_skill_point);
 		config.inventory_slot_count = ReadInt(player, "inventory_slot_count", config.inventory_slot_count);

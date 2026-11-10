@@ -10,3 +10,6 @@ void ToggleKeyHelp();
 
 // 패링으로 공격 스킬 쿨이 깎였다. 그 칸들이 잠깐 번쩍인다
 void NotifyCooldownCut();
+
+// 죽어서 잃은 경험치. 쓰러진 화면에 띄운다
+void NotifyExpLost(int32 amount);

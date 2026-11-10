@@ -415,6 +415,7 @@ struct GameConfig
 	float player_interrupted_sec = 1.f;
 	float player_move_speed = 4.f;
 	float player_respawn_sec = 2.f;
+	float player_death_exp_loss_rate = 1.f;	// 죽으면 이 레벨에서 쌓은 경험치를 이만큼 잃는다
 	int32 level_up_stat_point = 3;
 	int32 level_up_skill_point = 1;
 	int32 inventory_slot_count = 20;

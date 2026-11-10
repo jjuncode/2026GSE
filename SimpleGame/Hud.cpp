@@ -60,6 +60,7 @@ namespace
 	float g_hp_lag = 1.f;	// 맞은 뒤 잠깐 남는 체력 잔상
 	bool g_show_help = false;
 	float g_cooldown_cut_timer = 0.f;
+	int32 g_exp_lost = 0;
 
 	const float COOLDOWN_CUT_GLOW_SEC = 0.45f;
 
@@ -468,6 +469,11 @@ namespace
 		renderer->DrawSolidBox(0.f, 0.f, static_cast<float>(WINDOW_SIZE_X), static_cast<float>(WINDOW_SIZE_Y), 0.08f, 0.f, 0.f, 0.45f);
 		DrawStringOutline(renderer, L"쓰러졌다", 0.f, 70.f, TEXT_ALIGN_CENTER, 2, 0.9f, 0.25f, 0.2f, 1.f);
 		DrawStringShadow(renderer, L"성채에서 다시 일어선다", 0.f, 10.f, TEXT_ALIGN_CENTER, 0.8f, 0.72f, 0.65f, 1.f);
+
+		if (g_exp_lost > 0)
+		{
+			DrawStringShadow(renderer, L"경험치 -" + std::to_wstring(g_exp_lost) + L"  ( 이 레벨에서 쌓은 것을 모두 잃었다 )", 0.f, -22.f, TEXT_ALIGN_CENTER, 0.85f, 0.45f, 0.95f, 1.f);
+		}
 	}
 
 	void DrawIntroHint(Renderer* renderer)
@@ -596,4 +602,9 @@ void ToggleKeyHelp()
 void NotifyCooldownCut()
 {
 	g_cooldown_cut_timer = COOLDOWN_CUT_GLOW_SEC;
+}
+
+void NotifyExpLost(int32 amount)
+{
+	g_exp_lost = amount;
 }

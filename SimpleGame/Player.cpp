@@ -7,6 +7,7 @@
 #include "GameConfig.h"
 #include "Hud.h"
 #include "Npc.h"
+#include "Story.h"
 #include "Renderer.h"
 #include "SpriteAtlas.h"
 #include "World.h"
@@ -697,6 +698,15 @@ void Player::OnDeath(Creature* killer)
 {
 	m_respawn_timer = GetConfig().player_respawn_sec;
 	m_guard_held = false;
+
+	// 상시 PK 의 대가 - 이 레벨에서 쌓은 경험치를 잃는다. 레벨은 안 내린다. 튜토리얼의 최강자는 예외
+	if (IsStoryTutorial() == false)
+	{
+		const int32 lost = static_cast<int32>(static_cast<float>(m_exp) * GetConfig().player_death_exp_loss_rate);
+		m_exp -= lost;
+		NotifyExpLost(lost);
+		std::cout << "[ Player - OnDeath ] : exp lost " << lost << "\n";
+	}
 
 	AddShake(0.6f);
 	AddScreenFlash(0.6f, 0.f, 0.f, 0.5f);

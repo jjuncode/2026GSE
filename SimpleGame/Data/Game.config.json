@@ -22,6 +22,7 @@
         "interrupted_sec": 1.0,
         "move_speed": 600.0,
         "respawn_sec": 2.0,
+        "death_exp_loss_rate": 1.0,
         "level_up_stat_point": 3,
         "level_up_skill_point": 1,
         "inventory_slot_count": 20,
