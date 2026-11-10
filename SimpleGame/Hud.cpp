@@ -7,6 +7,7 @@
 #include "NpcHud.h"
 #include "Player.h"
 #include "Profiler.h"
+#include "Quest.h"
 #include "Renderer.h"
 #include "SpriteAtlas.h"
 #include "Text.h"
@@ -506,6 +507,7 @@ void DrawHud(Renderer* renderer)
 	DrawPointBadges(renderer);
 	DrawIntroHint(renderer);
 
+	DrawQuestTracker(renderer, GetSelectedNpc() >= 0);
 	DrawMinimap(renderer, IsAnyWindowOpen() || GetSelectedNpc() >= 0);
 	DrawNpcPanels(renderer, IsAnyWindowOpen());
 

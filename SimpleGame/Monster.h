@@ -74,6 +74,7 @@ struct MonsterReport
 	int32 kind = MONSTER_BLIGHTED;
 	bool is_elite = false;
 	bool is_alive = false;
+	int32 level = 1;
 	bool is_fighting = false;	// 쫓거나 때리는 중
 };
 

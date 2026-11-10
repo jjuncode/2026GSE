@@ -14,6 +14,7 @@
 #include "SpriteAtlas.h"
 #include "Text.h"
 #include "UiDraw.h"
+#include "UiQuestBoard.h"
 #include "UiShop.h"
 #include "Village.h"
 
@@ -76,8 +77,10 @@ namespace
 	const float BOARD_HEIGHT = 600.f;
 	const float BOARD_LINE = 25.f;	// 24 면 굴림 두 줄이 붙는다
 	const float BOARD_CLOSE_RANGE = 4.f;	// 이보다 멀어지면 창을 닫는다
-	constexpr int32 BOARD_TAB_NEWS = 0;
-	constexpr int32 BOARD_TAB_VIEW = 1;
+	constexpr int32 BOARD_TAB_QUEST = 0;	// 플레이어가 게시판을 찾는 이유라 맨 앞
+	constexpr int32 BOARD_TAB_NEWS = 1;
+	constexpr int32 BOARD_TAB_VIEW = 2;
+	constexpr int32 BOARD_TAB_COUNT = 3;
 
 	constexpr int32 DRAG_NONE = 0;
 	constexpr int32 DRAG_BAG = 1;
@@ -1378,7 +1381,18 @@ namespace
 
 	float GetBoardTabX(int32 tab)
 	{
-		return BOARD_X - 110.f + static_cast<float>(tab) * 220.f;
+		return BOARD_X - 220.f + static_cast<float>(tab) * 220.f;
+	}
+
+	BoardRect GetQuestBoardRect()
+	{
+		BoardRect rect;
+		rect.left = BOARD_LEFT + 10.f;
+		rect.right = BOARD_X + BOARD_WIDTH * 0.5f - 10.f;
+		rect.top = BOARD_LIST_TOP;
+		rect.bottom = BOARD_BOTTOM + 20.f;
+
+		return rect;
 	}
 
 	// 띄어쓰기에서 끊어 너비 안에 담는다
@@ -1642,12 +1656,18 @@ namespace
 
 		DrawPanel(renderer, BOARD_X, BOARD_Y, BOARD_WIDTH, BOARD_HEIGHT, std::wstring(GetVillageName(g_board_village)) + L" 게시판  ( F )");
 
-		const std::array<const wchar_t*, 2> tab_names = { L"소식", L"마을 평판" };
+		const std::array<const wchar_t*, BOARD_TAB_COUNT> tab_names = { L"의뢰", L"소식", L"마을 평판" };
 		for (int32 tab = 0; tab < static_cast<int32>(tab_names.size()); ++tab)
 		{
 			const float tab_x = GetBoardTabX(tab);
 			const bool hovered = IsInsideBox(g_mouse_x, g_mouse_y, tab_x, BOARD_TAB_Y, BOARD_TAB_WIDTH, BOARD_BUTTON_HEIGHT);
 			DrawButton(renderer, tab_x, BOARD_TAB_Y, BOARD_TAB_WIDTH, BOARD_BUTTON_HEIGHT, tab_names[static_cast<size_t>(tab)], tab == g_board_tab, hovered);
+		}
+
+		if (g_board_tab == BOARD_TAB_QUEST)
+		{
+			DrawQuestBoardTab(renderer, g_board_village, GetQuestBoardRect(), g_mouse_x, g_mouse_y);
+			return;
 		}
 
 		if (g_board_tab == BOARD_TAB_NEWS)
@@ -1661,7 +1681,7 @@ namespace
 
 	bool HandleBoardDown(float x, float y)
 	{
-		for (int32 tab = BOARD_TAB_NEWS; tab <= BOARD_TAB_VIEW; ++tab)
+		for (int32 tab = 0; tab < BOARD_TAB_COUNT; ++tab)
 		{
 			if (IsInsideBox(x, y, GetBoardTabX(tab), BOARD_TAB_Y, BOARD_TAB_WIDTH, BOARD_BUTTON_HEIGHT) && tab != g_board_tab)
 			{
@@ -1669,6 +1689,11 @@ namespace
 				PlaySfx(SFX_UI_CLICK, 0.5f);
 				return true;
 			}
+		}
+
+		if (g_board_tab == BOARD_TAB_QUEST)
+		{
+			return HandleQuestBoardDown(g_board_village, GetQuestBoardRect(), x, y);
 		}
 
 		if (g_board_tab != BOARD_TAB_NEWS)
@@ -1802,7 +1827,8 @@ void ToggleBoardWindow(int32 village)
 	}
 
 	g_board_village = village;
-	g_board_tab = BOARD_TAB_NEWS;
+	g_board_tab = BOARD_TAB_QUEST;
+	ResetQuestBoardSelection();
 	g_board_first = 0;
 	g_board_next = 0;
 	g_board_page_starts.clear();

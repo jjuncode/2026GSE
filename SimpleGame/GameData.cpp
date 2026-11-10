@@ -35,6 +35,8 @@ namespace
 	std::vector<int32> g_combo_skill_ids;
 	PlayerPreset g_preset;
 	std::array<ShopData, SHOP_KIND_COUNT> g_shops;
+	QuestConfig g_quest_config;
+	std::vector<QuestTemplate> g_quest_templates;
 
 	const std::vector<int32> EMPTY_LINKS;
 
@@ -857,6 +859,129 @@ namespace
 		}
 	}
 
+	int32 ParseQuestTier(const std::string& text)
+	{
+		if (text == "NORMAL")
+		{
+			return QUEST_TIER_NORMAL;
+		}
+
+		if (text == "HARD")
+		{
+			return QUEST_TIER_HARD;
+		}
+
+		if (text == "TRIAL")
+		{
+			return QUEST_TIER_TRIAL;
+		}
+
+		return QUEST_TIER_DAILY;
+	}
+
+	int32 ParseQuestGoal(const std::string& text)
+	{
+		if (text == "ELITE")
+		{
+			return QUEST_GOAL_ELITE;
+		}
+
+		if (text == "DELIVER")
+		{
+			return QUEST_GOAL_DELIVER;
+		}
+
+		if (text == "SCOUT")
+		{
+			return QUEST_GOAL_SCOUT;
+		}
+
+		if (text == "BOSS")
+		{
+			return QUEST_GOAL_BOSS;
+		}
+
+		return QUEST_GOAL_HUNT;
+	}
+
+	// ZoneGen.h 의 SITE_ 번호. GameData 가 구역 헤더를 안 보게 숫자로 둔다
+	int32 ParseSiteKind(const std::string& text)
+	{
+		const std::array<const char*, 6> names = { "TOWN", "GATE", "OUTPOST", "HIDEOUT", "VILLAGE", "LAIR" };
+
+		for (size_t index = 0; index < names.size(); ++index)
+		{
+			if (text == names[index])
+			{
+				return static_cast<int32>(index);
+			}
+		}
+
+		return 2;
+	}
+
+	void LoadQuests()
+	{
+		Json root;
+		if (ReadJson("QuestData.json", &root) == false)
+		{
+			return;
+		}
+
+		QuestConfig& config = g_quest_config;
+		config.board_size = ReadInt(root, "board_size", config.board_size);
+		config.max_active = ReadInt(root, "max_active", config.max_active);
+		config.refresh_sec = ReadFloat(root, "refresh_sec", config.refresh_sec);
+		config.scout_radius = ReadFloat(root, "scout_radius", config.scout_radius);
+
+		if (root.contains("tiers") && root["tiers"].is_array())
+		{
+			for (const Json& tier : root["tiers"])
+			{
+				const int32 index = ParseQuestTier(ReadString(tier, "tier"));
+				config.tier_slots[static_cast<size_t>(index)] = ReadInt(tier, "slots", 0);
+				config.tier_names[static_cast<size_t>(index)] = Utf8ToWide(ReadString(tier, "name"));
+			}
+		}
+
+		if (root.contains("templates") == false || root["templates"].is_array() == false)
+		{
+			return;
+		}
+
+		for (const Json& entry : root["templates"])
+		{
+			QuestTemplate quest;
+			quest.tier = ParseQuestTier(ReadString(entry, "tier"));
+			quest.goal = ParseQuestGoal(ReadString(entry, "goal"));
+			quest.monster_type = ReadInt(entry, "monster", MONSTER_TYPE_NONE);
+			quest.item_id = ReadInt(entry, "item", ITEM_ID_NONE);
+			quest.site_kind = ParseSiteKind(ReadString(entry, "site"));
+			quest.level = ReadInt(entry, "level", 1);
+			quest.level_bonus = ReadInt(entry, "level_bonus", 0);
+			quest.title = Utf8ToWide(ReadString(entry, "title"));
+			quest.desc = Utf8ToWide(ReadString(entry, "desc"));
+
+			const std::vector<int32> count = ReadIntArray(entry, "count");
+			if (count.size() == 2)
+			{
+				quest.count_min = count[0];
+				quest.count_max = std::max(count[0], count[1]);
+			}
+
+			if (entry.contains("reward"))
+			{
+				const Json& reward = entry["reward"];
+				quest.reward.gold = ReadInt(reward, "gold", 0);
+				quest.reward.exp = ReadInt(reward, "exp", 0);
+				quest.reward.trace = ReadInt(reward, "trace", 0);
+				quest.reward.item_id = ReadInt(reward, "item", ITEM_ID_NONE);
+			}
+
+			g_quest_templates.push_back(quest);
+		}
+	}
+
 	// 좌클릭 연타 순서. 입력 이름에서 뽑아야 데이터만 고쳐도 콤보가 바뀐다
 	void BuildComboChain()
 	{
@@ -895,6 +1020,7 @@ bool LoadGameData()
 	LoadSkillTree();
 	LoadPreset();
 	LoadShops();
+	LoadQuests();
 	BuildComboChain();
 
 	if (g_skills.empty() || g_items.empty() || g_monsters.empty())
@@ -963,6 +1089,16 @@ const ShopData& GetShopData(int32 kind)
 	}
 
 	return g_shops[static_cast<size_t>(kind)];
+}
+
+const QuestConfig& GetQuestConfig()
+{
+	return g_quest_config;
+}
+
+const std::vector<QuestTemplate>& GetQuestTemplates()
+{
+	return g_quest_templates;
 }
 
 void BindItemArt()

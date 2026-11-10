@@ -4,6 +4,7 @@
 #include "Npc.h"
 #include "NpcData.h"
 #include "Player.h"
+#include "Quest.h"
 #include "Renderer.h"
 #include "Text.h"
 #include "Village.h"
@@ -282,6 +283,31 @@ void DrawMinimap(Renderer* renderer, bool hidden)
 	renderer->DrawAffine(g_texture, region, quad, 1.f, 1.f, 1.f, 0.92f);
 
 	DrawSiteMarks(renderer);
+
+	// 받은 의뢰가 갈 곳. 안내 중인 것은 크게
+	const std::vector<Quest>& quests = GetActiveQuests();
+	const int32 tracked = GetTrackedQuest();
+	for (size_t index = 0; index < quests.size(); ++index)
+	{
+		WorldPos guide;
+		if (GetQuestGuide(quests[index], &guide) == false)
+		{
+			continue;
+		}
+
+		float mark_x = 0.f;
+		float mark_y = 0.f;
+		ProjectWorld(guide, &mark_x, &mark_y);
+
+		float size = 0.32f;
+		if (static_cast<int32>(index) == tracked)
+		{
+			size = 0.5f;
+		}
+
+		renderer->DrawSolidDiamond(mark_x, mark_y, size + 0.12f, 0.05f, 0.03f, 0.01f, 1.f);
+		renderer->DrawSolidDiamond(mark_x, mark_y, size, 1.f, 0.82f, 0.3f, 1.f);
+	}
 
 	DotContext context;
 	context.renderer = renderer;

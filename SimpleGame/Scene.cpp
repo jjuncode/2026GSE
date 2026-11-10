@@ -20,6 +20,7 @@
 #include "Player.h"
 #include "PostProcess.h"
 #include "Profiler.h"
+#include "Quest.h"
 #include "Renderer.h"
 #include "SceneGraph.h"
 #include "SpriteAtlas.h"
@@ -945,6 +946,9 @@ namespace
 		BuildMinimap(g_zone);
 		BuildMonitorZone(g_zone);
 
+		// 사냥터를 몬스터 자리에서 고르니 몬스터 · 마을 뒤
+		BuildQuests(g_zone);
+
 		std::cout << "[ Scene - BuildZone ] : seed " << seed << " packs " << g_zone.packs.size() << " decor " << g_decor.size() << "\n";
 	}
 }
@@ -1466,6 +1470,7 @@ void UpdateScene(float real_seconds)
 	UpdateMonsters(world_seconds);
 	UpdateNpcs(world_seconds);
 	UpdateDrops(world_seconds);
+	UpdateQuests(real_seconds);
 	UpdateFloatingTexts(real_seconds);
 
 	float flash_r = 0.f;
@@ -1497,6 +1502,7 @@ void DrawScene(Renderer* renderer)
 	DrawMonsterTelegraphs(renderer, camera);
 	DrawFeelGround(renderer, camera);
 	DrawAimMarker(renderer, camera);
+	DrawQuestGround(renderer, camera);
 
 	BeginSceneGraph();
 	AddDecorActors(camera);
@@ -1530,6 +1536,7 @@ void DrawSceneOverlay(Renderer* renderer)
 	DrawBoardPrompt(renderer, camera);
 	DrawShopPrompts(renderer, camera);
 	DrawBossMarker(renderer, camera);
+	DrawQuestOverlay(renderer, camera);
 	DrawFloatingTexts(renderer, camera);
 	DrawVillageBanner(renderer);
 
@@ -1585,6 +1592,8 @@ void Interact()
 	const int32 board = FindBoardInRange(BOARD_RANGE);
 	if (board >= 0)
 	{
+		// 끝낸 의뢰는 게시판 앞에 서는 순간 넘긴다. 보고 단추를 따로 누르게 하면 한 번 더 헤맨다
+		ReportQuestsAt(board);
 		ToggleBoardWindow(board);
 	}
 }

@@ -51,6 +51,7 @@ but WITHOUT ANY WARRANTY.
 #include "GameData.h"
 #include "UiWindows.h"
 #include "Monitor.h"
+#include "Quest.h"
 
 const uint8 KEY_NONE = 0;
 const uint8 KEY_ESCAPE = 27;
@@ -335,6 +336,12 @@ void KeyInput(GLFWwindow* window, uint8 key)
 		case 'O':
 		{
 			ToggleFollowNpc();
+			break;
+		}
+		case 't':
+		case 'T':
+		{
+			CycleTrackedQuest();
 			break;
 		}
 		case 'v':
@@ -664,6 +671,7 @@ int main()
 	std::cout << "V J M       : npc labels / journal / map\n";
 	std::cout << "N G L P     : new zone / blocked overlay / lighting / profiler\n";
 	std::cout << "B           : monitor page in browser\n";
+	std::cout << "T           : next quest guide ( board quests )\n";
 	std::cout << "ESC         : close window, twice to quit\n";
 
 	// 포커스를 잃으면 glfw 가 눌린 키 · 버튼마다 뗌을 보내 준다. 창 밖에서 떼도 눌린 채로 안 남는다

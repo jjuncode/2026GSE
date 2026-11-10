@@ -11,6 +11,7 @@
 #include "Npc.h"
 #include "NpcData.h"
 #include "Player.h"
+#include "Quest.h"
 #include "Renderer.h"
 #include "SceneGraph.h"
 #include "SpriteAtlas.h"
@@ -534,6 +535,7 @@ namespace
 		m_killed_by_player = true;
 
 		GrantKillReward(m_exp, m_level);
+		NotifyQuestKill(m_kind, m_is_elite || m_grade == GRADE_ELITE, m_grade == GRADE_BOSS, m_level);
 
 		const int32 rolls = static_cast<int32>(m_drop_rolls);
 		SpawnRewardDrops(m_pos, m_data->reward, RollInt(m_gold_min, m_gold_max), rolls);
@@ -1784,6 +1786,7 @@ bool GetMonsterReport(int32 index, MonsterReport* report)
 	report->home = monster->m_home;
 	report->kind = monster->m_kind;
 	report->is_elite = monster->m_is_elite;
+	report->level = monster->m_level;
 	report->is_alive = monster->IsDead() == false && monster->m_in_world;
 	report->is_fighting = monster->m_ai == AI_CHASE || monster->m_ai == AI_ATTACK;
 

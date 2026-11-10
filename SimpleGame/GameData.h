@@ -190,6 +190,52 @@ struct ItemData
 	int32 price = 0;	// 상점에서 살 때. 팔 땐 sell_rate 를 곱한다
 };
 
+constexpr int32 QUEST_TIER_DAILY = 0;	// 일일 - 가까운 잡몹 · 납품 · 순찰
+constexpr int32 QUEST_TIER_NORMAL = 1;	// 보상 - 제 레벨 사냥터
+constexpr int32 QUEST_TIER_HARD = 2;	// 고난 - 정예 · 깊은 곳
+constexpr int32 QUEST_TIER_TRIAL = 3;	// 특급 시련 - 보스 · 레벨 위 정예
+constexpr int32 QUEST_TIER_COUNT = 4;
+
+constexpr int32 QUEST_GOAL_HUNT = 0;	// 그 몬스터 N 마리
+constexpr int32 QUEST_GOAL_ELITE = 1;	// 정예 아무거나 N 마리
+constexpr int32 QUEST_GOAL_DELIVER = 2;	// 아이템 N 개를 게시판에 맡긴다
+constexpr int32 QUEST_GOAL_SCOUT = 3;	// 그 거점까지 가 본다
+constexpr int32 QUEST_GOAL_BOSS = 4;
+
+struct QuestReward
+{
+	int32 gold = 0;
+	int32 exp = 0;
+	int32 trace = 0;	// 주문의 흔적
+	int32 item_id = ITEM_ID_NONE;
+};
+
+struct QuestTemplate
+{
+	int32 tier = QUEST_TIER_DAILY;
+	int32 goal = QUEST_GOAL_HUNT;
+	int32 monster_type = MONSTER_TYPE_NONE;	// HUNT · BOSS
+	int32 item_id = ITEM_ID_NONE;	// DELIVER
+	int32 site_kind = 0;	// SCOUT ( SITE_ )
+	int32 count_min = 1;
+	int32 count_max = 1;
+	int32 level = 1;	// 권장 레벨. 사냥 의뢰는 사냥터 몬스터 레벨로 덮는다
+	int32 level_bonus = 0;	// 정예를 이만큼 높은 레벨로 띄운다 ( 쉽게 못 밀게 )
+	QuestReward reward;
+	std::wstring title;
+	std::wstring desc;
+};
+
+struct QuestConfig
+{
+	int32 board_size = 10;
+	int32 max_active = 5;
+	float refresh_sec = 600.f;
+	float scout_radius = 4.f;
+	std::array<int32, QUEST_TIER_COUNT> tier_slots = { 4, 3, 2, 1 };
+	std::array<std::wstring, QUEST_TIER_COUNT> tier_names;
+};
+
 struct ShopData
 {
 	int32 kind = SHOP_GENERAL;
@@ -300,6 +346,8 @@ const MonsterData& GetMonsterData(int32 monster_type);
 const ItemData& GetItemData(int32 item_id);
 const PlayerPreset& GetPlayerPreset();
 const ShopData& GetShopData(int32 kind);
+const QuestConfig& GetQuestConfig();
+const std::vector<QuestTemplate>& GetQuestTemplates();
 
 // 아이템 그림판을 읽은 뒤 부른다. "ext:" 아이콘을 그림 번호로 잇는다
 void BindItemArt();

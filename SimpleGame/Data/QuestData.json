@@ -1,0 +1,242 @@
+{
+  "board_size": 10,
+  "max_active": 5,
+  "refresh_sec": 600.0,
+  "scout_radius": 4.0,
+  "tiers": [
+    {
+      "tier": "DAILY",
+      "name": "일일",
+      "slots": 4
+    },
+    {
+      "tier": "NORMAL",
+      "name": "보상",
+      "slots": 3
+    },
+    {
+      "tier": "HARD",
+      "name": "고난",
+      "slots": 2
+    },
+    {
+      "tier": "TRIAL",
+      "name": "특급 시련",
+      "slots": 1
+    }
+  ],
+  "templates": [
+    {
+      "tier": "DAILY",
+      "goal": "HUNT",
+      "monster": 1,
+      "count": [
+        4,
+        6
+      ],
+      "reward": {
+        "gold": 60,
+        "exp": 80,
+        "trace": 1
+      },
+      "title": "타락자 정리",
+      "desc": "성문 밖을 서성이는 타락자를 처리해 달라. 밤이면 담 밑까지 온다"
+    },
+    {
+      "tier": "DAILY",
+      "goal": "HUNT",
+      "monster": 2,
+      "count": [
+        3,
+        5
+      ],
+      "reward": {
+        "gold": 70,
+        "exp": 90,
+        "trace": 1
+      },
+      "title": "재늑대 사냥",
+      "desc": "들판에서 가축을 무는 재늑대가 늘었다"
+    },
+    {
+      "tier": "DAILY",
+      "goal": "DELIVER",
+      "item": 2,
+      "count": [
+        3,
+        5
+      ],
+      "level": 1,
+      "reward": {
+        "gold": 90,
+        "exp": 40
+      },
+      "title": "주문의 흔적 납품",
+      "desc": "연금술 공방이 흔적을 사들인다. 모아서 게시판에 맡겨라"
+    },
+    {
+      "tier": "DAILY",
+      "goal": "SCOUT",
+      "site": "OUTPOST",
+      "level": 2,
+      "reward": {
+        "gold": 50,
+        "exp": 70
+      },
+      "title": "초소 순찰",
+      "desc": "교역로 초소에 들러 이상이 없는지 보고 와라"
+    },
+    {
+      "tier": "NORMAL",
+      "goal": "HUNT",
+      "monster": 2,
+      "count": [
+        6,
+        9
+      ],
+      "reward": {
+        "gold": 140,
+        "exp": 220,
+        "trace": 2
+      },
+      "title": "들판의 재늑대 무리",
+      "desc": "교역로를 끊는 재늑대 무리를 흩어 놓아라"
+    },
+    {
+      "tier": "NORMAL",
+      "goal": "HUNT",
+      "monster": 3,
+      "count": [
+        1,
+        2
+      ],
+      "reward": {
+        "gold": 220,
+        "exp": 320,
+        "trace": 3
+      },
+      "title": "소거식귀 토벌",
+      "desc": "배가 갈라지는 거식귀. 등 뒤가 급소다"
+    },
+    {
+      "tier": "NORMAL",
+      "goal": "SCOUT",
+      "site": "VILLAGE",
+      "level": 4,
+      "reward": {
+        "gold": 120,
+        "exp": 180,
+        "trace": 1
+      },
+      "title": "폐촌 조사",
+      "desc": "옛 원정대가 남긴 폐촌을 살피고 무덤 수를 세어 와라"
+    },
+    {
+      "tier": "NORMAL",
+      "goal": "SCOUT",
+      "site": "HIDEOUT",
+      "level": 4,
+      "reward": {
+        "gold": 150,
+        "exp": 200,
+        "trace": 2
+      },
+      "title": "약탈자 소굴 정찰",
+      "desc": "소굴에 몇이나 모였는지 멀리서 보고 와라"
+    },
+    {
+      "tier": "NORMAL",
+      "goal": "DELIVER",
+      "item": 2,
+      "count": [
+        8,
+        12
+      ],
+      "level": 3,
+      "reward": {
+        "gold": 260,
+        "exp": 120
+      },
+      "title": "대장간 흔적 주문",
+      "desc": "대장간이 강화용 흔적을 넉넉히 원한다"
+    },
+    {
+      "tier": "HARD",
+      "goal": "ELITE",
+      "count": [
+        1,
+        2
+      ],
+      "reward": {
+        "gold": 400,
+        "exp": 600,
+        "trace": 5
+      },
+      "title": "재불 정예 처치",
+      "desc": "몸에서 재가 타오르는 놈이 나타났다. 혼자라면 패링으로 풀어라"
+    },
+    {
+      "tier": "HARD",
+      "goal": "HUNT",
+      "monster": 3,
+      "count": [
+        3,
+        4
+      ],
+      "reward": {
+        "gold": 450,
+        "exp": 700,
+        "trace": 6
+      },
+      "title": "거식귀 짝 소탕",
+      "desc": "깊은 곳의 거식귀는 짝으로 다닌다"
+    },
+    {
+      "tier": "HARD",
+      "goal": "SCOUT",
+      "site": "LAIR",
+      "level": 8,
+      "reward": {
+        "gold": 300,
+        "exp": 400,
+        "trace": 3
+      },
+      "title": "둥지 정찰",
+      "desc": "성문파쇄자의 둥지를 확인하고 살아서 돌아와라"
+    },
+    {
+      "tier": "TRIAL",
+      "goal": "BOSS",
+      "monster": 4,
+      "count": [
+        1,
+        1
+      ],
+      "reward": {
+        "gold": 1500,
+        "exp": 2500,
+        "trace": 20,
+        "item": 23
+      },
+      "title": "성문파쇄자 토벌",
+      "desc": "깨어난 거인이 성문을 노린다. 못 막는 지면 강타는 피해라"
+    },
+    {
+      "tier": "TRIAL",
+      "goal": "ELITE",
+      "count": [
+        3,
+        3
+      ],
+      "level_bonus": 3,
+      "reward": {
+        "gold": 900,
+        "exp": 1600,
+        "trace": 10,
+        "item": 12
+      },
+      "title": "정예 셋을 혼자",
+      "desc": "권장 레벨보다 높은 정예 셋. 쉽게 밀 수 있는 의뢰가 아니다"
+    }
+  ]
+}

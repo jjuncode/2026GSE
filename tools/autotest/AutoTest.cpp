@@ -8,6 +8,7 @@
 #include "Monster.h"
 #include "NpcData.h"
 #include "Player.h"
+#include "Quest.h"
 #include "Scene.h"
 #include "UiWindows.h"
 #include "Village.h"
@@ -805,6 +806,155 @@ void UpdateAutoTest(float real_seconds)
 		if (crossed(4.3f))
 		{
 			Capture("shop_sold");
+		}
+
+		return;
+	}
+
+	if (g_mode == "quest")
+	{
+		// 성채 게시판에서 의뢰 넷을 받고, 길 안내를 보고, 목표를 채워 보고한다
+		const auto crossed = [](float mark)
+		{
+			return g_time - FIXED_STEP_SECONDS < mark && g_time >= mark;
+		};
+
+		Player& player = MutablePlayer();
+		const auto log_quests = [&player](const char* tag)
+		{
+			std::cout << "[ AutoTest ] : " << tag << " gold " << player.m_gold << " lv " << player.m_level << " exp " << player.m_exp << " active " << GetActiveQuests().size();
+			for (const Quest& quest : GetActiveQuests())
+			{
+				std::cout << " | goal " << quest.goal << " " << quest.progress << "/" << quest.need << " state " << quest.state;
+			}
+
+			std::cout << "\n";
+		};
+
+		const auto click = [](float x, float y)
+		{
+			UiMouseMove(x, y);
+			UiMouseDown(UI_MOUSE_LEFT, x, y);
+			UiMouseUp(UI_MOUSE_LEFT, x, y);
+		};
+
+		if (crossed(0.5f))
+		{
+			WorldPos spot = GetBoardPos(ZONE_CITADEL);
+			MoveWorldPos(&spot, 1.2f, 1.2f);
+			PlacePlayer(spot);
+		}
+
+		if (crossed(1.0f))
+		{
+			Interact();
+		}
+
+		if (crossed(1.2f))
+		{
+			UiMouseMove(-231.f, 174.f - 42.f * 4.f);
+		}
+
+		if (crossed(1.4f))
+		{
+			Capture("quest_board");
+		}
+
+		// 일일 · 보상 · 고난 하나씩과 일일 하나 더
+		const std::array<int32, 4> rows = { 0, 4, 7, 1 };
+		for (size_t index = 0; index < rows.size(); ++index)
+		{
+			const float at = 1.6f + static_cast<float>(index) * 0.3f;
+			if (crossed(at))
+			{
+				click(-231.f, 174.f - 42.f * static_cast<float>(rows[index]));
+			}
+
+			if (crossed(at + 0.15f))
+			{
+				click(211.f, -250.f);
+			}
+		}
+
+		if (crossed(3.0f))
+		{
+			Capture("quest_accepted");
+			log_quests("accepted");
+		}
+
+		if (crossed(3.2f))
+		{
+			CloseTopWindow();
+			UiMouseMove(0.f, 0.f);
+		}
+
+		if (crossed(4.0f))
+		{
+			Capture("quest_guide");
+		}
+
+		if (crossed(4.3f))
+		{
+			ToggleMinimap();
+		}
+
+		if (crossed(4.6f))
+		{
+			Capture("quest_map");
+		}
+
+		if (crossed(4.8f))
+		{
+			ToggleMinimap();
+		}
+
+		// 사냥 목표는 처치 알림을 그대로 흘려 채운다. 처치 경로 자체는 Monster::OnDeath 가 부른다
+		if (crossed(5.0f))
+		{
+			const std::vector<Quest> quests = GetActiveQuests();
+			for (const Quest& quest : quests)
+			{
+				for (int32 count = 0; count < quest.need; ++count)
+				{
+					NotifyQuestKill(quest.target, quest.goal == QUEST_GOAL_ELITE, quest.goal == QUEST_GOAL_BOSS, 99);
+				}
+
+				if (quest.goal == QUEST_GOAL_DELIVER)
+				{
+					GivePlayerItem(quest.target, quest.need);
+				}
+
+				if (quest.goal == QUEST_GOAL_SCOUT)
+				{
+					PlacePlayer(quest.place);
+				}
+			}
+
+			log_quests("filled");
+		}
+
+		if (crossed(5.6f))
+		{
+			Capture("quest_done");
+			log_quests("before report");
+		}
+
+		if (crossed(6.0f))
+		{
+			WorldPos spot = GetBoardPos(ZONE_CITADEL);
+			MoveWorldPos(&spot, 1.2f, 1.2f);
+			PlacePlayer(spot);
+		}
+
+		if (crossed(6.4f))
+		{
+			Interact();
+			log_quests("reported");
+		}
+
+		if (crossed(6.7f))
+		{
+			Capture("quest_reported");
 		}
 
 		return;
