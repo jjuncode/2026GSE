@@ -18,6 +18,7 @@
         "hit_freeze_cool_sec": 0.6,
         "parry_success_sec": 1.0,
         "parry_success_lock_sec": 0.3,
+        "parry_cooldown_cut_sec": 1.5,
         "interrupted_sec": 1.0,
         "move_speed": 600.0,
         "respawn_sec": 2.0,

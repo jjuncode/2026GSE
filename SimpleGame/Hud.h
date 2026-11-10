@@ -7,3 +7,6 @@ void UpdateHud(float real_seconds);
 void DrawHud(Renderer* renderer);
 
 void ToggleKeyHelp();
+
+// 패링으로 공격 스킬 쿨이 깎였다. 그 칸들이 잠깐 번쩍인다
+void NotifyCooldownCut();

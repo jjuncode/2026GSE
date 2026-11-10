@@ -94,6 +94,7 @@ public:
 	float GetSkillCooldown(int32 skill_id) const;
 	void StartCooldown(const SkillData& skill);
 	void ResetCooldownOfType(int32 skill_type);
+	bool ReduceCooldownOfType(int32 skill_type, float seconds);	// 줄인 게 하나라도 있으면 true
 
 	void CastAttack(const SkillData& skill);	// 잠금 + 루트모션 + 히트 창 예약
 	void CancelCast();	// 예약된 히트 창 무효

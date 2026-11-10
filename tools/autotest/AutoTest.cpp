@@ -190,7 +190,8 @@ namespace
 		{
 			g_parry_count += 1;
 			g_parry_capture_timer = 0.03f;
-			std::cout << "[ AutoTest ] : parry " << g_parry_count << " at " << g_time << "\n";
+			std::cout << "[ AutoTest ] : parry " << g_parry_count << " at " << g_time
+				<< " cd Q " << player.GetSkillCooldown(106) << " E " << player.GetSkillCooldown(107) << " R " << player.GetSkillCooldown(108) << "\n";
 		}
 
 		if (player.m_hp < g_last_hp)
@@ -830,7 +831,27 @@ void UpdateAutoTest(float real_seconds)
 	if (g_spawn_stage == 0 && g_time >= 1.f)
 	{
 		g_spawn_stage = 1;
+
+		// 마을 안 표적은 몬스터가 안 노린다 ( 2.27 ). 성문 밖 초소로 나가서 싸운다
+		for (const ZoneSite& site : GetNpcSites())
+		{
+			if (site.kind == SITE_OUTPOST)
+			{
+				PlacePlayer(ZoneTileToWorld(site.tile.x, site.tile.y, 0.5f, 0.5f));
+				break;
+			}
+		}
+
 		SpawnNear(MONSTER_BLIGHTED, 2.4f, 0.f);
+
+		// 패링 쿨 감소를 보려고 Q E R 을 풀어 쿨을 돌려 둔다
+		Player& player = MutablePlayer();
+		player.AddExp(1500);
+		for (int32 skill_id : { 106, 107, 108 })
+		{
+			player.TryUnlockSkill(skill_id);
+			player.StartCooldown(GetSkillData(skill_id));
+		}
 	}
 
 	if (g_spawn_stage == 1 && g_time >= 14.f)

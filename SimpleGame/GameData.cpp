@@ -359,6 +359,7 @@ namespace
 		config.player_hit_freeze_cool_sec = ReadFloat(player, "hit_freeze_cool_sec", config.player_hit_freeze_cool_sec);
 		config.player_parry_success_sec = ReadFloat(player, "parry_success_sec", config.player_parry_success_sec);
 		config.player_parry_success_lock_sec = ReadFloat(player, "parry_success_lock_sec", config.player_parry_success_lock_sec);
+		config.player_parry_cooldown_cut_sec = ReadFloat(player, "parry_cooldown_cut_sec", config.player_parry_cooldown_cut_sec);
 		config.player_interrupted_sec = ReadFloat(player, "interrupted_sec", config.player_interrupted_sec);
 		config.player_move_speed = CmToTile(ReadFloat(player, "move_speed", 600.f));
 		config.player_respawn_sec = ReadFloat(player, "respawn_sec", config.player_respawn_sec);

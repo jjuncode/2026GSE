@@ -5,6 +5,7 @@
 #include "Feel.h"
 #include "FloatingText.h"
 #include "GameConfig.h"
+#include "Hud.h"
 #include "Npc.h"
 #include "Renderer.h"
 #include "SpriteAtlas.h"
@@ -676,6 +677,12 @@ void Player::OnParry(const HitInfo& hit)
 {
 	// 성공하면 패링 쿨이 돈다. 연속 패링이 여기서 나온다
 	ResetCooldownOfType(SKILL_TYPE_PARRY);
+
+	// 공격 스킬 쿨도 깎는다. 막기만 하는 게 아니라 다음 스킬을 앞당기는 공격 수단이 된다
+	if (ReduceCooldownOfType(SKILL_TYPE_ATTACK, GetConfig().player_parry_cooldown_cut_sec))
+	{
+		NotifyCooldownCut();
+	}
 
 	if (hit.attacker != nullptr)
 	{

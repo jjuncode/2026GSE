@@ -214,6 +214,7 @@ struct GameConfig
 	float player_hit_freeze_cool_sec = 0.6f;
 	float player_parry_success_sec = 1.f;
 	float player_parry_success_lock_sec = 0.3f;
+	float player_parry_cooldown_cut_sec = 1.5f;	// 패링 성공마다 도는 공격 스킬 쿨을 깎는다
 	float player_interrupted_sec = 1.f;
 	float player_move_speed = 4.f;
 	float player_respawn_sec = 2.f;

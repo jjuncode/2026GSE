@@ -55,6 +55,9 @@ namespace
 	float g_time = 0.f;
 	float g_hp_lag = 1.f;	// 맞은 뒤 잠깐 남는 체력 잔상
 	bool g_show_help = false;
+	float g_cooldown_cut_timer = 0.f;
+
+	const float COOLDOWN_CUT_GLOW_SEC = 0.45f;
 
 	float GetBottom()
 	{
@@ -225,6 +228,7 @@ namespace
 
 				const float cooldown = player.GetSkillCooldown(slot.skill_id);
 				const float total = GetSkillData(slot.skill_id).cooldown_sec;
+
 				if (owned && cooldown > 0.f && total > 0.f)
 				{
 					// 위에서부터 걷히는 덮개
@@ -235,6 +239,20 @@ namespace
 					{
 						DrawStringOutline(renderer, FormatSeconds(cooldown), x, ACTION_Y + 12.f, TEXT_ALIGN_CENTER, 1, 1.f, 1.f, 1.f, 1.f);
 					}
+				}
+
+				// 패링 보상이 어디로 갔는지 칸에서 보여야 쿨 감소가 읽힌다. 아이콘은 가리지 않게 테두리만
+				if (owned && g_cooldown_cut_timer > 0.f && GetSkillData(slot.skill_id).skill_type == SKILL_TYPE_ATTACK && total > 0.f)
+				{
+					const float glow = g_cooldown_cut_timer / COOLDOWN_CUT_GLOW_SEC;
+					const float outer = UI_SLOT + 10.f;
+					const float thick = 3.f;
+					const float edge = outer * 0.5f - thick * 0.5f;
+
+					renderer->DrawSolidBox(x, ACTION_Y + edge, outer, thick, 0.6f, 1.f, 1.f, glow);
+					renderer->DrawSolidBox(x, ACTION_Y - edge, outer, thick, 0.6f, 1.f, 1.f, glow);
+					renderer->DrawSolidBox(x + edge, ACTION_Y, thick, outer, 0.6f, 1.f, 1.f, glow);
+					renderer->DrawSolidBox(x - edge, ACTION_Y, thick, outer, 0.6f, 1.f, 1.f, glow);
 				}
 
 				if (owned == false)
@@ -454,6 +472,7 @@ namespace
 void UpdateHud(float real_seconds)
 {
 	g_time += real_seconds;
+	g_cooldown_cut_timer = std::max(0.f, g_cooldown_cut_timer - real_seconds);
 
 	const float ratio = GetPlayer().GetHpRatio();
 	if (g_hp_lag < ratio)
@@ -494,4 +513,9 @@ void DrawHud(Renderer* renderer)
 void ToggleKeyHelp()
 {
 	g_show_help = !g_show_help;
+}
+
+void NotifyCooldownCut()
+{
+	g_cooldown_cut_timer = COOLDOWN_CUT_GLOW_SEC;
 }

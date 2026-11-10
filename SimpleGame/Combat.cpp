@@ -454,6 +454,29 @@ void Creature::ResetCooldownOfType(int32 skill_type)
 	}
 }
 
+bool Creature::ReduceCooldownOfType(int32 skill_type, float seconds)
+{
+	bool reduced = false;
+
+	for (OwnedSkill& owned : m_skills)
+	{
+		if (owned.cooldown <= 0.f)
+		{
+			continue;
+		}
+
+		if (GetSkillData(owned.skill_id).skill_type != skill_type)
+		{
+			continue;
+		}
+
+		owned.cooldown = std::max(0.f, owned.cooldown - seconds);
+		reduced = true;
+	}
+
+	return reduced;
+}
+
 void Creature::CastAttack(const SkillData& skill)
 {
 	SetAction(ACTION_ATTACK_TRY, skill.anim.length);
