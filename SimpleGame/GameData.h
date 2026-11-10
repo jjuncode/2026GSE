@@ -314,6 +314,58 @@ struct InstanceData
 	int32 rank_points = 0;
 };
 
+// 컷신 시간표 한 줄. 종류( type )마다 쓰는 칸이 다르다 - 자리는 시작점( anchor )에서 칸 단위
+struct CineStep
+{
+	float time = 0.f;
+	std::string type;
+	int32 actor = -1;
+	int32 target = -1;	// follow 가 따라붙는 배우
+	std::string sheet;
+	std::string anim;
+	std::string style;	// shadow - 어둡게 물들고 보랏빛 테 / silhouette - 단색 그림자
+	std::string sound;
+	float x = 0.f;
+	float y = 0.f;
+	float face_x = 1.f;
+	float face_y = 0.f;
+	float duration = 0.f;
+	float from = 0.f;
+	float to = 0.f;
+	float scale = 1.f;
+	std::array<float, 3> color = { 1.f, 1.f, 1.f };
+	bool flag = false;	// letterbox · dark 켜기, 등불 들기
+	std::wstring text;
+	std::wstring sub;
+	std::wstring speaker;
+};
+
+struct CinematicData
+{
+	std::string id;
+	std::string anchor;	// citadel_street · player
+	bool hide_player = false;	// 플레이어가 안 나오는 장면
+	float length = 0.f;
+	std::vector<CineStep> steps;
+};
+
+// 메인 퀘스트 한 단계. 받을 때 intro, 넘길 때 outro 를 자막으로 흘리고, cinematic 이 있으면 넘긴 뒤 튼다
+struct StoryStep
+{
+	QuestTemplate quest;
+	std::vector<std::wstring> intro;
+	std::vector<std::wstring> outro;
+	std::string cinematic;
+};
+
+struct StoryConfig
+{
+	bool play_opening = true;
+	int32 tutorial_kills = 4;
+	int32 tutorial_attack_rate = 3;	// 최강자는 세다. 튜토리얼 동안만
+	int32 tutorial_hp_rate = 4;
+};
+
 struct ShopData
 {
 	int32 kind = SHOP_GENERAL;
@@ -428,6 +480,9 @@ const QuestConfig& GetQuestConfig();
 const std::vector<QuestTemplate>& GetQuestTemplates();
 const RankConfig& GetRankConfig();
 const std::vector<InstanceData>& GetInstanceDatas();
+const CinematicData* FindCinematic(const std::string& id);	// 없으면 nullptr
+const std::vector<StoryStep>& GetStorySteps();
+const StoryConfig& GetStoryConfig();
 
 // 아이템 그림판을 읽은 뒤 부른다. "ext:" 아이콘을 그림 번호로 잇는다
 void BindItemArt();

@@ -836,8 +836,9 @@ namespace
 		int32 best_kind = TARGET_NONE;
 		int32 best_npc = -1;
 
-		// 마을 안은 몬스터가 손대지 못하는 곳이다. 마을이 일곱이라 이 규칙 없이는 주민이 경계에서 몰살된다
-		if (IsPlayerDead() == false && GetVillageAt(GetPlayer().m_pos) < 0)
+		// 마을 안은 몬스터가 손대지 못하는 곳이다. 마을이 일곱이라 이 규칙 없이는 주민이 경계에서 몰살된다.
+		// 던전 · 튜토리얼 몬스터는 플레이어만 노리고 이 규칙을 안 따른다 ( 튜토리얼은 성채 광장에서 싸운다 )
+		if (IsPlayerDead() == false && (m_instanced || GetVillageAt(GetPlayer().m_pos) < 0))
 		{
 			const float distance = DistanceBetween(m_pos, GetPlayer().m_pos);
 			if (distance <= best_distance)
@@ -849,7 +850,7 @@ namespace
 
 		int32 npc_index = -1;
 		float npc_distance = 0.f;
-		if (FindNpcForMonster(m_pos, range, &npc_index, &npc_distance) && npc_distance < best_distance)
+		if (m_instanced == false && FindNpcForMonster(m_pos, range, &npc_index, &npc_distance) && npc_distance < best_distance)
 		{
 			best_kind = TARGET_NPC;
 			best_npc = npc_index;
@@ -1043,7 +1044,7 @@ namespace
 	void Monster::UpdateChase(float delta_seconds)
 	{
 		// 리쉬 - 이동보다 먼저 봐야 넘긴 틱에 한 걸음 더 가지 않는다. 마을 경계를 밟아도 물러난다
-		if (IsOverLeash() || GetVillageAt(m_pos) >= 0)
+		if (IsOverLeash() || (m_instanced == false && GetVillageAt(m_pos) >= 0))
 		{
 			m_ai = AI_RETURN;
 			m_target = TARGET_NONE;
@@ -1056,7 +1057,7 @@ namespace
 		float target_radius = 0.f;
 
 		const bool has_target = GetTargetPos(&target_pos, &target_radius);
-		if (has_target == false || DistanceBetween(m_pos, target_pos) > m_data->search_range * LOSE_TARGET_RATE || GetVillageAt(target_pos) >= 0)
+		if (has_target == false || DistanceBetween(m_pos, target_pos) > m_data->search_range * LOSE_TARGET_RATE || (m_instanced == false && GetVillageAt(target_pos) >= 0))
 		{
 			if (SearchTarget() == false)
 			{

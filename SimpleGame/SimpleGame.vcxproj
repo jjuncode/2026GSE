@@ -207,6 +207,8 @@
     <ClInclude Include="Village.h" />
     <ClInclude Include="HouseArt.h" />
     <ClInclude Include="Board.h" />
+    <ClInclude Include="Story.h" />
+    <ClInclude Include="Cinematic.h" />
     <ClInclude Include="Instance.h" />
     <ClInclude Include="Rank.h" />
     <ClInclude Include="UiQuestBoard.h" />
@@ -259,6 +261,8 @@
     <ClCompile Include="Village.cpp" />
     <ClCompile Include="HouseArt.cpp" />
     <ClCompile Include="Board.cpp" />
+    <ClCompile Include="Story.cpp" />
+    <ClCompile Include="Cinematic.cpp" />
     <ClCompile Include="Instance.cpp" />
     <ClCompile Include="Rank.cpp" />
     <ClCompile Include="UiQuestBoard.cpp" />
@@ -294,6 +298,8 @@
     <None Include="Data\AnimationData.json" />
     <None Include="Data\LevelTable.json" />
     <None Include="Data\NewPlayerPreset.json" />
+    <None Include="Data\StoryData.json" />
+    <None Include="Data\CinematicData.json" />
     <None Include="Data\InstanceData.json" />
     <None Include="Data\RankData.json" />
     <None Include="Data\QuestData.json" />

@@ -50,6 +50,7 @@ but WITHOUT ANY WARRANTY.
 #include "FloatingText.h"
 #include "GameData.h"
 #include "UiWindows.h"
+#include "Cinematic.h"
 #include "Monitor.h"
 #include "Quest.h"
 
@@ -189,7 +190,7 @@ void MouseInput(GLFWwindow* window, int32 button, int32 action, int32 mods)
 		return;
 	}
 
-	if (UiMouseDown(button, screen.x, screen.y))
+	if (IsCinematicPlaying() || UiMouseDown(button, screen.x, screen.y))
 	{
 		return;
 	}
@@ -231,6 +232,17 @@ void MouseMotion(GLFWwindow* window, double x, double y)
 void KeyInput(GLFWwindow* window, uint8 key)
 {
 	SetKeyDown(key, true);
+
+	// 컷신 동안은 넘기기만 받는다
+	if (IsCinematicPlaying())
+	{
+		if (key == KEY_ESCAPE || key == KEY_ENTER)
+		{
+			SkipCinematic();
+		}
+
+		return;
+	}
 
 	switch (key)
 	{

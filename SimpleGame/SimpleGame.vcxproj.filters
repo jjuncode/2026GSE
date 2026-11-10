@@ -57,6 +57,12 @@
     <ClInclude Include="Board.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="Story.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Cinematic.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
     <ClInclude Include="Instance.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -228,6 +234,12 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="Board.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Story.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Cinematic.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="Instance.cpp">

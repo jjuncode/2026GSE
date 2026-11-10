@@ -33,6 +33,8 @@ struct Quest
 	int32 level = 1;	// 권장 레벨
 	int32 state = QUEST_STATE_OFFERED;
 	bool is_exam = false;	// 승급 심사. 넘기면 등급이 오른다
+	bool is_story = false;	// 메인 퀘스트. 진행 칸 수에 안 센다
+	int32 story_step = -1;
 	int32 exam_rank = 0;	// 넘기면 오를 등급
 	bool has_place = false;
 	WorldPos place;
@@ -47,6 +49,7 @@ void BuildQuests(const ZoneLayout& layout);
 void UpdateQuests(float real_seconds);
 void NotifyQuestKill(int32 kind, bool is_elite, bool is_boss, int32 level);
 void NotifyQuestInstanceClear(int32 instance);
+void StartStoryQuest(int32 step);	// 메인 퀘스트 그 단계를 받는다. 없으면 아무것도 안 한다
 
 // 게시판
 const std::vector<Quest>& GetBoardQuests(int32 village);

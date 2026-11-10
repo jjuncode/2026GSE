@@ -7,8 +7,10 @@
 #include "NpcHud.h"
 #include "Player.h"
 #include "Profiler.h"
+#include "Cinematic.h"
 #include "Quest.h"
 #include "Rank.h"
+#include "Story.h"
 #include "Renderer.h"
 #include "SpriteAtlas.h"
 #include "Text.h"
@@ -549,6 +551,14 @@ void DrawHud(Renderer* renderer)
 {
 	BeginProfileStage(PROFILE_STAGE_HUD);
 
+	// 컷신 동안은 레터박스 · 자막만
+	if (IsCinematicPlaying())
+	{
+		DrawCinematicOverlay(renderer);
+		EndProfileStage();
+		return;
+	}
+
 	DrawLowHpEdge(renderer);
 	DrawFocus(renderer);
 	DrawHpBar(renderer);
@@ -565,9 +575,15 @@ void DrawHud(Renderer* renderer)
 	DrawWorldMap(renderer);
 	DrawNpcPanels(renderer, IsAnyWindowOpen());
 
+	DrawStoryOverlay(renderer);
+	DrawNarration(renderer);
+
 	DrawKeyHelp(renderer);
 	DrawUiWindows(renderer);
 	DrawDeathOverlay(renderer);
+
+	// 컷신이 끝나며 걷히는 암전 · 레터박스
+	DrawCinematicOverlay(renderer);
 
 	EndProfileStage();
 }

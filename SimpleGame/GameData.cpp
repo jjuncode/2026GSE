@@ -39,6 +39,9 @@ namespace
 	std::vector<QuestTemplate> g_quest_templates;
 	RankConfig g_rank_config;
 	std::vector<InstanceData> g_instances;
+	std::vector<CinematicData> g_cinematics;
+	std::vector<StoryStep> g_story_steps;
+	StoryConfig g_story_config;
 
 	const std::vector<int32> EMPTY_LINKS;
 
@@ -1132,6 +1135,123 @@ namespace
 		}
 	}
 
+	std::array<float, 3> ReadColor(const Json& node, const char* key, const std::array<float, 3>& fallback)
+	{
+		if (node.contains(key) == false || node[key].is_array() == false || node[key].size() != 3)
+		{
+			return fallback;
+		}
+
+		std::array<float, 3> color = fallback;
+		for (size_t index = 0; index < 3; ++index)
+		{
+			color[index] = node[key][index].get<float>();
+		}
+
+		return color;
+	}
+
+	std::vector<std::wstring> ReadWideArray(const Json& node, const char* key)
+	{
+		std::vector<std::wstring> lines;
+		if (node.contains(key) == false || node[key].is_array() == false)
+		{
+			return lines;
+		}
+
+		for (const Json& line : node[key])
+		{
+			lines.push_back(Utf8ToWide(line.get<std::string>()));
+		}
+
+		return lines;
+	}
+
+	void LoadCinematics()
+	{
+		Json root;
+		if (ReadJson("CinematicData.json", &root) == false || root.contains("cinematics") == false)
+		{
+			return;
+		}
+
+		for (const Json& entry : root["cinematics"])
+		{
+			CinematicData cinematic;
+			cinematic.id = ReadString(entry, "id");
+			cinematic.anchor = ReadString(entry, "anchor");
+			cinematic.hide_player = entry.value("hide_player", false);
+
+			for (const Json& step_node : entry["steps"])
+			{
+				CineStep step;
+				step.time = ReadFloat(step_node, "t", 0.f);
+				step.type = ReadString(step_node, "type");
+				step.actor = ReadInt(step_node, "actor", -1);
+				step.target = ReadInt(step_node, "target", -1);
+				step.sheet = ReadString(step_node, "sheet");
+				step.anim = ReadString(step_node, "anim");
+				step.style = ReadString(step_node, "style");
+				step.sound = ReadString(step_node, "sound");
+				step.x = ReadFloat(step_node, "x", 0.f);
+				step.y = ReadFloat(step_node, "y", 0.f);
+				step.duration = ReadFloat(step_node, "dur", 0.f);
+				step.from = ReadFloat(step_node, "from", 0.f);
+				step.to = ReadFloat(step_node, "to", 1.f);	// spawn 의 처음 투명도도 이 칸. 안 적으면 다 보인다
+				step.scale = ReadFloat(step_node, "scale", 1.f);
+				step.color = ReadColor(step_node, "color", step.color);
+				step.flag = step_node.value("on", false);
+				step.text = Utf8ToWide(ReadString(step_node, "text"));
+				step.sub = Utf8ToWide(ReadString(step_node, "sub"));
+				step.speaker = Utf8ToWide(ReadString(step_node, "speaker"));
+
+				const std::array<float, 3> face = ReadColor(step_node, "face", { 1.f, 0.f, 0.f });
+				step.face_x = face[0];
+				step.face_y = face[1];
+
+				cinematic.length = std::max(cinematic.length, step.time + step.duration);
+				cinematic.steps.push_back(step);
+			}
+
+			std::sort(cinematic.steps.begin(), cinematic.steps.end(),
+				[](const CineStep& left, const CineStep& right)
+				{
+					return left.time < right.time;
+				});
+
+			g_cinematics.push_back(cinematic);
+		}
+	}
+
+	void LoadStory()
+	{
+		Json root;
+		if (ReadJson("StoryData.json", &root) == false)
+		{
+			return;
+		}
+
+		g_story_config.play_opening = root.value("play_opening", true);
+		g_story_config.tutorial_kills = ReadInt(root, "tutorial_kills", g_story_config.tutorial_kills);
+		g_story_config.tutorial_attack_rate = ReadInt(root, "tutorial_attack_rate", g_story_config.tutorial_attack_rate);
+		g_story_config.tutorial_hp_rate = ReadInt(root, "tutorial_hp_rate", g_story_config.tutorial_hp_rate);
+
+		if (root.contains("steps") == false || root["steps"].is_array() == false)
+		{
+			return;
+		}
+
+		for (const Json& entry : root["steps"])
+		{
+			StoryStep step;
+			step.quest = ReadQuestTemplate(entry);
+			step.intro = ReadWideArray(entry, "intro");
+			step.outro = ReadWideArray(entry, "outro");
+			step.cinematic = ReadString(entry, "cinematic");
+			g_story_steps.push_back(step);
+		}
+	}
+
 	void LoadRanks()
 	{
 		Json root;
@@ -1228,6 +1348,8 @@ bool LoadGameData()
 	LoadQuests();
 	LoadRanks();
 	LoadInstances();
+	LoadCinematics();
+	LoadStory();
 	BuildComboChain();
 
 	if (g_skills.empty() || g_items.empty() || g_monsters.empty())
@@ -1316,6 +1438,29 @@ const RankConfig& GetRankConfig()
 const std::vector<InstanceData>& GetInstanceDatas()
 {
 	return g_instances;
+}
+
+const CinematicData* FindCinematic(const std::string& id)
+{
+	for (const CinematicData& cinematic : g_cinematics)
+	{
+		if (cinematic.id == id)
+		{
+			return &cinematic;
+		}
+	}
+
+	return nullptr;
+}
+
+const std::vector<StoryStep>& GetStorySteps()
+{
+	return g_story_steps;
+}
+
+const StoryConfig& GetStoryConfig()
+{
+	return g_story_config;
 }
 
 void BindItemArt()

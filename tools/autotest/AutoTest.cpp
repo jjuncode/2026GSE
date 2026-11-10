@@ -12,6 +12,7 @@
 #include "Quest.h"
 #include "Rank.h"
 #include "Scene.h"
+#include "Story.h"
 #include "UiWindows.h"
 #include "Village.h"
 #include "World.h"
@@ -600,6 +601,12 @@ void InitAutoTest()
 	g_mode = mode;
 	free(mode);
 	std::cout << "[ AutoTest ] : mode " << g_mode << "\n";
+
+	// 시작 컷신 · 튜토리얼은 story 모드에서만 본다. 나머지 시험은 바로 지금으로
+	if (g_mode != "story")
+	{
+		SkipStoryOpening();
+	}
 }
 
 bool IsAutoTestOn()
@@ -1162,6 +1169,55 @@ void UpdateAutoTest(float real_seconds)
 			{
 				CloseTopWindow();
 			}
+		}
+
+		return;
+	}
+
+	if (g_mode == "story")
+	{
+		// 시작 컷신을 그대로 보고, 튜토리얼은 자동 전투로 넘기고, 최강자의 죽음과 메인 퀘스트까지
+		Player& player = MutablePlayer();
+
+		if (IsStoryTutorial())
+		{
+			UpdateCombat(real_seconds);
+
+			float distance = 0.f;
+			Creature* target = FindNearestMonster(&distance);
+			if (target != nullptr && distance > 1.8f && distance < 12.f && player.m_action == ACTION_NORMAL)
+			{
+				const float delta_x = GetTileDistanceX(player.m_pos, target->m_pos);
+				const float delta_y = GetTileDistanceY(player.m_pos, target->m_pos);
+				SetPlayerMoveInput(delta_x - delta_y, -(delta_x + delta_y) * 0.5f);
+			}
+			else if (target != nullptr && distance <= 2.4f && target->IsAttacking() == false && player.m_action == ACTION_NORMAL)
+			{
+				PressPlayerAttack();
+			}
+		}
+
+		// 지금으로 넘어온 뒤엔 메인 퀘스트 다섯째 단계를 넘긴 것처럼 흘려 군단장 암시 컷신을 본다
+		static bool s_hint_started = false;
+		if (s_hint_started == false && GetActiveQuests().empty() == false && g_time > 92.f)
+		{
+			s_hint_started = true;
+			OnStoryStepReported(4);
+		}
+
+		g_gallery_timer -= real_seconds;
+		if (g_gallery_timer <= 0.f)
+		{
+			g_gallery_timer = 2.5f;
+			Capture("story_" + std::to_string(static_cast<int32>(g_time * 10.f)));
+		}
+
+		g_log_timer -= real_seconds;
+		if (g_log_timer <= 0.f)
+		{
+			g_log_timer = 2.f;
+			std::cout << "[ AutoTest ] : t " << g_time << " tutorial " << IsStoryTutorial() << " hp " << player.m_hp << " / " << player.m_stat.max_hp
+				<< " atk " << player.m_stat.attack << " quests " << GetActiveQuests().size() << "\n";
 		}
 
 		return;

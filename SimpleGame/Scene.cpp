@@ -4,6 +4,7 @@
 #include "Audio.h"
 #include "Balance.h"
 #include "Board.h"
+#include "Cinematic.h"
 #include "Drop.h"
 #include "Feel.h"
 #include "FloatingText.h"
@@ -25,6 +26,7 @@
 #include "Renderer.h"
 #include "SceneGraph.h"
 #include "SpriteAtlas.h"
+#include "Story.h"
 #include "Text.h"
 #include "UiWindows.h"
 #include "Village.h"
@@ -970,6 +972,28 @@ namespace
 		}
 	}
 
+	// 시작 컷신 무대. 성채 광장에서 조금 떨어진 등불 곁 - 경비대가 등불을 들고 도는 거리
+	WorldPos PickStreetAnchor()
+	{
+		for (const ZoneTile& lamp : g_zone.lamps)
+		{
+			if (GetZoneVillageAt(g_zone, lamp.x, lamp.y) != ZONE_CITADEL)
+			{
+				continue;
+			}
+
+			const float delta_x = static_cast<float>(lamp.x - g_zone.center.x);
+			const float delta_y = static_cast<float>(lamp.y - g_zone.center.y);
+			const float distance = std::sqrt(delta_x * delta_x + delta_y * delta_y);
+			if (distance >= 10.f && distance <= 20.f)
+			{
+				return ZoneTileToWorld(lamp.x, lamp.y, 0.5f, 1.5f);
+			}
+		}
+
+		return ZoneTileToWorld(g_zone.center.x + 3, g_zone.center.y + 9, 0.5f, 0.5f);
+	}
+
 	void BuildZone(uint32 seed)
 	{
 		GenerateZone(seed, &g_zone);
@@ -1039,6 +1063,7 @@ namespace
 
 		// 사냥터를 몬스터 자리에서 고르니 몬스터 · 마을 뒤
 		BuildQuests(g_zone);
+		SetCinematicAnchor("citadel_street", PickStreetAnchor());
 
 		std::cout << "[ Scene - BuildZone ] : seed " << seed << " packs " << g_zone.packs.size() << " decor " << g_decor.size() << "\n";
 	}
@@ -1223,7 +1248,8 @@ namespace
 
 	void DrawPlayerSilhouette(Renderer* renderer, const WorldPos& camera)
 	{
-		if (g_player_hidden == false || IsPlayerDead())
+		// 컷신이 플레이어를 숨기면 벽 투시 실루엣도 숨긴다. 지난 프레임 값이 남아 어둠 속에 떠 있었다
+		if (g_player_hidden == false || IsPlayerDead() || IsCinematicHidingPlayer())
 		{
 			return;
 		}
@@ -1535,6 +1561,9 @@ namespace
 void InitScene()
 {
 	BuildZone(MakeRandomSeed());
+
+	// 처음 한 번만. 구역을 새로 만들어도( N ) 이야기는 다시 안 튼다
+	InitStory();
 }
 
 void RegenerateZone()
@@ -1546,6 +1575,23 @@ void UpdateScene(float real_seconds)
 {
 	// 연출은 실제 시간, 판정은 히트스톱이 곱해진 시간. 그래야 세상이 멈춰도 불꽃은 튄다
 	UpdateFeel(real_seconds);
+	UpdateCinematic(real_seconds);
+	UpdateStory(real_seconds);
+
+	// 컷신 동안 세상은 멈춘다. 배우 · 불꽃 · 글자만 돈다
+	if (IsCinematicPlaying())
+	{
+		UpdateFloatingTexts(real_seconds);
+
+		float cine_r = 0.f;
+		float cine_g = 0.f;
+		float cine_b = 0.f;
+		float cine_strength = 0.f;
+		GetScreenFlash(&cine_r, &cine_g, &cine_b, &cine_strength);
+		SetPostEffects(GetZoomPunch(), cine_r, cine_g, cine_b, cine_strength);
+		return;
+	}
+
 	const float world_seconds = real_seconds * GetWorldTimeScale();
 
 	g_fog_scroll += world_seconds * 60.f;
@@ -1596,20 +1642,37 @@ void DrawScene(Renderer* renderer)
 	DrawAimMarker(renderer, camera);
 	DrawQuestGround(renderer, camera);
 	DrawInstanceGround(renderer, camera);
+	DrawCinematicGround(renderer, camera);
 
 	BeginSceneGraph();
-	AddDecorActors(camera);
-	CollectMonsterActors();
-	CollectDropActors();
-	CollectNpcActors();
-	AddSceneActor(&GetPlayer());
+
+	// 어둠이 깔린 장면엔 배우만 남긴다
+	if (IsCinematicHidingWorld() == false)
+	{
+		AddDecorActors(camera);
+		CollectMonsterActors();
+		CollectDropActors();
+		CollectNpcActors();
+	}
+
+	if (IsCinematicHidingPlayer() == false)
+	{
+		AddSceneActor(&GetPlayer());
+	}
+
+	CollectCinematicActors();
 
 	DrawSceneGraph(renderer, camera);
 
 	DrawFeelWorld(renderer, camera);
 	DrawPlayerSilhouette(renderer, camera);
-	DrawNpcArrows(renderer, camera);
-	DrawLightGlows(renderer, camera);
+
+	// 어둠이 깔린 장면엔 등불 빛무리도 숨긴다. 검은 바탕에 흰 점으로 떠 있었다
+	if (IsCinematicHidingWorld() == false)
+	{
+		DrawNpcArrows(renderer, camera);
+		DrawLightGlows(renderer, camera);
+	}
 
 	EndProfileStage();
 
@@ -1621,6 +1684,12 @@ void DrawSceneOverlay(Renderer* renderer)
 	const WorldPos camera = GetCameraPos();
 
 	BeginProfileStage(PROFILE_STAGE_OVERLAY);
+
+	if (IsCinematicPlaying())
+	{
+		EndProfileStage();
+		return;
+	}
 
 	DrawMonsterBars(renderer, camera);
 	DrawNpcOverlay(renderer, camera);
@@ -1642,7 +1711,11 @@ WorldPos GetCameraPos()
 	WorldPos camera = GetPlayer().m_pos;
 
 	WorldPos follow;
-	if (GetFollowPos(&follow))
+	if (GetCinematicCamera(&follow))
+	{
+		camera = follow;
+	}
+	else if (GetFollowPos(&follow))
 	{
 		camera = follow;
 	}

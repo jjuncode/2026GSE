@@ -1,0 +1,1056 @@
+{
+ "cinematics": [
+  {
+   "id": "opening",
+   "anchor": "citadel_street",
+   "hide_player": true,
+   "steps": [
+    {
+     "t": 0.0,
+     "type": "letterbox",
+     "on": true
+    },
+    {
+     "t": 0.0,
+     "type": "fade",
+     "from": 1.0,
+     "to": 0.0,
+     "dur": 2.5,
+     "color": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "t": 0.0,
+     "type": "camera",
+     "x": -1.5,
+     "y": 0.0
+    },
+    {
+     "t": 0.0,
+     "type": "spawn",
+     "actor": 0,
+     "sheet": "warden",
+     "x": -7.0,
+     "y": 0.0,
+     "face": [
+      1,
+      0,
+      0
+     ],
+     "on": true
+    },
+    {
+     "t": 0.0,
+     "type": "spawn",
+     "actor": 1,
+     "sheet": "warden",
+     "x": -8.4,
+     "y": 0.7,
+     "face": [
+      1,
+      0,
+      0
+     ],
+     "on": true
+    },
+    {
+     "t": 0.0,
+     "type": "spawn",
+     "actor": 2,
+     "sheet": "warden",
+     "style": "silhouette",
+     "color": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "to": 0.55,
+     "x": -8.0,
+     "y": 1.6
+    },
+    {
+     "t": 0.0,
+     "type": "follow",
+     "actor": 2,
+     "target": 1,
+     "x": 0.5,
+     "y": 0.9
+    },
+    {
+     "t": 0.6,
+     "type": "text",
+     "text": "하르벤의 밤은 길었다.",
+     "dur": 3.0
+    },
+    {
+     "t": 0.8,
+     "type": "move",
+     "actor": 0,
+     "x": 1.5,
+     "y": 0.0,
+     "dur": 9.0
+    },
+    {
+     "t": 0.8,
+     "type": "move",
+     "actor": 1,
+     "x": 0.1,
+     "y": 0.7,
+     "dur": 9.0
+    },
+    {
+     "t": 0.8,
+     "type": "camera",
+     "x": 0.5,
+     "y": 0.3,
+     "dur": 9.0
+    },
+    {
+     "t": 3.8,
+     "type": "text",
+     "text": "경비대 둘이 등불을 들고 성벽 아래를 돌았다.",
+     "dur": 3.2
+    },
+    {
+     "t": 7.2,
+     "type": "text",
+     "text": "뒤에서 비친 동료의 그림자가 — 이상했다.",
+     "dur": 3.0
+    },
+    {
+     "t": 9.8,
+     "type": "follow",
+     "actor": 2,
+     "target": -1
+    },
+    {
+     "t": 9.8,
+     "type": "anim",
+     "actor": 2,
+     "anim": "attack",
+     "dur": 1.4
+    },
+    {
+     "t": 9.9,
+     "type": "face",
+     "actor": 0,
+     "face": [
+      -1,
+      0,
+      0
+     ]
+    },
+    {
+     "t": 9.9,
+     "type": "sound",
+     "sound": "glint"
+    },
+    {
+     "t": 10.2,
+     "type": "text",
+     "speaker": "경비병",
+     "text": "......방금, 네 그림자가—",
+     "dur": 2.4
+    },
+    {
+     "t": 11.4,
+     "type": "anim",
+     "actor": 2,
+     "anim": "idle",
+     "dur": 1.0
+    },
+    {
+     "t": 12.6,
+     "type": "text",
+     "text": "눈을 비볐다. 그림자는 다시 얌전했다. 고개를 갸웃했다.",
+     "dur": 3.0
+    },
+    {
+     "t": 15.0,
+     "type": "face",
+     "actor": 0,
+     "face": [
+      1,
+      0,
+      0
+     ]
+    },
+    {
+     "t": 15.0,
+     "type": "move",
+     "actor": 0,
+     "x": 2.6,
+     "y": 0.0,
+     "dur": 1.6
+    },
+    {
+     "t": 16.6,
+     "type": "remove",
+     "actor": 1
+    },
+    {
+     "t": 16.6,
+     "type": "remove",
+     "actor": 2
+    },
+    {
+     "t": 16.6,
+     "type": "spawn",
+     "actor": 3,
+     "sheet": "",
+     "x": 0.4,
+     "y": 0.9,
+     "on": true
+    },
+    {
+     "t": 17.0,
+     "type": "face",
+     "actor": 0,
+     "face": [
+      -1,
+      0,
+      0
+     ]
+    },
+    {
+     "t": 17.0,
+     "type": "text",
+     "text": "돌아봤을 때 동료는 없었다. 등불만 바닥에 굴러 있었다.",
+     "dur": 3.2
+    },
+    {
+     "t": 20.4,
+     "type": "text",
+     "speaker": "경비병",
+     "text": "어디 갔어? 장난치지 마!",
+     "dur": 2.2
+    },
+    {
+     "t": 22.4,
+     "type": "move",
+     "actor": 0,
+     "x": -2.5,
+     "y": -5.0,
+     "dur": 1.6
+    },
+    {
+     "t": 22.4,
+     "type": "text",
+     "text": "그는 동료를 찾아 골목으로 뛰어들었다.",
+     "dur": 2.6
+    },
+    {
+     "t": 24.0,
+     "type": "remove",
+     "actor": 0
+    },
+    {
+     "t": 24.2,
+     "type": "spawn",
+     "actor": 4,
+     "sheet": "warden",
+     "style": "silhouette",
+     "color": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "to": 0.0,
+     "x": 0.6,
+     "y": 1.5,
+     "face": [
+      -1,
+      0,
+      0
+     ]
+    },
+    {
+     "t": 24.2,
+     "type": "alpha",
+     "actor": 4,
+     "to": 0.85,
+     "dur": 1.6
+    },
+    {
+     "t": 24.6,
+     "type": "text",
+     "text": "그림자는 따라가지 않았다. 그 자리에 가만히 있었다.",
+     "dur": 3.0
+    },
+    {
+     "t": 27.8,
+     "type": "spawn",
+     "actor": 5,
+     "sheet": "blighted",
+     "style": "shadow",
+     "to": 0.0,
+     "x": 0.6,
+     "y": 1.5,
+     "face": [
+      -1,
+      0,
+      0
+     ]
+    },
+    {
+     "t": 27.8,
+     "type": "alpha",
+     "actor": 5,
+     "to": 1.0,
+     "dur": 1.4
+    },
+    {
+     "t": 27.8,
+     "type": "alpha",
+     "actor": 4,
+     "to": 0.0,
+     "dur": 1.4
+    },
+    {
+     "t": 27.8,
+     "type": "smoke",
+     "actor": 5
+    },
+    {
+     "t": 27.8,
+     "type": "sound",
+     "sound": "danger"
+    },
+    {
+     "t": 27.8,
+     "type": "shake",
+     "to": 0.25
+    },
+    {
+     "t": 28.0,
+     "type": "text",
+     "text": "그러다 땅을 짚고, 쑤욱 일어섰다.",
+     "dur": 2.6
+    },
+    {
+     "t": 30.6,
+     "type": "anim",
+     "actor": 5,
+     "anim": "skill:1",
+     "dur": 1.3
+    },
+    {
+     "t": 30.8,
+     "type": "text",
+     "text": "칼을 뽑고 — 골목으로 들어갔다.",
+     "dur": 2.4
+    },
+    {
+     "t": 32.2,
+     "type": "move",
+     "actor": 5,
+     "x": -2.5,
+     "y": -5.0,
+     "dur": 1.8
+    },
+    {
+     "t": 34.0,
+     "type": "remove",
+     "actor": 5
+    },
+    {
+     "t": 34.0,
+     "type": "remove",
+     "actor": 4
+    },
+    {
+     "t": 34.0,
+     "type": "remove",
+     "actor": 3
+    },
+    {
+     "t": 34.4,
+     "type": "flash",
+     "color": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "to": 0.5
+    },
+    {
+     "t": 34.4,
+     "type": "shake",
+     "to": 0.6
+    },
+    {
+     "t": 34.4,
+     "type": "sound",
+     "sound": "hurt"
+    },
+    {
+     "t": 34.6,
+     "type": "fade",
+     "from": 0.0,
+     "to": 1.0,
+     "dur": 1.2,
+     "color": [
+      0.12,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "t": 36.0,
+     "type": "title",
+     "text": "의문의 대량 살인",
+     "sub": "그날 밤 하르벤에서만 서른 명이 죽었다",
+     "dur": 3.6
+    },
+    {
+     "t": 39.8,
+     "type": "text",
+     "text": "왕은 왕국 최강자를 보냈다. 낮 동안 아무것도 찾지 못했다.",
+     "dur": 3.4
+    },
+    {
+     "t": 43.4,
+     "type": "text",
+     "text": "그리고 밤이 오자 — 그림자들이 일제히 일어섰다.",
+     "dur": 3.0
+    },
+    {
+     "t": 43.4,
+     "type": "shake",
+     "to": 0.4
+    },
+    {
+     "t": 43.4,
+     "type": "sound",
+     "sound": "danger"
+    },
+    {
+     "t": 46.6,
+     "type": "text",
+     "speaker": "최강자",
+     "text": "......나를 따라올 그림자는 없다. 전부 베어 주마.",
+     "dur": 3.0
+    },
+    {
+     "t": 49.6,
+     "type": "fade",
+     "from": 1.0,
+     "to": 0.0,
+     "dur": 1.2,
+     "color": [
+      0.12,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "t": 49.8,
+     "type": "letterbox",
+     "on": false
+    },
+    {
+     "t": 51.0,
+     "type": "end"
+    }
+   ]
+  },
+  {
+   "id": "knight_fall",
+   "anchor": "player",
+   "steps": [
+    {
+     "t": 0.0,
+     "type": "letterbox",
+     "on": true
+    },
+    {
+     "t": 0.0,
+     "type": "camera",
+     "x": 0.0,
+     "y": 0.0
+    },
+    {
+     "t": 0.2,
+     "type": "text",
+     "speaker": "최강자",
+     "text": "허억... 허억...",
+     "dur": 2.4
+    },
+    {
+     "t": 2.8,
+     "type": "text",
+     "speaker": "최강자",
+     "text": "이게... 대체 뭐란 말인가.",
+     "dur": 2.4
+    },
+    {
+     "t": 5.0,
+     "type": "spawn",
+     "actor": 0,
+     "sheet": "blighted",
+     "style": "silhouette",
+     "color": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "to": 0.0,
+     "x": -0.9,
+     "y": 0.9,
+     "face": [
+      1,
+      -1,
+      0
+     ]
+    },
+    {
+     "t": 5.0,
+     "type": "alpha",
+     "actor": 0,
+     "to": 0.95,
+     "dur": 1.6
+    },
+    {
+     "t": 5.0,
+     "type": "smoke",
+     "actor": 0
+    },
+    {
+     "t": 5.0,
+     "type": "sound",
+     "sound": "danger"
+    },
+    {
+     "t": 5.4,
+     "type": "text",
+     "text": "그의 발밑에서도 — 그림자가 일어섰다.",
+     "dur": 2.8
+    },
+    {
+     "t": 8.0,
+     "type": "anim",
+     "actor": 0,
+     "anim": "skill:4",
+     "dur": 1.8
+    },
+    {
+     "t": 9.0,
+     "type": "flash",
+     "color": [
+      1.0,
+      0.0,
+      0.0
+     ],
+     "to": 0.55
+    },
+    {
+     "t": 9.0,
+     "type": "shake",
+     "to": 0.8
+    },
+    {
+     "t": 9.0,
+     "type": "sound",
+     "sound": "hurt"
+    },
+    {
+     "t": 9.4,
+     "type": "fade",
+     "from": 0.0,
+     "to": 1.0,
+     "dur": 1.4,
+     "color": [
+      0.1,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "t": 10.9,
+     "type": "remove",
+     "actor": 0
+    },
+    {
+     "t": 11.0,
+     "type": "text",
+     "text": "왕국 최강자가 쓰러졌다.",
+     "dur": 3.0
+    },
+    {
+     "t": 14.2,
+     "type": "dark",
+     "on": true
+    },
+    {
+     "t": 14.2,
+     "type": "fade",
+     "from": 1.0,
+     "to": 0.0,
+     "dur": 0.8,
+     "color": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "t": 14.2,
+     "type": "spawn",
+     "actor": 1,
+     "sheet": "gatebreaker",
+     "style": "shadow",
+     "scale": 2.0,
+     "color": [
+      1.2,
+      0.6,
+      0.6
+     ],
+     "to": 0.0,
+     "x": 0.0,
+     "y": 0.0,
+     "face": [
+      1,
+      1,
+      0
+     ]
+    },
+    {
+     "t": 14.2,
+     "type": "alpha",
+     "actor": 1,
+     "to": 1.0,
+     "dur": 2.4
+    },
+    {
+     "t": 14.6,
+     "type": "sound",
+     "sound": "danger"
+    },
+    {
+     "t": 15.2,
+     "type": "shake",
+     "to": 0.5
+    },
+    {
+     "t": 14.8,
+     "type": "text",
+     "text": "그의 그림자는 그날 밤, 모든 그림자의 왕이 되었다.",
+     "dur": 3.6
+    },
+    {
+     "t": 18.6,
+     "type": "fade",
+     "from": 0.0,
+     "to": 1.0,
+     "dur": 1.0,
+     "color": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "t": 19.6,
+     "type": "remove",
+     "actor": 1
+    },
+    {
+     "t": 19.6,
+     "type": "dark",
+     "on": false
+    },
+    {
+     "t": 19.8,
+     "type": "title",
+     "text": "수백 년 뒤",
+     "sub": "그림자 전쟁은 아직 끝나지 않았다",
+     "dur": 3.6
+    },
+    {
+     "t": 23.6,
+     "type": "text",
+     "text": "당신은 하르벤 모험가 길드의 신참 용병이다.",
+     "dur": 3.0
+    },
+    {
+     "t": 26.6,
+     "type": "fade",
+     "from": 1.0,
+     "to": 0.0,
+     "dur": 1.2,
+     "color": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "t": 26.8,
+     "type": "letterbox",
+     "on": false
+    },
+    {
+     "t": 28.0,
+     "type": "end"
+    }
+   ]
+  },
+  {
+   "id": "legion_hint",
+   "anchor": "player",
+   "hide_player": true,
+   "steps": [
+    {
+     "t": 0.0,
+     "type": "letterbox",
+     "on": true
+    },
+    {
+     "t": 0.0,
+     "type": "fade",
+     "from": 0.0,
+     "to": 1.0,
+     "dur": 1.0,
+     "color": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "t": 0.0,
+     "type": "camera",
+     "x": 0.0,
+     "y": 0.0
+    },
+    {
+     "t": 1.0,
+     "type": "dark",
+     "on": true
+    },
+    {
+     "t": 1.0,
+     "type": "fade",
+     "from": 1.0,
+     "to": 0.0,
+     "dur": 0.8,
+     "color": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "t": 1.0,
+     "type": "spawn",
+     "actor": 0,
+     "sheet": "blighted",
+     "scale": 2.0,
+     "color": [
+      1.25,
+      1.05,
+      0.6
+     ],
+     "x": 0.0,
+     "y": 0.0,
+     "face": [
+      1,
+      1,
+      0
+     ]
+    },
+    {
+     "t": 1.0,
+     "type": "spawn",
+     "actor": 1,
+     "sheet": "blighted",
+     "style": "shadow",
+     "x": -3.5,
+     "y": -1.0,
+     "face": [
+      1,
+      0.3,
+      0
+     ]
+    },
+    {
+     "t": 1.0,
+     "type": "spawn",
+     "actor": 2,
+     "sheet": "blighted",
+     "style": "shadow",
+     "x": -3.0,
+     "y": 1.4,
+     "face": [
+      1,
+      -0.2,
+      0
+     ]
+    },
+    {
+     "t": 1.0,
+     "type": "spawn",
+     "actor": 3,
+     "sheet": "raider",
+     "x": 3.2,
+     "y": -1.2,
+     "face": [
+      -1,
+      0.3,
+      0
+     ]
+    },
+    {
+     "t": 1.0,
+     "type": "spawn",
+     "actor": 4,
+     "sheet": "raider",
+     "x": 3.4,
+     "y": 1.2,
+     "face": [
+      -1,
+      -0.2,
+      0
+     ]
+    },
+    {
+     "t": 1.4,
+     "type": "text",
+     "text": "어느 먼 왕국. 그림자 군단과 — 인간의 왕국이 함께 쳐들어왔다.",
+     "dur": 3.6
+    },
+    {
+     "t": 2.0,
+     "type": "move",
+     "actor": 1,
+     "x": -2.0,
+     "y": -0.6,
+     "dur": 3.0
+    },
+    {
+     "t": 2.0,
+     "type": "move",
+     "actor": 2,
+     "x": -1.8,
+     "y": 1.0,
+     "dur": 3.0
+    },
+    {
+     "t": 2.0,
+     "type": "move",
+     "actor": 3,
+     "x": 2.0,
+     "y": -0.8,
+     "dur": 3.0
+    },
+    {
+     "t": 2.0,
+     "type": "move",
+     "actor": 4,
+     "x": 2.1,
+     "y": 0.9,
+     "dur": 3.0
+    },
+    {
+     "t": 5.2,
+     "type": "text",
+     "speaker": "왕",
+     "text": "같은 인간이... 그림자를 몰아내지는 못할망정 침공을 와?",
+     "dur": 3.4
+    },
+    {
+     "t": 8.8,
+     "type": "text",
+     "speaker": "왕",
+     "text": "탐욕에 눈이 멀었구나. 인류애 따위... 이제 없다.",
+     "dur": 3.2
+    },
+    {
+     "t": 12.2,
+     "type": "spawn",
+     "actor": 5,
+     "sheet": "gatebreaker",
+     "style": "shadow",
+     "scale": 2.0,
+     "color": [
+      1.7,
+      0.3,
+      0.35
+     ],
+     "to": 0.0,
+     "x": -2.0,
+     "y": -2.0,
+     "face": [
+      1,
+      1,
+      0
+     ]
+    },
+    {
+     "t": 12.0,
+     "type": "camera",
+     "x": -1.1,
+     "y": -1.1,
+     "dur": 1.6
+    },
+    {
+     "t": 12.2,
+     "type": "alpha",
+     "actor": 5,
+     "to": 1.0,
+     "dur": 1.8
+    },
+    {
+     "t": 12.4,
+     "type": "sound",
+     "sound": "danger"
+    },
+    {
+     "t": 12.6,
+     "type": "text",
+     "text": "왕은 그림자의 왕과 계약했다.",
+     "dur": 2.8
+    },
+    {
+     "t": 15.4,
+     "type": "tint",
+     "actor": 0,
+     "style": "shadow",
+     "color": [
+      1.4,
+      0.5,
+      0.6
+     ]
+    },
+    {
+     "t": 15.4,
+     "type": "flash",
+     "color": [
+      0.7,
+      0.2,
+      1.0
+     ],
+     "to": 0.5
+    },
+    {
+     "t": 15.4,
+     "type": "shake",
+     "to": 0.6
+    },
+    {
+     "t": 15.6,
+     "type": "anim",
+     "actor": 0,
+     "anim": "skill:4",
+     "dur": 1.8
+    },
+    {
+     "t": 16.4,
+     "type": "smoke",
+     "actor": 3
+    },
+    {
+     "t": 16.4,
+     "type": "smoke",
+     "actor": 4
+    },
+    {
+     "t": 16.4,
+     "type": "remove",
+     "actor": 3
+    },
+    {
+     "t": 16.4,
+     "type": "remove",
+     "actor": 4
+    },
+    {
+     "t": 16.4,
+     "type": "sound",
+     "sound": "hurt"
+    },
+    {
+     "t": 16.6,
+     "type": "text",
+     "text": "그리고 침공한 자들을 모두 도륙냈다.",
+     "dur": 2.8
+    },
+    {
+     "t": 19.6,
+     "type": "text",
+     "speaker": "왕",
+     "text": "나는 제1군단장. 그림자의 칼이다.",
+     "dur": 3.2
+    },
+    {
+     "t": 22.8,
+     "type": "fade",
+     "from": 0.0,
+     "to": 1.0,
+     "dur": 0.8,
+     "color": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "t": 23.6,
+     "type": "remove",
+     "actor": 0
+    },
+    {
+     "t": 23.6,
+     "type": "remove",
+     "actor": 1
+    },
+    {
+     "t": 23.6,
+     "type": "remove",
+     "actor": 2
+    },
+    {
+     "t": 23.6,
+     "type": "remove",
+     "actor": 5
+    },
+    {
+     "t": 23.6,
+     "type": "dark",
+     "on": false
+    },
+    {
+     "t": 23.8,
+     "type": "title",
+     "text": "제1군단장",
+     "sub": "망국의 왕 — 언젠가 그 이름 앞에 서게 될 것이다",
+     "dur": 3.8
+    },
+    {
+     "t": 27.6,
+     "type": "fade",
+     "from": 1.0,
+     "to": 0.0,
+     "dur": 1.0,
+     "color": [
+      0.0,
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "t": 27.8,
+     "type": "letterbox",
+     "on": false
+    },
+    {
+     "t": 28.8,
+     "type": "end"
+    }
+   ]
+  }
+ ]
+}

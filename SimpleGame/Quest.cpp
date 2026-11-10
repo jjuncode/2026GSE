@@ -10,8 +10,10 @@
 #include "Monster.h"
 #include "NavGrid.h"
 #include "Player.h"
+#include "Cinematic.h"
 #include "Rank.h"
 #include "Renderer.h"
+#include "Story.h"
 #include "Text.h"
 #include "UiDraw.h"
 #include "Village.h"
@@ -737,6 +739,37 @@ void NotifyQuestKill(int32 kind, bool is_elite, bool is_boss, int32 level)
 	}
 }
 
+void StartStoryQuest(int32 step)
+{
+	const std::vector<StoryStep>& steps = GetStorySteps();
+	if (step < 0 || step >= static_cast<int32>(steps.size()))
+	{
+		return;
+	}
+
+	const StoryStep& story = steps[static_cast<size_t>(step)];
+	std::mt19937 rng(g_seed ^ static_cast<uint32>(step * 2654435761u));
+
+	Quest quest;
+	if (MakeQuest(story.quest, ZONE_CITADEL, &rng, &quest) == false)
+	{
+		std::cout << "[ Quest - StartStoryQuest ] : cannot make step " << step << "\n";
+		return;
+	}
+
+	quest.is_story = true;
+	quest.story_step = step;
+	quest.state = QUEST_STATE_ACTIVE;
+	g_active.insert(g_active.begin(), quest);
+	g_tracked_serial = quest.serial;
+	UpdateLiveProgress();
+
+	QueueNarration(story.intro);
+	AddDamageText(GetPlayer().m_pos, NextBannerLift(), L"메인  " + quest.title, DAMAGE_STYLE_BANNER_GOOD);
+
+	std::cout << "[ Quest - StartStoryQuest ] : step " << step << " goal " << quest.goal << "\n";
+}
+
 void NotifyQuestInstanceClear(int32 instance)
 {
 	for (Quest& quest : g_active)
@@ -783,7 +816,17 @@ int32 AcceptBoardQuest(int32 village, int32 index)
 		return QUEST_ACCEPT_RANK;
 	}
 
-	if (static_cast<int32>(g_active.size()) >= GetQuestConfig().max_active)
+	// 메인 퀘스트는 진행 칸을 안 먹는다. 의뢰를 고르다 이야기가 막히면 안 된다
+	int32 side_count = 0;
+	for (const Quest& quest : g_active)
+	{
+		if (quest.is_story == false)
+		{
+			side_count += 1;
+		}
+	}
+
+	if (side_count >= GetQuestConfig().max_active)
 	{
 		return QUEST_ACCEPT_FULL;
 	}
@@ -844,10 +887,19 @@ int32 ReportQuestsAt(int32 village)
 			AddRankPoints(GetRankConfig().tier_points[static_cast<size_t>(quest.tier)]);
 		}
 
+		const bool is_story = quest.is_story;
+		const int32 story_step = quest.story_step;
+
 		std::cout << "[ Quest - ReportQuestsAt ] : village " << village << " serial " << quest.serial << " gold " << quest.reward.gold << " exp " << quest.reward.exp << "\n";
 
 		g_active.erase(g_active.begin() + static_cast<std::ptrdiff_t>(index));
 		reported += 1;
+
+		// 다음 단계는 지운 뒤에 붙인다. 붙이는 동안 목록이 늘어 index 가 어긋난다
+		if (is_story)
+		{
+			OnStoryStepReported(story_step);
+		}
 	}
 
 	if (reported > 0)
@@ -955,6 +1007,11 @@ std::wstring DescribeQuestGoal(const Quest& quest, bool with_progress)
 
 std::wstring GetQuestTagName(const Quest& quest)
 {
+	if (quest.is_story)
+	{
+		return L"메인";
+	}
+
 	if (quest.is_exam)
 	{
 		return L"승급";
@@ -1168,6 +1225,14 @@ void DrawQuestTracker(Renderer* renderer, bool hidden)
 		float tier_g = 0.f;
 		float tier_b = 0.f;
 		GetQuestTierColor(quest.tier, &tier_r, &tier_g, &tier_b);
+
+		// 메인 퀘스트는 금빛. 의뢰 사이에서 이야기 줄기가 먼저 읽혀야 한다
+		if (quest.is_story)
+		{
+			tier_r = 1.f;
+			tier_g = 0.8f;
+			tier_b = 0.3f;
+		}
 
 		float title_r = 0.95f;
 		float title_g = 0.9f;
