@@ -230,6 +230,7 @@ constexpr int32 QUEST_GOAL_ELITE = 1;	// 정예 아무거나 N 마리
 constexpr int32 QUEST_GOAL_DELIVER = 2;	// 아이템 N 개를 게시판에 맡긴다
 constexpr int32 QUEST_GOAL_SCOUT = 3;	// 그 거점까지 가 본다
 constexpr int32 QUEST_GOAL_BOSS = 4;
+constexpr int32 QUEST_GOAL_DUNGEON = 5;	// 그 인스턴스를 끝까지 비운다
 
 struct QuestReward
 {
@@ -246,6 +247,7 @@ struct QuestTemplate
 	int32 monster_type = MONSTER_TYPE_NONE;	// HUNT · BOSS
 	int32 item_id = ITEM_ID_NONE;	// DELIVER
 	int32 site_kind = 0;	// SCOUT ( SITE_ )
+	int32 target = 0;	// DUNGEON - 인스턴스 번호
 	int32 count_min = 1;
 	int32 count_max = 1;
 	int32 level = 1;	// 권장 레벨. 사냥 의뢰는 사냥터 몬스터 레벨로 덮는다
@@ -280,6 +282,36 @@ struct RankConfig
 	std::vector<RankData> ranks;
 	std::array<int32, QUEST_TIER_COUNT> tier_points = { 10, 25, 60, 150 };
 	std::array<int32, QUEST_TIER_COUNT> tier_min_rank = { 0, 0, 1, 2 };	// 이 등급부터 받는다
+};
+
+constexpr int32 INSTANCE_KIND_DUNGEON = 0;
+constexpr int32 INSTANCE_KIND_RAID = 1;
+
+struct InstanceSpawn
+{
+	int32 monster_type = MONSTER_TYPE_NONE;
+	int32 count = 1;
+};
+
+struct InstanceRoom
+{
+	std::vector<InstanceSpawn> spawns;
+};
+
+// 던전 · 레이드. 구역 구석을 막힌 방 여럿으로 파고, 방을 비울 때마다 다음 문이 열린다
+struct InstanceData
+{
+	std::string id;
+	std::wstring name;
+	std::wstring desc;
+	int32 kind = INSTANCE_KIND_DUNGEON;
+	int32 min_rank = 0;
+	int32 entrance_site = 2;	// SITE_ 번호. 가장 가까운 그 거점 곁에 입구
+	int32 room_width = 16;	// 칸
+	int32 room_height = 18;
+	std::vector<InstanceRoom> rooms;
+	MonsterRewardData reward;
+	int32 rank_points = 0;
 };
 
 struct ShopData
@@ -395,6 +427,7 @@ const ShopData& GetShopData(int32 kind);
 const QuestConfig& GetQuestConfig();
 const std::vector<QuestTemplate>& GetQuestTemplates();
 const RankConfig& GetRankConfig();
+const std::vector<InstanceData>& GetInstanceDatas();
 
 // 아이템 그림판을 읽은 뒤 부른다. "ext:" 아이콘을 그림 번호로 잇는다
 void BindItemArt();

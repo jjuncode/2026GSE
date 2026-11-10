@@ -46,6 +46,7 @@ struct Quest
 void BuildQuests(const ZoneLayout& layout);
 void UpdateQuests(float real_seconds);
 void NotifyQuestKill(int32 kind, bool is_elite, bool is_boss, int32 level);
+void NotifyQuestInstanceClear(int32 instance);
 
 // 게시판
 const std::vector<Quest>& GetBoardQuests(int32 village);

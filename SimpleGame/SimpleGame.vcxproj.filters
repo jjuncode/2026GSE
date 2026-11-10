@@ -57,6 +57,9 @@
     <ClInclude Include="Board.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="Instance.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
     <ClInclude Include="Rank.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -225,6 +228,9 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="Board.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Instance.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="Rank.cpp">

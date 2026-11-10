@@ -19,7 +19,8 @@ constexpr int32 MONSTER_SHADOW_DEVOURER = 6;	// 정예
 constexpr int32 MONSTER_SHADOW_KNIGHT = 7;	// 정예. 연속 베기
 constexpr int32 MONSTER_SHADOW_COLOSSUS = 8;	// 정예. 성문파쇄자의 그림자
 constexpr int32 MONSTER_SHADOW_COMMANDER = 9;	// 엘리트 보스. 그림자 기사단장 - 페이즈 패턴 · 슈퍼아머 게이지
-constexpr int32 MONSTER_KIND_COUNT = 10;
+constexpr int32 MONSTER_SHADOW_WARDEN = 10;	// 던전 보스. 그림자 감시자 - 페이즈 셋
+constexpr int32 MONSTER_KIND_COUNT = 11;
 
 // NPC 가 잡았을 때 받는 것
 struct MonsterReward
@@ -41,7 +42,10 @@ struct MonsterFocus
 };
 
 void ClearMonsters();
-void AddMonster(int32 kind, const WorldPos& pos, int32 band, bool is_elite);
+int32 AddMonster(int32 kind, const WorldPos& pos, int32 band, bool is_elite);	// 번호
+
+// 던전 · 레이드 몬스터. 죽어도 안 살아나고, 꺼 두면 세상에서 빠져 있다가 켜는 순간 처음 자리에서 일어선다
+void SetMonsterInstanced(int32 index, bool active);
 
 // 보스는 자리만 잡아 두고, 해금 조건을 채울 때 불러낸다
 void SetBossSpawnPoint(const WorldPos& pos);

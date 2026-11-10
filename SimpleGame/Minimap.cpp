@@ -3,6 +3,7 @@
 #include "Monster.h"
 #include "Npc.h"
 #include "NpcData.h"
+#include "Instance.h"
 #include "Player.h"
 #include "Quest.h"
 #include "Renderer.h"
@@ -454,6 +455,24 @@ void DrawWorldMap(Renderer* renderer)
 
 		ForEachLiveMonster(DrawMonsterDot, &context);
 		ForEachLiveNpc(DrawNpcDot, &context);
+	}
+
+	// 던전 · 레이드 입구 균열
+	for (int32 index = 0; index < GetInstanceCount(); ++index)
+	{
+		WorldPos rift;
+		std::wstring rift_name;
+		if (GetInstanceEntrance(index, &rift, &rift_name) == false)
+		{
+			continue;
+		}
+
+		float rift_x = 0.f;
+		float rift_y = 0.f;
+		ProjectWorld(view, rift, &rift_x, &rift_y);
+		renderer->DrawSolidDiamond(rift_x, rift_y, 0.42f, 0.02f, 0.01f, 0.04f, 1.f);
+		renderer->DrawSolidDiamond(rift_x, rift_y, 0.3f, 0.75f, 0.35f, 1.f, 1.f);
+		DrawStringShadow(renderer, rift_name, rift_x, rift_y + 26.f, TEXT_ALIGN_CENTER, 0.8f, 0.6f, 1.f, 0.95f);
 	}
 
 	// 엘리트 보스 자리. 몬스터는 숨기지만 이름 붙은 적은 찾아갈 목적지다

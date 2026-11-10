@@ -12,6 +12,7 @@
 #include "Ground.h"
 #include "HouseArt.h"
 #include "Input.h"
+#include "Instance.h"
 #include "Minimap.h"
 #include "Monitor.h"
 #include "Monster.h"
@@ -973,6 +974,9 @@ namespace
 	{
 		GenerateZone(seed, &g_zone);
 
+		// 던전 투기장을 먼저 판다. 칸 · 무리 · 거점을 고치니 다른 것이 서기 전이어야 한다
+		CarveInstances(&g_zone);
+
 		ClearWorld();
 		ClearMonsters();
 		ClearDrops();
@@ -1012,6 +1016,7 @@ namespace
 
 		BuildSites();
 		BuildMonsters();
+		BuildInstances();
 
 		const WorldPos spawn = ZoneTileToWorld(g_zone.spawn.x, g_zone.spawn.y, 0.5f, 0.5f);
 
@@ -1556,6 +1561,7 @@ void UpdateScene(float real_seconds)
 	UpdateMonsters(world_seconds);
 	UpdateNpcs(world_seconds);
 	UpdateDrops(world_seconds);
+	UpdateInstances(real_seconds);
 	UpdateQuests(real_seconds);
 	UpdateFloatingTexts(real_seconds);
 
@@ -1589,6 +1595,7 @@ void DrawScene(Renderer* renderer)
 	DrawFeelGround(renderer, camera);
 	DrawAimMarker(renderer, camera);
 	DrawQuestGround(renderer, camera);
+	DrawInstanceGround(renderer, camera);
 
 	BeginSceneGraph();
 	AddDecorActors(camera);
@@ -1623,6 +1630,7 @@ void DrawSceneOverlay(Renderer* renderer)
 	DrawShopPrompts(renderer, camera);
 	DrawBossMarker(renderer, camera);
 	DrawQuestOverlay(renderer, camera);
+	DrawInstanceOverlay(renderer, camera);
 	DrawFloatingTexts(renderer, camera);
 	DrawVillageBanner(renderer);
 
@@ -1659,6 +1667,11 @@ void Interact()
 	if (PickupNearestDrop())
 	{
 		g_interact_timer = PICKUP_REPEAT_SEC;
+		return;
+	}
+
+	if (InteractInstance())
+	{
 		return;
 	}
 

@@ -38,6 +38,7 @@ namespace
 	QuestConfig g_quest_config;
 	std::vector<QuestTemplate> g_quest_templates;
 	RankConfig g_rank_config;
+	std::vector<InstanceData> g_instances;
 
 	const std::vector<int32> EMPTY_LINKS;
 
@@ -957,6 +958,11 @@ namespace
 			return QUEST_GOAL_BOSS;
 		}
 
+		if (text == "DUNGEON")
+		{
+			return QUEST_GOAL_DUNGEON;
+		}
+
 		return QUEST_GOAL_HUNT;
 	}
 
@@ -986,6 +992,7 @@ namespace
 		quest.site_kind = ParseSiteKind(ReadString(entry, "site"));
 		quest.level = ReadInt(entry, "level", 1);
 		quest.level_bonus = ReadInt(entry, "level_bonus", 0);
+		quest.target = ReadInt(entry, "target", 0);
 		quest.title = Utf8ToWide(ReadString(entry, "title"));
 		quest.desc = Utf8ToWide(ReadString(entry, "desc"));
 
@@ -1040,6 +1047,88 @@ namespace
 		for (const Json& entry : root["templates"])
 		{
 			g_quest_templates.push_back(ReadQuestTemplate(entry));
+		}
+	}
+
+	MonsterRewardData ReadRewardData(const Json& reward)
+	{
+		MonsterRewardData data;
+		data.exp = ReadInt(reward, "exp", 0);
+
+		const std::vector<int32> gold = ReadIntArray(reward, "gold");
+		if (gold.size() >= 2)
+		{
+			data.gold_min = gold[0];
+			data.gold_max = gold[1];
+		}
+
+		if (reward.contains("drops") && reward["drops"].is_array())
+		{
+			for (const Json& drop_node : reward["drops"])
+			{
+				DropInfo drop;
+				drop.item_id = ReadInt(drop_node, "item_id", ITEM_ID_NONE);
+				drop.rate = ReadFloat(drop_node, "rate", 0.f);
+				drop.min_count = ReadInt(drop_node, "min_count", 1);
+				drop.max_count = ReadInt(drop_node, "max_count", drop.min_count);
+				data.drops.push_back(drop);
+			}
+		}
+
+		return data;
+	}
+
+	void LoadInstances()
+	{
+		Json root;
+		if (ReadJson("InstanceData.json", &root) == false || root.contains("instances") == false)
+		{
+			return;
+		}
+
+		for (const Json& entry : root["instances"])
+		{
+			InstanceData instance;
+			instance.id = ReadString(entry, "id");
+			instance.name = Utf8ToWide(ReadString(entry, "name"));
+			instance.desc = Utf8ToWide(ReadString(entry, "desc"));
+			instance.min_rank = ReadInt(entry, "min_rank", 0);
+			instance.entrance_site = ParseSiteKind(ReadString(entry, "entrance"));
+			instance.room_width = ReadInt(entry, "room_width", instance.room_width);
+			instance.room_height = ReadInt(entry, "room_height", instance.room_height);
+			instance.rank_points = ReadInt(entry, "rank_points", 0);
+
+			if (ReadString(entry, "kind") == "RAID")
+			{
+				instance.kind = INSTANCE_KIND_RAID;
+			}
+
+			if (entry.contains("rooms") && entry["rooms"].is_array())
+			{
+				for (const Json& room_node : entry["rooms"])
+				{
+					InstanceRoom room;
+					if (room_node.contains("spawns") && room_node["spawns"].is_array())
+					{
+						for (const Json& spawn_node : room_node["spawns"])
+						{
+							InstanceSpawn spawn;
+							spawn.monster_type = ReadInt(spawn_node, "monster", MONSTER_TYPE_NONE);
+							spawn.count = ReadInt(spawn_node, "count", 1);
+							room.spawns.push_back(spawn);
+						}
+					}
+
+					instance.rooms.push_back(room);
+				}
+			}
+
+			if (entry.contains("reward"))
+			{
+				instance.reward = ReadRewardData(entry["reward"]);
+			}
+
+			g_instances.push_back(instance);
 		}
 	}
 
@@ -1138,6 +1227,7 @@ bool LoadGameData()
 	LoadShops();
 	LoadQuests();
 	LoadRanks();
+	LoadInstances();
 	BuildComboChain();
 
 	if (g_skills.empty() || g_items.empty() || g_monsters.empty())
@@ -1221,6 +1311,11 @@ const std::vector<QuestTemplate>& GetQuestTemplates()
 const RankConfig& GetRankConfig()
 {
 	return g_rank_config;
+}
+
+const std::vector<InstanceData>& GetInstanceDatas()
+{
+	return g_instances;
 }
 
 void BindItemArt()

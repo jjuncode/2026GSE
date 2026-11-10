@@ -1,0 +1,90 @@
+{
+  "instances": [
+    {
+      "id": "shadow_rift",
+      "name": "그림자 균열",
+      "kind": "DUNGEON",
+      "min_rank": 1,
+      "entrance": "OUTPOST",
+      "desc": "초소 곁에 벌어진 그림자의 틈. 방 셋을 비우면 균열이 닫힌다",
+      "room_width": 16,
+      "room_height": 18,
+      "rooms": [
+        {
+          "spawns": [
+            {
+              "monster": 5,
+              "count": 4
+            },
+            {
+              "monster": 6,
+              "count": 2
+            }
+          ]
+        },
+        {
+          "spawns": [
+            {
+              "monster": 8,
+              "count": 1
+            },
+            {
+              "monster": 5,
+              "count": 3
+            },
+            {
+              "monster": 6,
+              "count": 2
+            }
+          ]
+        },
+        {
+          "spawns": [
+            {
+              "monster": 11,
+              "count": 1
+            },
+            {
+              "monster": 5,
+              "count": 2
+            }
+          ]
+        }
+      ],
+      "reward": {
+        "exp": 1500,
+        "gold": [
+          700,
+          1000
+        ],
+        "drops": [
+          {
+            "item_id": 31,
+            "rate": 100.0,
+            "min_count": 6,
+            "max_count": 10
+          },
+          {
+            "item_id": 32,
+            "rate": 100.0,
+            "min_count": 2,
+            "max_count": 4
+          },
+          {
+            "item_id": 2,
+            "rate": 100.0,
+            "min_count": 8,
+            "max_count": 12
+          },
+          {
+            "item_id": 22,
+            "rate": 25.0,
+            "min_count": 1,
+            "max_count": 1
+          }
+        ]
+      },
+      "rank_points": 80
+    }
+  ]
+}

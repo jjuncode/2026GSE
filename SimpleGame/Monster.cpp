@@ -288,6 +288,7 @@ namespace
 		float m_walk_distance = 0.f;
 		float m_idle_timer = 0.f;
 		bool m_killed_by_player = false;
+		bool m_instanced = false;	// 던전 몬스터. 안 살아난다
 
 		// 엘리트 보스
 		int32 m_phase = 0;
@@ -1326,8 +1327,8 @@ namespace
 			return;
 		}
 
-		// 보스는 안 살아난다
-		if (m_data->respawn_sec <= 0.f)
+		// 보스와 던전 몬스터는 안 살아난다
+		if (m_data->respawn_sec <= 0.f || m_instanced)
 		{
 			return;
 		}
@@ -1612,14 +1613,42 @@ void ClearMonsters()
 	g_focus_timer = 0.f;
 }
 
-void AddMonster(int32 kind, const WorldPos& pos, int32 band, bool is_elite)
+int32 AddMonster(int32 kind, const WorldPos& pos, int32 band, bool is_elite)
 {
+	const int32 index = static_cast<int32>(g_monsters.size());
+
 	std::unique_ptr<Monster> monster = std::make_unique<Monster>();
-	monster->m_index = static_cast<int32>(g_monsters.size());
+	monster->m_index = index;
 	monster->Setup(kind, pos, band, is_elite);
 
 	RegisterCreature(monster.get());
 	g_monsters.push_back(std::move(monster));
+
+	return index;
+}
+
+void SetMonsterInstanced(int32 index, bool active)
+{
+	Monster* monster = GetMonsterAt(index);
+	if (monster == nullptr)
+	{
+		return;
+	}
+
+	monster->m_instanced = true;
+
+	if (active)
+	{
+		monster->Revive();
+		return;
+	}
+
+	// 판정 목록에선 죽은 것으로 걸러지고 그림도 안 나온다
+	monster->CancelCast();
+	monster->m_action = ACTION_DEATH;
+	monster->m_hp = 0;
+	monster->m_corpse_timer = 0.f;
+	monster->m_in_world = false;
 }
 
 void SetBossSpawnPoint(const WorldPos& pos)

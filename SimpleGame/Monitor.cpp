@@ -520,7 +520,11 @@ namespace
 			{
 				SiteTally& tally = snapshot->tallies[static_cast<size_t>(region)];
 				tally.monster_here += 1;
-				tally.monster_kinds[static_cast<size_t>(report.kind)] += 1;
+				// 데이터에 몬스터가 늘었는데 상수를 안 올리면 배열 밖에 쓴다
+				if (report.kind >= 0 && report.kind < MONSTER_KIND_COUNT)
+				{
+					tally.monster_kinds[static_cast<size_t>(report.kind)] += 1;
+				}
 
 				if (report.is_elite)
 				{

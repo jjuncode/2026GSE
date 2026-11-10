@@ -1145,6 +1145,15 @@ void PlacePlayer(const WorldPos& spawn_pos)
 	RegisterCreature(&g_player);
 }
 
+void TeleportPlayer(const WorldPos& pos)
+{
+	g_player.m_pos = pos;
+	g_player.CancelCast();
+	g_player.StopMotion();
+	g_player.m_combo_step = -1;
+	g_player.m_attack_buffer = 0.f;
+}
+
 const Player& GetPlayer()
 {
 	return g_player;

@@ -4,6 +4,7 @@
 #include "GameConfig.h"
 #include "GameTime.h"
 #include "Input.h"
+#include "Instance.h"
 #include "Minimap.h"
 #include "Monster.h"
 #include "NpcData.h"
@@ -1161,6 +1162,128 @@ void UpdateAutoTest(float real_seconds)
 			{
 				CloseTopWindow();
 			}
+		}
+
+		return;
+	}
+
+	if (g_mode == "dungeon")
+	{
+		// 실버로 올려 균열에 들어가 자동 전투로 방 셋을 비운다. 다음 방은 가장 가까운 적 쪽으로 걸어간다
+		Player& player = MutablePlayer();
+
+		if (g_spawn_stage == 0 && g_time >= 0.5f)
+		{
+			g_spawn_stage = 1;
+			UseBagItem(0);
+			player.AddExp(5000);
+			for (int32 skill_id : { 106, 107, 108, 109 })
+			{
+				player.TryUnlockSkill(skill_id);
+			}
+
+			WorldPos rift;
+			std::wstring name;
+			if (GetInstanceEntrance(0, &rift, &name))
+			{
+				PlacePlayer(rift);
+			}
+
+			// 브론즈로 먼저 두드려 막히는지 본다
+			const bool entered_as_bronze = InteractInstance() && IsPlayerInInstance();
+			std::cout << "[ AutoTest ] : bronze entered " << entered_as_bronze << "\n";
+			PromotePlayerRank();
+		}
+
+		// 레벨업이 능력치를 다시 계산하니 매 틱 다시 건다
+		if (g_spawn_stage >= 1)
+		{
+			player.m_stat.max_hp = 99999;
+			player.m_hp = 99999;
+			player.m_stat.attack = 120;
+		}
+
+		if (g_spawn_stage == 1 && g_time >= 1.f)
+		{
+			g_spawn_stage = 2;
+			InteractInstance();
+			std::cout << "[ AutoTest ] : silver entered " << IsPlayerInInstance() << "\n";
+		}
+
+		if (g_spawn_stage == 2 && g_time >= 1.3f)
+		{
+			g_spawn_stage = 3;
+			Capture("dungeon_enter");
+		}
+
+		// 다 비우면 출구로 나간다
+		WorldPos exit_guide;
+		if (g_spawn_stage == 3 && GetInstanceGuide(&exit_guide) && GetRankPoints() > 0)
+		{
+			const float exit_x = GetTileDistanceX(player.m_pos, exit_guide);
+			const float exit_y = GetTileDistanceY(player.m_pos, exit_guide);
+			if (exit_x * exit_x + exit_y * exit_y < 2.f)
+			{
+				g_spawn_stage = 4;
+				Capture("dungeon_cleared");
+			}
+		}
+
+		if (g_spawn_stage == 4 && g_time > 0.f)
+		{
+			g_spawn_stage = 5;
+			InteractInstance();
+			std::cout << "[ AutoTest ] : left dungeon inside " << IsPlayerInInstance() << "\n";
+		}
+
+		if (g_spawn_stage >= 2 && g_time < 80.f)
+		{
+			UpdateCombat(real_seconds);
+
+			float distance = 0.f;
+			Creature* target = FindNearestMonster(&distance);
+			WorldPos guide;
+			if (GetInstanceGuide(&guide) && player.m_action == ACTION_NORMAL)
+			{
+				// 비운 방에선 금빛 문을 지나 다음 방 안쪽까지 걷는다
+				WorldPos beyond = guide;
+				const float guide_x = GetTileDistanceX(player.m_pos, guide);
+				const float guide_y = GetTileDistanceY(player.m_pos, guide);
+				if (guide_x * guide_x + guide_y * guide_y < 1.f)
+				{
+					MoveWorldPos(&beyond, 4.f, 0.f);
+				}
+				const float delta_x = GetTileDistanceX(player.m_pos, beyond);
+				const float delta_y = GetTileDistanceY(player.m_pos, beyond);
+				SetPlayerMoveInput(delta_x - delta_y, -(delta_x + delta_y) * 0.5f);
+			}
+			else if (target != nullptr && distance > 1.8f && distance < 40.f && player.m_action == ACTION_NORMAL)
+			{
+				const float delta_x = GetTileDistanceX(player.m_pos, target->m_pos);
+				const float delta_y = GetTileDistanceY(player.m_pos, target->m_pos);
+				SetPlayerMoveInput(delta_x - delta_y, -(delta_x + delta_y) * 0.5f);
+			}
+			else if (target != nullptr && distance <= 2.4f && target->IsAttacking() == false && player.m_action == ACTION_NORMAL)
+			{
+				PressPlayerAttack();
+			}
+		}
+
+		g_log_timer -= real_seconds;
+		if (g_log_timer <= 0.f)
+		{
+			g_log_timer = 2.f;
+			float distance = 0.f;
+			FindNearestMonster(&distance);
+			std::cout << "[ AutoTest ] : t " << g_time << " inside " << IsPlayerInInstance() << " nearest " << distance << " lv " << player.m_level << " rank " << GetPlayerRank() << " points " << GetRankPoints() << "\n";
+		}
+
+		g_gallery_timer -= real_seconds;
+		if (g_time > 3.f && g_gallery_timer <= 0.f)
+		{
+			g_gallery_timer = 6.f;
+			Capture("dungeon_" + std::to_string(g_gallery_count));
+			g_gallery_count += 1;
 		}
 
 		return;

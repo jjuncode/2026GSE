@@ -75,6 +75,7 @@ public:
 
 void InitPlayer(const WorldPos& spawn_pos);
 void PlacePlayer(const WorldPos& spawn_pos);	// 성장은 두고 자리만 옮긴다
+void TeleportPlayer(const WorldPos& pos);	// 일어설 자리( 성채 )는 두고 몸만 옮긴다. 던전 드나들기
 const Player& GetPlayer();
 Player& MutablePlayer();
 bool IsPlayerDead();

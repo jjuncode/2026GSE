@@ -4,6 +4,7 @@
 #include "Drop.h"
 #include "FloatingText.h"
 #include "GameConfig.h"
+#include "Instance.h"
 #include "Inventory.h"
 #include "Minimap.h"
 #include "Monster.h"
@@ -343,6 +344,21 @@ namespace
 				quest->place = g_boss_pos;
 				quest->has_place = true;
 				quest->place_name = DescribePlace(village, quest->place, L"둥지");
+				break;
+			}
+			case QUEST_GOAL_DUNGEON:
+			{
+				quest->need = 1;
+				quest->target = source.target;
+
+				std::wstring name;
+				if (GetInstanceEntrance(source.target, &quest->place, &name) == false)
+				{
+					return false;
+				}
+
+				quest->has_place = true;
+				quest->place_name = name + L" 입구";
 				break;
 			}
 			case QUEST_GOAL_SCOUT:
@@ -721,6 +737,18 @@ void NotifyQuestKill(int32 kind, bool is_elite, bool is_boss, int32 level)
 	}
 }
 
+void NotifyQuestInstanceClear(int32 instance)
+{
+	for (Quest& quest : g_active)
+	{
+		if (quest.state == QUEST_STATE_ACTIVE && quest.goal == QUEST_GOAL_DUNGEON && quest.target == instance)
+		{
+			quest.progress = quest.need;
+			CompleteGoal(&quest);
+		}
+	}
+}
+
 const std::vector<Quest>& GetBoardQuests(int32 village)
 {
 	if (village < 0 || village >= static_cast<int32>(g_boards.size()))
@@ -906,6 +934,10 @@ std::wstring DescribeQuestGoal(const Quest& quest, bool with_progress)
 		{
 			text = GetItemData(quest.target).name + L" 납품";
 			break;
+		}
+		case QUEST_GOAL_DUNGEON:
+		{
+			return quest.place_name.substr(0, quest.place_name.size() - 3) + L" 정화";
 		}
 		default:
 		{
